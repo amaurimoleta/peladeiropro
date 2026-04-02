@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
       "Bash(export PATH=\"/usr/local/bin:$PATH\")",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(npx shadcn@latest init -d --style default --base-color neutral)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init -d)"
     ]
   }
 }
