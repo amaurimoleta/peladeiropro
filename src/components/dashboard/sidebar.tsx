@@ -1,0 +1,126 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  UserPlus,
+  Receipt,
+  Trophy,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+} from 'lucide-react'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Logo } from '@/components/shared/logo'
+
+const navItems = [
+  { href: '', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/members', icon: Users, label: 'Membros' },
+  { href: '/payments', icon: CreditCard, label: 'Mensalidades' },
+  { href: '/guests', icon: UserPlus, label: 'Avulsos' },
+  { href: '/expenses', icon: Receipt, label: 'Despesas' },
+  { href: '/ranking', icon: Trophy, label: 'Ranking' },
+  { href: '/settings', icon: Settings, label: 'Configurações' },
+]
+
+export function Sidebar({ groupId, groupName }: { groupId: string; groupName: string }) {
+  const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  const nav = (
+    <nav className="flex flex-col h-full">
+      <div className="p-4 border-b border-gray-100">
+        <Link href="/dashboard">
+          <Logo size="sm" />
+        </Link>
+        <p className="text-xs text-muted-foreground mt-2 truncate font-medium">{groupName}</p>
+      </div>
+      <div className="flex-1 py-4 space-y-1 px-3">
+        {navItems.map((item) => {
+          const fullHref = `/dashboard/${groupId}${item.href}`
+          const isActive = item.href === ''
+            ? pathname === `/dashboard/${groupId}`
+            : pathname.startsWith(fullHref)
+          return (
+            <Link
+              key={item.href}
+              href={fullHref}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                isActive
+                  ? 'bg-gradient-to-r from-brand-green/10 to-brand-green/5 text-brand-green shadow-sm'
+                  : 'text-muted-foreground hover:bg-gray-50 hover:text-brand-navy'
+              )}
+            >
+              <item.icon className={cn('h-4 w-4', isActive && 'text-brand-green')} />
+              {item.label}
+            </Link>
+          )
+        })}
+      </div>
+      <div className="p-3 border-t border-gray-100">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 w-full transition-all duration-200"
+        >
+          <LogOut className="h-4 w-4" />
+          Sair
+        </button>
+      </div>
+    </nav>
+  )
+
+  return (
+    <>
+      {/* Mobile toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-3 left-3 z-50 lg:hidden bg-white/80 backdrop-blur-sm shadow-sm rounded-xl"
+        onClick={() => setMobileOpen(!mobileOpen)}
+      >
+        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </Button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - mobile */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 w-64 bg-white/95 backdrop-blur-xl border-r border-gray-100 shadow-2xl transform transition-transform duration-300 ease-out lg:hidden',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {nav}
+      </aside>
+
+      {/* Sidebar - desktop */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-gray-100 bg-white/80 backdrop-blur-xl h-screen sticky top-0">
+        {nav}
+      </aside>
+    </>
+  )
+}
