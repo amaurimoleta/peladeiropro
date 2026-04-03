@@ -43,6 +43,9 @@ import { toast } from 'sonner'
 import { PIX_KEY_TYPES, MEMBER_ROLES, type Group, type GroupMember, type AuditLog } from '@/lib/types'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
+import { InviteManager } from '@/components/dashboard/invite-manager'
+import RecurringExpenses from '@/components/dashboard/recurring-expenses'
+import CustomCategories from '@/components/dashboard/custom-categories'
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
   update_group_settings: 'Atualizou configuracoes do grupo',
@@ -374,6 +377,17 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Convites */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Convites</CardTitle>
+          <CardDescription>Gerencie os convites do grupo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <InviteManager groupId={groupId} />
+        </CardContent>
+      </Card>
+
       {/* Group Settings Form */}
       <form onSubmit={handleSave} className="space-y-6">
         <Card>
@@ -601,6 +615,12 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Categorias Personalizadas */}
+        <CustomCategories groupId={groupId} />
+
+        {/* Despesas Recorrentes */}
+        <RecurringExpenses groupId={groupId} />
 
         {/* Danger Zone - admin only */}
         {isAdmin && (

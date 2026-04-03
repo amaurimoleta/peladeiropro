@@ -3,6 +3,7 @@ import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2,
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import RankingCard from '@/components/dashboard/ranking-card'
+import AnnouncementsCard from '@/components/dashboard/announcements-card'
 import FinancialCharts from '@/components/dashboard/financial-charts'
 import type { MonthlyFinancialData, ExpenseCategoryData } from '@/components/dashboard/financial-charts'
 
@@ -208,6 +209,8 @@ export default async function GroupDashboard({
           <span>{matches?.length || 0} jogos no mes</span>
         </div>
       </div>
+
+      <AnnouncementsCard groupId={groupId} />
 
       {/* Caixa do Grupo - Accumulated Balance */}
       <div className="card-modern-elevated mb-8 p-6 border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-green-50/50">

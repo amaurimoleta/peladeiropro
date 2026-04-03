@@ -20,6 +20,7 @@ import { format } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
+import { TeamShuffle } from '@/components/dashboard/team-shuffle'
 import type { Match, GuestPlayer, GroupMember, MatchAttendance, Group } from '@/lib/types'
 
 interface AttendanceMap {
@@ -603,6 +604,14 @@ export default function MatchesPage() {
                             })}
                           </div>
                         )}
+                        {(() => {
+                          const presentMembers = mensalistas.filter(m => matchAttendance[m.id]?.present)
+                          return presentMembers.length > 0 ? (
+                            <div className="mt-3">
+                              <TeamShuffle members={presentMembers.map(m => ({ id: m.id, name: m.name }))} />
+                            </div>
+                          ) : null
+                        })()}
                       </div>
 
                       <Separator />

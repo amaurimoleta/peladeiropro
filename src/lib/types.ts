@@ -17,6 +17,7 @@ export interface Group {
   monthly_fee_amount: number
   due_day: number
   public_slug: string | null
+  cover_url: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -31,6 +32,7 @@ export interface GroupMember {
   role: 'admin' | 'treasurer' | 'member'
   status: 'active' | 'inactive'
   member_type: 'mensalista' | 'avulso'
+  avatar_url: string | null
   joined_at: string
   created_at: string
 }
@@ -45,6 +47,7 @@ export interface MonthlyFee {
   paid_at: string | null
   payment_method: string | null
   receipt_url: string | null
+  carry_over: number
   status: 'pending' | 'paid' | 'overdue' | 'waived' | 'dm_leave'
   notes: string | null
   created_at: string
@@ -90,7 +93,8 @@ export interface MatchAttendance {
 export interface Expense {
   id: string
   group_id: string
-  category: 'court_rental' | 'goalkeeper' | 'equipment' | 'drinks' | 'other'
+  category: string
+  custom_category_id: string | null
   description: string
   amount: number
   expense_date: string
@@ -98,6 +102,7 @@ export interface Expense {
   notes: string | null
   created_at: string
   paid_by_member?: GroupMember
+  custom_category?: CustomExpenseCategory
 }
 
 export interface AuditLog {
@@ -112,7 +117,51 @@ export interface AuditLog {
   created_at: string
 }
 
-export const EXPENSE_CATEGORIES: Record<Expense['category'], string> = {
+export interface Announcement {
+  id: string
+  group_id: string
+  author_id: string | null
+  title: string
+  content: string
+  pinned: boolean
+  created_at: string
+  updated_at: string
+  author?: GroupMember
+}
+
+export interface GroupInvite {
+  id: string
+  group_id: string
+  token: string
+  created_by: string | null
+  expires_at: string
+  max_uses: number
+  uses: number
+  created_at: string
+}
+
+export interface CustomExpenseCategory {
+  id: string
+  group_id: string
+  name: string
+  color: string
+  created_at: string
+}
+
+export interface RecurringExpense {
+  id: string
+  group_id: string
+  category: string
+  custom_category_id: string | null
+  description: string
+  amount: number
+  day_of_month: number
+  active: boolean
+  last_generated_month: string | null
+  created_at: string
+}
+
+export const EXPENSE_CATEGORIES: Record<string, string> = {
   court_rental: 'Quadra',
   goalkeeper: 'Goleiro',
   equipment: 'Equipamento',
