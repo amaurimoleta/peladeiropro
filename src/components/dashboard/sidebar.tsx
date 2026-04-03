@@ -14,6 +14,7 @@ import {
   X,
   User,
   Trophy,
+  Shield,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
@@ -28,6 +29,7 @@ const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
+  { href: '/times', icon: Shield, label: 'Times' },
   { href: '/members', icon: Users, label: 'Membros' },
   { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
   { href: '/settings', icon: Settings, label: 'Configurações' },

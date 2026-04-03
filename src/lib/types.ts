@@ -78,7 +78,7 @@ export interface Tournament {
   start_date: string | null
   end_date: string | null
   status: 'active' | 'finished' | 'cancelled'
-  format: 'league' | 'playoff'
+  format: 'league' | 'playoff' | 'best_of_4'
   points_win: number
   points_draw: number
   points_loss: number
@@ -185,6 +185,23 @@ export interface RecurringExpense {
   created_at: string
 }
 
+export interface Team {
+  id: string
+  group_id: string
+  name: string
+  color: string
+  logo_url: string | null
+  created_at: string
+}
+
+export interface TeamMember {
+  id: string
+  team_id: string
+  member_id: string
+  created_at: string
+  member?: GroupMember
+}
+
 export const EXPENSE_CATEGORIES: Record<string, string> = {
   court_rental: 'Quadra',
   goalkeeper: 'Goleiro',
@@ -222,6 +239,7 @@ export const TOURNAMENT_STATUSES: Record<string, string> = {
 export const TOURNAMENT_FORMATS: Record<string, string> = {
   league: 'Pontos Corridos',
   playoff: 'Playoff (Mata-mata)',
+  best_of_4: 'Melhor de 4 Vitórias',
 }
 
 export const PLAYOFF_PHASES: Record<string, string> = {
