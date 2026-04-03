@@ -78,6 +78,7 @@ export interface Tournament {
   start_date: string | null
   end_date: string | null
   status: 'active' | 'finished' | 'cancelled'
+  format: 'league' | 'playoff'
   points_win: number
   points_draw: number
   points_loss: number
@@ -96,6 +97,7 @@ export interface Match {
   score_a: number | null
   score_b: number | null
   tournament_id: string | null
+  tournament_phase: string | null
   created_at: string
   updated_at: string
   guest_players?: GuestPlayer[]
@@ -215,6 +217,19 @@ export const TOURNAMENT_STATUSES: Record<string, string> = {
   active: 'Em andamento',
   finished: 'Encerrado',
   cancelled: 'Cancelado',
+}
+
+export const TOURNAMENT_FORMATS: Record<string, string> = {
+  league: 'Pontos Corridos',
+  playoff: 'Playoff (Mata-mata)',
+}
+
+export const PLAYOFF_PHASES: Record<string, string> = {
+  final: 'Final',
+  semi: 'Semifinal',
+  quarter: 'Quartas de Final',
+  round16: 'Oitavas de Final',
+  group: 'Fase de Grupos',
 }
 
 export const FEE_STATUSES: Record<string, string> = {
