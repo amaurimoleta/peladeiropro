@@ -23,7 +23,7 @@ import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
 import type { Match, GuestPlayer, GroupMember, Group, Tournament } from '@/lib/types'
-import { TOURNAMENT_STATUSES } from '@/lib/types'
+import { TOURNAMENT_STATUSES, PLAYOFF_PHASES } from '@/lib/types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface AttendanceMap {
@@ -84,7 +84,9 @@ export default function MatchesPage() {
   // Tournaments
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [newTournamentId, setNewTournamentId] = useState('')
+  const [newTournamentPhase, setNewTournamentPhase] = useState('')
   const [editTournamentId, setEditTournamentId] = useState('')
+  const [editTournamentPhase, setEditTournamentPhase] = useState('')
 
   // Add guest dialog
   const [guestDialogOpen, setGuestDialogOpen] = useState(false)
@@ -282,6 +284,7 @@ export default function MatchesPage() {
       team_a_name: newTeamAName || 'Time A',
       team_b_name: newTeamBName || 'Time B',
       tournament_id: newTournamentId && newTournamentId !== 'none' ? newTournamentId : null,
+      tournament_phase: newTournamentPhase || null,
     })
     if (error) {
       console.error('Erro ao criar jogo:', error)
@@ -302,6 +305,7 @@ export default function MatchesPage() {
       setNewTeamAName('Time A')
       setNewTeamBName('Time B')
       setNewTournamentId('')
+      setNewTournamentPhase('')
       await loadMatches()
     }
     setSaving(false)
@@ -315,6 +319,7 @@ export default function MatchesPage() {
     setEditTeamAName(match.team_a_name || 'Time A')
     setEditTeamBName(match.team_b_name || 'Time B')
     setEditTournamentId(match.tournament_id || '')
+    setEditTournamentPhase(match.tournament_phase || '')
     setEditDialogOpen(true)
   }
 
@@ -331,6 +336,7 @@ export default function MatchesPage() {
         team_a_name: editTeamAName || 'Time A',
         team_b_name: editTeamBName || 'Time B',
         tournament_id: editTournamentId && editTournamentId !== 'none' ? editTournamentId : null,
+        tournament_phase: editTournamentPhase || null,
       })
       .eq('id', editingMatch.id)
     if (error) {
@@ -620,9 +626,12 @@ export default function MatchesPage() {
 
                         {/* Tournament badge */}
                         {match.tournament_id && tournaments.length > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5 w-fit">
+                          <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5 w-fit mt-1">
                             <Trophy className="h-3 w-3" />
                             {tournaments.find(t => t.id === match.tournament_id)?.name || 'Campeonato'}
+                            {match.tournament_phase && PLAYOFF_PHASES[match.tournament_phase] && (
+                              <span className="text-amber-600 font-medium">• {PLAYOFF_PHASES[match.tournament_phase]}</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -996,7 +1005,7 @@ export default function MatchesPage() {
             </div>
             <div className="space-y-2">
               <Label>Campeonato</Label>
-              <Select value={newTournamentId} onValueChange={(v) => setNewTournamentId(v || '')}>
+              <Select value={newTournamentId} onValueChange={(v) => { setNewTournamentId(v || ''); if (!v || v === 'none') setNewTournamentPhase('') }}>
                 <SelectTrigger><SelectValue placeholder="Nenhum (jogo avulso)" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum (jogo avulso)</SelectItem>
@@ -1006,6 +1015,22 @@ export default function MatchesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              const selectedTournament = tournaments.find(t => t.id === newTournamentId)
+              return selectedTournament?.format === 'playoff' ? (
+                <div className="space-y-2">
+                  <Label>Fase do Playoff</Label>
+                  <Select value={newTournamentPhase} onValueChange={(v) => setNewTournamentPhase(v || '')}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a fase" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PLAYOFF_PHASES).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null
+            })()}
             <div className="space-y-2">
               <Label>Observacoes</Label>
               <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
@@ -1044,7 +1069,7 @@ export default function MatchesPage() {
             </div>
             <div className="space-y-2">
               <Label>Campeonato</Label>
-              <Select value={editTournamentId} onValueChange={(v) => setEditTournamentId(v || '')}>
+              <Select value={editTournamentId} onValueChange={(v) => { setEditTournamentId(v || ''); if (!v || v === 'none') setEditTournamentPhase('') }}>
                 <SelectTrigger><SelectValue placeholder="Nenhum (jogo avulso)" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum (jogo avulso)</SelectItem>
@@ -1054,6 +1079,22 @@ export default function MatchesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              const selectedTournament = tournaments.find(t => t.id === editTournamentId)
+              return selectedTournament?.format === 'playoff' ? (
+                <div className="space-y-2">
+                  <Label>Fase do Playoff</Label>
+                  <Select value={editTournamentPhase} onValueChange={(v) => setEditTournamentPhase(v || '')}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a fase" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PLAYOFF_PHASES).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null
+            })()}
             <div className="space-y-2">
               <Label>Observacoes</Label>
               <Textarea placeholder="Notas sobre o jogo" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
