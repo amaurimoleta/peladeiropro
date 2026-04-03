@@ -33,6 +33,7 @@ export interface GroupMember {
   status: 'active' | 'inactive'
   member_type: 'mensalista' | 'avulso'
   avatar_url: string | null
+  team: string | null
   joined_at: string
   created_at: string
 }
@@ -75,6 +76,10 @@ export interface Match {
   match_date: string
   location: string | null
   notes: string | null
+  team_a_name: string | null
+  team_b_name: string | null
+  score_a: number | null
+  score_b: number | null
   created_at: string
   updated_at: string
   guest_players?: GuestPlayer[]
@@ -166,6 +171,7 @@ export const EXPENSE_CATEGORIES: Record<string, string> = {
   goalkeeper: 'Goleiro',
   equipment: 'Equipamento',
   drinks: 'Bebidas',
+  churrasco: 'Churrasco',
   other: 'Outros',
 }
 
@@ -178,7 +184,7 @@ export const PIX_KEY_TYPES: Record<string, string> = {
 }
 
 export const MEMBER_ROLES: Record<string, string> = {
-  admin: 'Administrador',
+  admin: 'Presidente',
   treasurer: 'Tesoureiro',
   member: 'Membro',
 }

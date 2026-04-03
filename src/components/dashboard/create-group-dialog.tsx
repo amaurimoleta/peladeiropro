@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { ImageUpload } from '@/components/shared/image-upload'
 
 export function CreateGroupDialog() {
   const [open, setOpen] = useState(false)
@@ -24,6 +25,7 @@ export function CreateGroupDialog() {
   const [description, setDescription] = useState('')
   const [monthlyFee, setMonthlyFee] = useState('')
   const [dueDay, setDueDay] = useState('10')
+  const [coverUrl, setCoverUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -42,6 +44,7 @@ export function CreateGroupDialog() {
         description: description || null,
         monthly_fee_amount: parseFloat(monthlyFee) || 0,
         due_day: parseInt(dueDay) || 10,
+        cover_url: coverUrl || null,
         created_by: user.id,
       })
       .select()
@@ -67,6 +70,7 @@ export function CreateGroupDialog() {
     setDescription('')
     setMonthlyFee('')
     setDueDay('10')
+    setCoverUrl('')
     setLoading(false)
     router.push(`/dashboard/${group.id}`)
     router.refresh()
@@ -84,6 +88,17 @@ export function CreateGroupDialog() {
           <DialogDescription>Configure seu grupo de pelada</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleCreate} className="space-y-4">
+          <div className="flex justify-center">
+            <ImageUpload
+              currentUrl={coverUrl || null}
+              onUpload={(url) => setCoverUrl(url)}
+              bucket="uploads"
+              folder="group-covers"
+              size="lg"
+              shape="rounded"
+              label="Capa do grupo"
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="group-name">Nome do grupo *</Label>
             <Input

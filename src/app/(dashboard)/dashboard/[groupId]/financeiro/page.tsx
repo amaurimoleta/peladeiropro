@@ -17,6 +17,7 @@ import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
   MessageCircle, Send, Image, Eye, Wallet, Users, Calculator, ShieldAlert,
+  ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -78,6 +79,12 @@ export default function FinanceiroPage() {
 
   // DRE state
   const [paidGuests, setPaidGuests] = useState<any[]>([])
+  const [dreView, setDreView] = useState<'mensal' | 'anual'>('mensal')
+  const [dreYear, setDreYear] = useState(new Date().getFullYear())
+  const [dreAnnualLoading, setDreAnnualLoading] = useState(false)
+  const [dreAnnualFees, setDreAnnualFees] = useState<any[]>([])
+  const [dreAnnualGuests, setDreAnnualGuests] = useState<any[]>([])
+  const [dreAnnualExpenses, setDreAnnualExpenses] = useState<any[]>([])
 
   // Saldo Acumulado state
   const [allTimeFees, setAllTimeFees] = useState(0)
@@ -222,6 +229,28 @@ export default function FinanceiroPage() {
   useEffect(() => {
     loadRateio()
   }, [loadRateio])
+
+  // Load DRE annual data
+  useEffect(() => {
+    if (dreView !== 'anual') return
+    async function loadDreAnnual() {
+      setDreAnnualLoading(true)
+      const year = dreYear
+      const [{ data: feesData }, { data: guestsData }, { data: expensesData }] = await Promise.all([
+        supabase.from('monthly_fees').select('amount, status, reference_month').eq('group_id', groupId).eq('status', 'paid')
+          .gte('reference_month', `${year}-01`).lte('reference_month', `${year}-12`),
+        supabase.from('guest_players').select('amount, match_date').eq('group_id', groupId).eq('paid', true)
+          .gte('match_date', `${year}-01-01`).lte('match_date', `${year}-12-31`),
+        supabase.from('expenses').select('amount, expense_date').eq('group_id', groupId)
+          .gte('expense_date', `${year}-01-01`).lte('expense_date', `${year}-12-31`),
+      ])
+      setDreAnnualFees(feesData || [])
+      setDreAnnualGuests(guestsData || [])
+      setDreAnnualExpenses(expensesData || [])
+      setDreAnnualLoading(false)
+    }
+    loadDreAnnual()
+  }, [dreView, dreYear, groupId])
 
   // ── Mensalidades handlers ──
 
@@ -533,6 +562,29 @@ export default function FinanceiroPage() {
     ...Object.values(dreExpensesByCategory),
   ].filter(v => v > 0)
   const dreMaxValue = Math.max(...allDreValues, 1)
+
+  // DRE Anual computed
+  const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  const dreAnnualMonthsData = MONTH_NAMES.map((name, idx) => {
+    const mm = String(idx + 1).padStart(2, '0')
+    const monthKey = `${dreYear}-${mm}`
+    const monthFees = dreAnnualFees.filter(f => f.reference_month === monthKey).reduce((s: number, f: any) => s + Number(f.amount), 0)
+    const monthGuests = dreAnnualGuests.filter(g => g.match_date?.startsWith(monthKey)).reduce((s: number, g: any) => s + Number(g.amount), 0)
+    const monthExpenses = dreAnnualExpenses.filter(e => e.expense_date?.startsWith(monthKey)).reduce((s: number, e: any) => s + Number(e.amount), 0)
+    const totalReceitas = monthFees + monthGuests
+    const saldo = totalReceitas - monthExpenses
+    return { name, monthKey, mensalidades: monthFees, avulsos: monthGuests, totalReceitas, despesas: monthExpenses, saldo }
+  })
+  const dreAnnualTotals = dreAnnualMonthsData.reduce(
+    (acc, m) => ({
+      mensalidades: acc.mensalidades + m.mensalidades,
+      avulsos: acc.avulsos + m.avulsos,
+      totalReceitas: acc.totalReceitas + m.totalReceitas,
+      despesas: acc.despesas + m.despesas,
+      saldo: acc.saldo + m.saldo,
+    }),
+    { mensalidades: 0, avulsos: 0, totalReceitas: 0, despesas: 0, saldo: 0 }
+  )
 
   // Saldo Acumulado
   const allTimeIncome = allTimeFees + allTimeGuests
@@ -1017,157 +1069,374 @@ export default function FinanceiroPage() {
         {/* ── Tab: DRE ── */}
         <TabsContent value="dre">
           <div className="space-y-6 mt-4">
-            {loading ? (
-              <div className="flex items-center justify-center py-16 text-muted-foreground">
-                Carregando...
-              </div>
-            ) : (
+            {/* Toggle Mensal / Anual */}
+            <div className="flex items-center justify-center gap-1 p-1 bg-muted rounded-lg w-fit mx-auto">
+              <button
+                onClick={() => setDreView('mensal')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  dreView === 'mensal'
+                    ? 'bg-white shadow-sm text-[#1B1F4B]'
+                    : 'text-muted-foreground hover:text-[#1B1F4B]'
+                }`}
+              >
+                Mensal
+              </button>
+              <button
+                onClick={() => setDreView('anual')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  dreView === 'anual'
+                    ? 'bg-white shadow-sm text-[#1B1F4B]'
+                    : 'text-muted-foreground hover:text-[#1B1F4B]'
+                }`}
+              >
+                Anual
+              </button>
+            </div>
+
+            {/* ── DRE Mensal ── */}
+            {dreView === 'mensal' && (
               <>
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Card className="border-l-4 border-l-[#00C853]">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-[#00C853]/10 p-2">
-                          <TrendingUp className="h-5 w-5 text-[#00C853]" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Receitas</p>
-                          <p className="text-xl font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                {loading ? (
+                  <div className="flex items-center justify-center py-16 text-muted-foreground">
+                    Carregando...
+                  </div>
+                ) : (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <Card className="border-l-4 border-l-[#00C853]">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-[#00C853]/10 p-2">
+                              <TrendingUp className="h-5 w-5 text-[#00C853]" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Receitas</p>
+                              <p className="text-xl font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  <Card className="border-l-4 border-l-red-500">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-red-500/10 p-2">
-                          <TrendingDown className="h-5 w-5 text-red-500" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Despesas</p>
-                          <p className="text-xl font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      <Card className="border-l-4 border-l-red-500">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-red-500/10 p-2">
+                              <TrendingDown className="h-5 w-5 text-red-500" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Despesas</p>
+                              <p className="text-xl font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  <Card className={`border-l-4 ${dreNetResult >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`rounded-full p-2 ${dreNetResult >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
-                          <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Resultado</p>
-                          <p className={`text-xl font-bold ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
-                            {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* DRE Report */}
-                <Card className="shadow-lg">
-                  <CardContent className="py-6 space-y-8">
-                    {/* RECEITAS */}
-                    <section>
-                      <div className="flex items-center gap-2 mb-4">
-                        <TrendingUp className="h-5 w-5 text-[#00C853]" />
-                        <h2 className="text-lg font-bold text-[#1B1F4B]">Receitas</h2>
-                      </div>
-                      <div className="space-y-4 pl-1">
-                        <BarLine
-                          label={`Mensalidades pagas (${fees.filter(f => f.status === 'paid').length})`}
-                          value={dreTotalFees}
-                          total={dreTotalIncome}
-                          color="#00C853"
-                        />
-                        <BarLine
-                          label={`Avulsos pagos (${paidGuests.length})`}
-                          value={dreTotalGuests}
-                          total={dreTotalIncome}
-                          color="#66BB6A"
-                        />
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
-                        <span className="text-sm font-bold text-[#1B1F4B]">Total de Receitas</span>
-                        <span className="text-sm font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</span>
-                      </div>
-                    </section>
-
-                    {/* Separator */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-border" />
-                      <Minus className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1 h-px bg-border" />
+                      <Card className={`border-l-4 ${dreNetResult >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`rounded-full p-2 ${dreNetResult >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
+                              <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Resultado</p>
+                              <p className={`text-xl font-bold ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                                {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
 
-                    {/* DESPESAS */}
-                    <section>
-                      <div className="flex items-center gap-2 mb-4">
-                        <TrendingDown className="h-5 w-5 text-red-500" />
-                        <h2 className="text-lg font-bold text-[#1B1F4B]">Despesas</h2>
-                      </div>
-                      <div className="space-y-4 pl-1">
-                        {(Object.keys(EXPENSE_CATEGORIES) as ExpenseCategory[]).map((cat) => {
-                          const value = dreExpensesByCategory[cat] || 0
-                          if (value === 0 && dreTotalExpenses > 0) return null
-                          return (
+                    {/* DRE Report */}
+                    <Card className="shadow-lg">
+                      <CardContent className="py-6 space-y-8">
+                        {/* RECEITAS */}
+                        <section>
+                          <div className="flex items-center gap-2 mb-4">
+                            <TrendingUp className="h-5 w-5 text-[#00C853]" />
+                            <h2 className="text-lg font-bold text-[#1B1F4B]">Receitas</h2>
+                          </div>
+                          <div className="space-y-4 pl-1">
                             <BarLine
-                              key={cat}
-                              label={EXPENSE_CATEGORIES[cat]}
-                              value={value}
-                              total={dreTotalExpenses}
-                              color="#EF4444"
+                              label={`Mensalidades pagas (${fees.filter(f => f.status === 'paid').length})`}
+                              value={dreTotalFees}
+                              total={dreTotalIncome}
+                              color="#00C853"
                             />
-                          )
-                        })}
-                        {dreTotalExpenses === 0 && (
-                          <p className="text-sm text-muted-foreground italic">Nenhuma despesa registrada neste mes.</p>
-                        )}
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
-                        <span className="text-sm font-bold text-[#1B1F4B]">Total de Despesas</span>
-                        <span className="text-sm font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</span>
-                      </div>
-                    </section>
+                            <BarLine
+                              label={`Avulsos pagos (${paidGuests.length})`}
+                              value={dreTotalGuests}
+                              total={dreTotalIncome}
+                              color="#66BB6A"
+                            />
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#1B1F4B]">Total de Receitas</span>
+                            <span className="text-sm font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</span>
+                          </div>
+                        </section>
 
-                    {/* Separator */}
-                    <div className="h-px bg-border" />
+                        {/* Separator */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-px bg-border" />
+                          <Minus className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex-1 h-px bg-border" />
+                        </div>
 
-                    {/* RESULTADO */}
-                    <section>
-                      <div className="flex items-center gap-2 mb-4">
-                        <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`} />
-                        <h2 className="text-lg font-bold text-[#1B1F4B]">Resultado</h2>
-                      </div>
-                      <div className="rounded-lg p-4 space-y-2"
-                        style={{
-                          backgroundColor: dreNetResult >= 0 ? 'rgba(0, 200, 83, 0.06)' : 'rgba(239, 68, 68, 0.06)',
-                        }}
-                      >
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Receitas</span>
-                          <span className="text-[#00C853] font-medium">{formatCurrency(dreTotalIncome)}</span>
+                        {/* DESPESAS */}
+                        <section>
+                          <div className="flex items-center gap-2 mb-4">
+                            <TrendingDown className="h-5 w-5 text-red-500" />
+                            <h2 className="text-lg font-bold text-[#1B1F4B]">Despesas</h2>
+                          </div>
+                          <div className="space-y-4 pl-1">
+                            {(Object.keys(EXPENSE_CATEGORIES) as ExpenseCategory[]).map((cat) => {
+                              const value = dreExpensesByCategory[cat] || 0
+                              if (value === 0 && dreTotalExpenses > 0) return null
+                              return (
+                                <BarLine
+                                  key={cat}
+                                  label={EXPENSE_CATEGORIES[cat]}
+                                  value={value}
+                                  total={dreTotalExpenses}
+                                  color="#EF4444"
+                                />
+                              )
+                            })}
+                            {dreTotalExpenses === 0 && (
+                              <p className="text-sm text-muted-foreground italic">Nenhuma despesa registrada neste mes.</p>
+                            )}
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#1B1F4B]">Total de Despesas</span>
+                            <span className="text-sm font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</span>
+                          </div>
+                        </section>
+
+                        {/* Separator */}
+                        <div className="h-px bg-border" />
+
+                        {/* RESULTADO */}
+                        <section>
+                          <div className="flex items-center gap-2 mb-4">
+                            <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`} />
+                            <h2 className="text-lg font-bold text-[#1B1F4B]">Resultado</h2>
+                          </div>
+                          <div className="rounded-lg p-4 space-y-2"
+                            style={{
+                              backgroundColor: dreNetResult >= 0 ? 'rgba(0, 200, 83, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                            }}
+                          >
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Receitas</span>
+                              <span className="text-[#00C853] font-medium">{formatCurrency(dreTotalIncome)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Despesas</span>
+                              <span className="text-red-500 font-medium">- {formatCurrency(dreTotalExpenses)}</span>
+                            </div>
+                            <div className="border-t pt-2 mt-2 flex items-center justify-between">
+                              <span className="text-base font-bold text-[#1B1F4B]">Resultado Liquido</span>
+                              <span className={`text-lg font-bold ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                                {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
+                              </span>
+                            </div>
+                          </div>
+                        </section>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* ── DRE Anual ── */}
+            {dreView === 'anual' && (
+              <>
+                {/* Year navigation */}
+                <div className="flex items-center justify-center gap-4">
+                  <Button variant="outline" size="icon" onClick={() => setDreYear(y => y - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-[#1B1F4B]" />
+                    <span className="text-lg font-semibold text-[#1B1F4B] min-w-[60px] text-center">{dreYear}</span>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={() => setDreYear(y => y + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {dreAnnualLoading ? (
+                  <div className="flex items-center justify-center py-16 text-muted-foreground">
+                    Carregando...
+                  </div>
+                ) : (
+                  <>
+                    {/* Annual Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <Card className="border-l-4 border-l-[#00C853]">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-[#00C853]/10 p-2">
+                              <TrendingUp className="h-5 w-5 text-[#00C853]" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Receitas {dreYear}</p>
+                              <p className="text-xl font-bold text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-l-4 border-l-red-500">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-red-500/10 p-2">
+                              <TrendingDown className="h-5 w-5 text-red-500" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Despesas {dreYear}</p>
+                              <p className="text-xl font-bold text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className={`border-l-4 ${dreAnnualTotals.saldo >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`rounded-full p-2 ${dreAnnualTotals.saldo >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
+                              <DollarSign className={`h-5 w-5 ${dreAnnualTotals.saldo >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Saldo {dreYear}</p>
+                              <p className={`text-xl font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                                {dreAnnualTotals.saldo >= 0 ? '+' : ''}{formatCurrency(dreAnnualTotals.saldo)}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Annual DRE Table */}
+                    <Card className="shadow-lg">
+                      <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="font-semibold text-[#1B1F4B]">Mes</TableHead>
+                                <TableHead className="text-right font-semibold text-[#00C853]">Mensalidades</TableHead>
+                                <TableHead className="text-right font-semibold text-[#66BB6A]">Avulsos</TableHead>
+                                <TableHead className="text-right font-semibold text-[#00C853]">Total Receitas</TableHead>
+                                <TableHead className="text-right font-semibold text-red-500">Despesas</TableHead>
+                                <TableHead className="text-right font-semibold text-[#1B1F4B]">Saldo</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {dreAnnualMonthsData.map((m, idx) => {
+                                const hasData = m.mensalidades > 0 || m.avulsos > 0 || m.despesas > 0
+                                return (
+                                  <TableRow key={m.monthKey} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
+                                    <TableCell className="font-medium text-[#1B1F4B]">{m.name}</TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                      {hasData ? formatCurrency(m.mensalidades) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                      {hasData ? formatCurrency(m.avulsos) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums font-medium text-[#00C853]">
+                                      {hasData ? formatCurrency(m.totalReceitas) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums font-medium text-red-500">
+                                      {hasData ? formatCurrency(m.despesas) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                    <TableCell className={`text-right tabular-nums font-semibold ${
+                                      !hasData ? 'text-muted-foreground' : m.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'
+                                    }`}>
+                                      {hasData ? (
+                                        <>{m.saldo >= 0 ? '+' : ''}{formatCurrency(m.saldo)}</>
+                                      ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                            {/* Total Row */}
+                            <tfoot>
+                              <TableRow className="border-t-2 bg-muted/40 font-bold">
+                                <TableCell className="font-bold text-[#1B1F4B]">Total</TableCell>
+                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.mensalidades)}</TableCell>
+                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.avulsos)}</TableCell>
+                                <TableCell className="text-right font-bold tabular-nums text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</TableCell>
+                                <TableCell className="text-right font-bold tabular-nums text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</TableCell>
+                                <TableCell className={`text-right font-bold tabular-nums ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                                  {dreAnnualTotals.saldo >= 0 ? '+' : ''}{formatCurrency(dreAnnualTotals.saldo)}
+                                </TableCell>
+                              </TableRow>
+                            </tfoot>
+                          </Table>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Despesas</span>
-                          <span className="text-red-500 font-medium">- {formatCurrency(dreTotalExpenses)}</span>
+                      </CardContent>
+                    </Card>
+
+                    {/* Annual Result Summary */}
+                    <Card className="shadow-lg">
+                      <CardContent className="py-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <BarChart3 className="h-5 w-5 text-[#1B1F4B]" />
+                          <h2 className="text-lg font-bold text-[#1B1F4B]">Resumo Anual {dreYear}</h2>
                         </div>
-                        <div className="border-t pt-2 mt-2 flex items-center justify-between">
-                          <span className="text-base font-bold text-[#1B1F4B]">Resultado Liquido</span>
-                          <span className={`text-lg font-bold ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
-                            {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
-                          </span>
+                        <div className="rounded-lg p-4 space-y-3"
+                          style={{
+                            backgroundColor: dreAnnualTotals.saldo >= 0 ? 'rgba(0, 200, 83, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                          }}
+                        >
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Mensalidades</span>
+                            <span className="text-[#00C853] font-medium">{formatCurrency(dreAnnualTotals.mensalidades)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Avulsos</span>
+                            <span className="text-[#66BB6A] font-medium">{formatCurrency(dreAnnualTotals.avulsos)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm border-t pt-2">
+                            <span className="font-semibold text-[#1B1F4B]">Total Receitas</span>
+                            <span className="text-[#00C853] font-bold">{formatCurrency(dreAnnualTotals.totalReceitas)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Total Despesas</span>
+                            <span className="text-red-500 font-medium">- {formatCurrency(dreAnnualTotals.despesas)}</span>
+                          </div>
+                          <div className="border-t pt-3 mt-2 flex items-center justify-between">
+                            <span className="text-base font-bold text-[#1B1F4B]">Resultado Liquido Anual</span>
+                            <span className={`text-lg font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                              {dreAnnualTotals.saldo >= 0 ? '+' : ''}{formatCurrency(dreAnnualTotals.saldo)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </section>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </Card>
+
+                    {/* No data message */}
+                    {dreAnnualTotals.totalReceitas === 0 && dreAnnualTotals.despesas === 0 && (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                          <p className="text-muted-foreground">
+                            Nenhum dado financeiro encontrado para {dreYear}.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
               </>
             )}
           </div>

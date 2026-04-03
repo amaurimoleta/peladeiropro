@@ -10,13 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
-  MessageCircle, DollarSign,
+  MessageCircle, DollarSign, Trophy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
@@ -61,6 +62,8 @@ export default function MatchesPage() {
   const [newMatchDate, setNewMatchDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [newLocation, setNewLocation] = useState('')
   const [newNotes, setNewNotes] = useState('')
+  const [newTeamAName, setNewTeamAName] = useState('Time A')
+  const [newTeamBName, setNewTeamBName] = useState('Time B')
   const [saving, setSaving] = useState(false)
 
   // Edit match dialog
@@ -69,6 +72,12 @@ export default function MatchesPage() {
   const [editMatchDate, setEditMatchDate] = useState('')
   const [editLocation, setEditLocation] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editTeamAName, setEditTeamAName] = useState('')
+  const [editTeamBName, setEditTeamBName] = useState('')
+
+  // Score state per match (local editing)
+  const [scoreInputs, setScoreInputs] = useState<Record<string, { a: string; b: string }>>({})
+  const [savingScore, setSavingScore] = useState<Record<string, boolean>>({})
 
   // Add guest dialog
   const [guestDialogOpen, setGuestDialogOpen] = useState(false)
@@ -163,6 +172,14 @@ export default function MatchesPage() {
       const match = matches.find((m) => m.id === expandedMatch)
       if (match) {
         loadExpenses(expandedMatch, match.match_date)
+        // Initialize score inputs from current match data
+        setScoreInputs((prev) => ({
+          ...prev,
+          [expandedMatch]: {
+            a: match.score_a != null ? String(match.score_a) : '',
+            b: match.score_b != null ? String(match.score_b) : '',
+          },
+        }))
       }
     }
   }, [expandedMatch, matches, loadAttendance, loadExpenses])
@@ -172,13 +189,11 @@ export default function MatchesPage() {
     const newPresent = !(current?.present ?? false)
 
     if (current?.id) {
-      // Update existing
       await supabase
         .from('match_attendance')
         .update({ present: newPresent })
         .eq('id', current.id)
     } else {
-      // Insert new
       const { data } = await supabase
         .from('match_attendance')
         .insert({ match_id: matchId, member_id: memberId, present: newPresent })
@@ -223,28 +238,32 @@ export default function MatchesPage() {
   async function handleAddMatch(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { data, error } = await supabase.from('matches').insert({
+    const { error } = await supabase.from('matches').insert({
       group_id: groupId,
       match_date: newMatchDate,
       location: newLocation || null,
       notes: newNotes || null,
-    }).select('id').single()
+      team_a_name: newTeamAName || 'Time A',
+      team_b_name: newTeamBName || 'Time B',
+    })
     if (error) {
-      toast.error('Erro', { description: error.message })
+      toast.error('Erro ao criar jogo', { description: error.message })
     } else {
-      toast.success('Jogo criado!')
+      toast.success('Jogo criado com sucesso!')
       await logAudit(supabase, {
         groupId,
         action: 'create_match',
         entityType: 'match',
-        entityId: data?.id,
+        entityId: newMatchDate,
         details: { match_date: newMatchDate, location: newLocation },
       })
       setNewDialogOpen(false)
       setNewMatchDate(format(new Date(), 'yyyy-MM-dd'))
       setNewLocation('')
       setNewNotes('')
-      loadMatches()
+      setNewTeamAName('Time A')
+      setNewTeamBName('Time B')
+      await loadMatches()
     }
     setSaving(false)
   }
@@ -254,6 +273,8 @@ export default function MatchesPage() {
     setEditMatchDate(match.match_date)
     setEditLocation(match.location || '')
     setEditNotes(match.notes || '')
+    setEditTeamAName(match.team_a_name || 'Time A')
+    setEditTeamBName(match.team_b_name || 'Time B')
     setEditDialogOpen(true)
   }
 
@@ -267,12 +288,14 @@ export default function MatchesPage() {
         match_date: editMatchDate,
         location: editLocation || null,
         notes: editNotes || null,
+        team_a_name: editTeamAName || 'Time A',
+        team_b_name: editTeamBName || 'Time B',
       })
       .eq('id', editingMatch.id)
     if (error) {
-      toast.error('Erro', { description: error.message })
+      toast.error('Erro ao atualizar jogo', { description: error.message })
     } else {
-      toast.success('Jogo atualizado!')
+      toast.success('Jogo atualizado com sucesso!')
       await logAudit(supabase, {
         groupId,
         action: 'edit_match',
@@ -282,7 +305,7 @@ export default function MatchesPage() {
       })
       setEditDialogOpen(false)
       setEditingMatch(null)
-      loadMatches()
+      await loadMatches()
     }
     setSaving(false)
   }
@@ -296,9 +319,9 @@ export default function MatchesPage() {
     if (!deletingMatchId) return
     const { error } = await supabase.from('matches').delete().eq('id', deletingMatchId)
     if (error) {
-      toast.error('Erro', { description: error.message })
+      toast.error('Erro ao excluir jogo', { description: error.message })
     } else {
-      toast.success('Jogo removido!')
+      toast.success('Jogo removido com sucesso!')
       await logAudit(supabase, {
         groupId,
         action: 'delete_match',
@@ -307,8 +330,34 @@ export default function MatchesPage() {
       })
       setDeleteDialogOpen(false)
       setDeletingMatchId(null)
-      loadMatches()
+      await loadMatches()
     }
+  }
+
+  async function handleSaveScore(matchId: string) {
+    const inputs = scoreInputs[matchId]
+    if (!inputs) return
+    setSavingScore((prev) => ({ ...prev, [matchId]: true }))
+    const scoreA = inputs.a !== '' ? parseInt(inputs.a, 10) : null
+    const scoreB = inputs.b !== '' ? parseInt(inputs.b, 10) : null
+    const { error } = await supabase
+      .from('matches')
+      .update({ score_a: scoreA, score_b: scoreB })
+      .eq('id', matchId)
+    if (error) {
+      toast.error('Erro ao salvar placar', { description: error.message })
+    } else {
+      toast.success('Placar salvo com sucesso!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'update_score',
+        entityType: 'match',
+        entityId: matchId,
+        details: { score_a: scoreA, score_b: scoreB },
+      })
+      await loadMatches()
+    }
+    setSavingScore((prev) => ({ ...prev, [matchId]: false }))
   }
 
   function openGuestDialog(matchId: string, matchDate: string) {
@@ -324,27 +373,27 @@ export default function MatchesPage() {
     e.preventDefault()
     if (!guestMatchId) return
     setSaving(true)
-    const { data, error } = await supabase.from('guest_players').insert({
+    const { error } = await supabase.from('guest_players').insert({
       group_id: groupId,
       match_id: guestMatchId,
       name: guestName,
       phone: guestPhone || null,
       match_date: guestMatchDate,
       amount: parseFloat(guestAmount) || 0,
-    }).select('id').single()
+    })
     if (error) {
-      toast.error('Erro', { description: error.message })
+      toast.error('Erro ao adicionar avulso', { description: error.message })
     } else {
       toast.success('Jogador avulso adicionado!')
       await logAudit(supabase, {
         groupId,
         action: 'add_guest',
         entityType: 'guest_player',
-        entityId: data?.id,
+        entityId: guestMatchDate,
         details: { name: guestName, amount: guestAmount, match_id: guestMatchId },
       })
       setGuestDialogOpen(false)
-      loadMatches()
+      await loadMatches()
     }
     setSaving(false)
   }
@@ -361,7 +410,7 @@ export default function MatchesPage() {
       entityType: 'guest_player',
       entityId: guestId,
     })
-    loadMatches()
+    await loadMatches()
   }
 
   async function deleteGuest(guestId: string) {
@@ -373,7 +422,7 @@ export default function MatchesPage() {
       entityType: 'guest_player',
       entityId: guestId,
     })
-    loadMatches()
+    await loadMatches()
   }
 
   function buildWhatsAppUrl(guest: GuestPlayer, matchDate: string) {
@@ -382,7 +431,7 @@ export default function MatchesPage() {
     const pixKey = groupData?.pix_key || ''
     const pixBeneficiary = groupData?.pix_beneficiary_name || ''
 
-    const message = `Ola ${guest.name}! Sua participacao na pelada de ${dateFormatted} ficou em R$ ${amount}.\n\nChave PIX: ${pixKey}\nFavor: ${pixBeneficiary}\n\nObrigado! ⚽`
+    const message = `Ola ${guest.name}! Sua participacao na pelada de ${dateFormatted} ficou em R$ ${amount}.\n\nChave PIX: ${pixKey}\nFavor: ${pixBeneficiary}\n\nObrigado!`
 
     const phone = (guest.phone || '').replace(/\D/g, '')
     const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`
@@ -405,6 +454,22 @@ export default function MatchesPage() {
     return expenses.total / totalPlayers
   }
 
+  function formatMatchDate(dateStr: string): string {
+    return format(new Date(dateStr + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })
+  }
+
+  function formatMatchDateShort(dateStr: string): string {
+    return format(new Date(dateStr + 'T12:00:00'), 'dd/MM/yyyy')
+  }
+
+  function getTeamAName(match: Match): string {
+    return match.team_a_name || 'Time A'
+  }
+
+  function getTeamBName(match: Match): string {
+    return match.team_b_name || 'Time B'
+  }
+
   // Summary
   const totalMatches = matches.length
   const allGuests = matches.flatMap((m) => m.guest_players || [])
@@ -422,40 +487,19 @@ export default function MatchesPage() {
           </p>
         </div>
         {isAdmin && (
-          <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
-            <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Jogo
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Jogo</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleAddMatch} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Data do jogo *</Label>
-                  <Input type="date" value={newMatchDate} onChange={(e) => setNewMatchDate(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Local</Label>
-                  <Input placeholder="Ex: Quadra Society ABC" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
-                </div>
-                <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-                  {saving ? 'Salvando...' : 'Criar Jogo'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button
+            className="bg-[#00C853] hover:bg-[#00A843] text-white"
+            onClick={() => setNewDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Jogo
+          </Button>
         )}
       </div>
 
       <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
-      {/* Summary cards */}
+      {/* Resumo do mes */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="card-modern-elevated">
           <CardContent className="p-4 text-center">
@@ -483,17 +527,17 @@ export default function MatchesPage() {
         </Card>
       </div>
 
-      {/* Matches list */}
+      {/* Cards de jogos */}
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+        <div className="text-center py-12 text-muted-foreground">Carregando jogos...</div>
       ) : matches.length === 0 ? (
         <Card className="card-modern-elevated">
           <CardContent className="text-center py-12 text-muted-foreground">
-            Nenhum jogo neste mês.
+            Nenhum jogo neste mes.
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {matches.map((match) => {
             const guests = match.guest_players || []
             const isExpanded = expandedMatch === match.id
@@ -502,19 +546,58 @@ export default function MatchesPage() {
             const guestCount = guests.length
             const costPerPlayer = getCostPerPlayer(match.id, guestCount)
             const expenseSummary = expenseSummaries[match.id]
+            const teamA = getTeamAName(match)
+            const teamB = getTeamBName(match)
+            const hasScore = match.score_a != null && match.score_b != null
+            const currentScoreInputs = scoreInputs[match.id] || { a: '', b: '' }
 
             return (
               <Card key={match.id} className="card-modern-elevated overflow-hidden">
                 <CardContent className="p-0">
-                  {/* Match header */}
+                  {/* Cabecalho do card */}
                   <div className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        {/* Data */}
+                        <div className="flex items-center gap-2 mb-2">
                           <CalendarDays className="h-4 w-4 text-[#1B1F4B] shrink-0" />
-                          <span className="font-semibold text-[#1B1F4B]">
-                            {format(new Date(match.match_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                          <span className="font-bold text-lg text-[#1B1F4B] capitalize">
+                            {formatMatchDate(match.match_date)}
                           </span>
+                        </div>
+
+                        {/* Local */}
+                        {match.location && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{match.location}</span>
+                          </div>
+                        )}
+
+                        {/* Placar */}
+                        <div className="flex items-center gap-3 mt-3 mb-1">
+                          <Trophy className="h-4 w-4 text-[#1B1F4B] shrink-0" />
+                          {hasScore ? (
+                            <div className="flex items-center gap-2 text-lg font-bold">
+                              <span className="text-[#1B1F4B]">{teamA}</span>
+                              <span className="bg-[#1B1F4B] text-white px-2 py-0.5 rounded text-base">
+                                {match.score_a}
+                              </span>
+                              <span className="text-muted-foreground font-normal">x</span>
+                              <span className="bg-[#1B1F4B] text-white px-2 py-0.5 rounded text-base">
+                                {match.score_b}
+                              </span>
+                              <span className="text-[#1B1F4B]">{teamB}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              Placar: --
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Badges */}
+                        <div className="flex items-center gap-2 mt-2">
                           {guests.length > 0 && (
                             <Badge variant="secondary" className="bg-[#1B1F4B]/10 text-[#1B1F4B]">
                               <Users className="h-3 w-3 mr-1" />
@@ -522,16 +605,14 @@ export default function MatchesPage() {
                             </Badge>
                           )}
                         </div>
-                        {match.location && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                            <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{match.location}</span>
-                          </div>
-                        )}
+
+                        {/* Observacoes */}
                         {match.notes && (
-                          <p className="text-sm text-muted-foreground mt-1">{match.notes}</p>
+                          <p className="text-sm text-muted-foreground mt-2">{match.notes}</p>
                         )}
                       </div>
+
+                      {/* Botoes de acao */}
                       <div className="flex items-center gap-1 ml-2 shrink-0">
                         {isAdmin && (
                           <>
@@ -562,14 +643,71 @@ export default function MatchesPage() {
                     </div>
                   </div>
 
-                  {/* Expanded sections */}
+                  {/* Secoes expandidas */}
                   {isExpanded && (
                     <div className="border-t bg-muted/30 px-4 py-3 space-y-4">
-                      {/* Attendance Section */}
+
+                      {/* Placar */}
+                      {isAdmin && (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                              Placar
+                            </p>
+                            <div className="bg-background rounded-lg px-4 py-3">
+                              <div className="flex items-center justify-center gap-3">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-sm font-semibold text-[#1B1F4B]">{teamA}</span>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    className="w-16 text-center text-lg font-bold"
+                                    placeholder="0"
+                                    value={currentScoreInputs.a}
+                                    onChange={(e) =>
+                                      setScoreInputs((prev) => ({
+                                        ...prev,
+                                        [match.id]: { ...prev[match.id], a: e.target.value },
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <span className="text-xl font-bold text-muted-foreground mt-5">x</span>
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-sm font-semibold text-[#1B1F4B]">{teamB}</span>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    className="w-16 text-center text-lg font-bold"
+                                    placeholder="0"
+                                    value={currentScoreInputs.b}
+                                    onChange={(e) =>
+                                      setScoreInputs((prev) => ({
+                                        ...prev,
+                                        [match.id]: { ...prev[match.id], b: e.target.value },
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <Button
+                                className="w-full mt-3 bg-[#1B1F4B] hover:bg-[#1B1F4B]/90 text-white"
+                                onClick={() => handleSaveScore(match.id)}
+                                disabled={savingScore[match.id]}
+                              >
+                                {savingScore[match.id] ? 'Salvando...' : 'Salvar Placar'}
+                              </Button>
+                            </div>
+                          </div>
+                          <Separator />
+                        </>
+                      )}
+
+                      {/* Presenca */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Presença
+                            Lista de Presenca
                           </p>
                           <Badge variant="secondary" className="bg-[#1B1F4B]/10 text-[#1B1F4B]">
                             {presentCount}/{mensalistas.length} presentes
@@ -616,12 +754,12 @@ export default function MatchesPage() {
 
                       <Separator />
 
-                      {/* Guests Section */}
+                      {/* Avulsos */}
                       {guests.length > 0 && (
                         <>
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              Avulsos
+                              Jogadores Avulsos
                             </p>
                             <div className="space-y-2">
                               {guests.map((guest) => (
@@ -695,7 +833,7 @@ export default function MatchesPage() {
                         </>
                       )}
 
-                      {/* Cost Split (Rateio) Section */}
+                      {/* Rateio */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Rateio
@@ -731,7 +869,7 @@ export default function MatchesPage() {
                               <span className="text-lg font-bold text-[#00C853]">
                                 {costPerPlayer !== null
                                   ? `R$ ${costPerPlayer.toFixed(2)}`
-                                  : 'R$ 0.00'}
+                                  : 'R$ 0,00'}
                               </span>
                             </div>
                           </div>
@@ -746,7 +884,43 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* Edit match dialog */}
+      {/* Dialog: Novo Jogo */}
+      <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Jogo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddMatch} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Data do jogo *</Label>
+              <Input type="date" value={newMatchDate} onChange={(e) => setNewMatchDate(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Local</Label>
+              <Input placeholder="Ex: Quadra Society ABC" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Nome do Time A</Label>
+                <Input placeholder="Time A" value={newTeamAName} onChange={(e) => setNewTeamAName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Nome do Time B</Label>
+                <Input placeholder="Time B" value={newTeamBName} onChange={(e) => setNewTeamBName(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Observacoes</Label>
+              <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
+            </div>
+            <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
+              {saving ? 'Salvando...' : 'Criar Jogo'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Editar Jogo */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -761,25 +935,35 @@ export default function MatchesPage() {
               <Label>Local</Label>
               <Input placeholder="Ex: Quadra Society ABC" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Nome do Time A</Label>
+                <Input placeholder="Time A" value={editTeamAName} onChange={(e) => setEditTeamAName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Nome do Time B</Label>
+                <Input placeholder="Time B" value={editTeamBName} onChange={(e) => setEditTeamBName(e.target.value)} />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label>Observações</Label>
+              <Label>Observacoes</Label>
               <Textarea placeholder="Notas sobre o jogo" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
+              {saving ? 'Salvando...' : 'Salvar Alteracoes'}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
+      {/* Dialog: Confirmar Exclusao */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogTitle>Confirmar Exclusao</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Tem certeza que deseja excluir este jogo? Os jogadores avulsos vinculados também serão removidos.
+            Tem certeza que deseja excluir este jogo? Os jogadores avulsos vinculados tambem serao removidos.
           </p>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteDialogOpen(false)}>
@@ -792,7 +976,7 @@ export default function MatchesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add guest dialog */}
+      {/* Dialog: Adicionar Jogador Avulso */}
       <Dialog open={guestDialogOpen} onOpenChange={setGuestDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -813,7 +997,7 @@ export default function MatchesPage() {
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="25.00"
+                placeholder="25,00"
                 value={guestAmount}
                 onChange={(e) => setGuestAmount(e.target.value)}
                 required

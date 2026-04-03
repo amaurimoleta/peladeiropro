@@ -12,27 +12,47 @@ import {
   LogOut,
   Menu,
   X,
+  User,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
+import { GroupSelector } from '@/components/dashboard/group-selector'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/members', icon: Users, label: 'Membros' },
   { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
-  { href: '/settings', icon: Settings, label: 'Configuracoes' },
+  { href: '/settings', icon: Settings, label: 'Configurações' },
 ]
 
 export function Sidebar({ groupId, groupName }: { groupId: string; groupName: string }) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userName, setUserName] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+  const { resolvedTheme } = useTheme()
+
+  useEffect(() => {
+    async function fetchUser() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+        setUserName(profile?.full_name || user.email || null)
+      }
+    }
+    fetchUser()
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -42,11 +62,11 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
 
   const nav = (
     <nav className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800 space-y-3">
         <Link href="/dashboard">
-          <Logo size="sm" />
+          <Logo size="sm" variant={resolvedTheme === 'dark' ? 'white' : 'dark'} />
         </Link>
-        <p className="text-xs text-muted-foreground mt-2 truncate font-medium">{groupName}</p>
+        <GroupSelector currentGroupId={groupId} currentGroupName={groupName} />
       </div>
       <div className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
         {navItems.map((item) => {
@@ -73,6 +93,24 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
         })}
       </div>
       <div className="p-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+        {userName && (
+          <div className="px-3 py-1 mb-1">
+            <p className="text-xs text-muted-foreground truncate">{userName}</p>
+          </div>
+        )}
+        <Link
+          href="/dashboard/profile"
+          onClick={() => setMobileOpen(false)}
+          className={cn(
+            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+            pathname === '/dashboard/profile'
+              ? 'bg-gradient-to-r from-brand-green/10 to-brand-green/5 text-brand-green shadow-sm'
+              : 'text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-brand-navy dark:hover:text-gray-200'
+          )}
+        >
+          <User className="h-4 w-4" />
+          Meu Perfil
+        </Link>
         <div className="flex items-center gap-3 px-3 py-1">
           <ThemeToggle />
           <span className="text-sm font-medium text-muted-foreground">Tema</span>

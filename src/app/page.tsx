@@ -50,7 +50,7 @@ const features = [
   {
     icon: Shield,
     title: 'Controle de Permissoes',
-    description: 'Admin, tesoureiro e membro: cada um ve e edita apenas o que pode.',
+    description: 'Presidente, tesoureiro e membro: cada um ve e edita apenas o que pode.',
     gradient: 'from-cyan-500 to-blue-600',
   },
   {
@@ -72,19 +72,19 @@ const testimonials = [
   {
     name: 'Rafael Oliveira',
     group: 'Pelada dos Crias FC',
-    text: 'Acabou a briga por causa de dinheiro. Agora todo mundo ve no link quem pagou e quem nao pagou.',
+    text: 'Antes eu era o chato que ficava cobrando. Agora o app cobra por mim e eu volto a ser amigo de todo mundo.',
     stars: 5,
   },
   {
     name: 'Carlos Eduardo',
     group: 'Veteranos United',
-    text: 'Eu era tesoureiro e usava Excel. Com o PeladeiroPro gero as mensalidades em 1 clique e cobro pelo WhatsApp.',
+    text: 'Meu Excel tinha mais abas que jogador no grupo. Com o PeladeiroPro, so preciso de um clique. Minha terapeuta agradeceu.',
     stars: 5,
   },
   {
     name: 'Anderson Lima',
     group: 'Bola Preta FC',
-    text: 'A prestacao de contas publica mudou o jogo. Transparencia total, zero reclamacao. Recomendo demais!',
+    text: 'O tesoureiro anterior pediu pra sair do grupo. Eu assumi com o PeladeiroPro e agora todo mundo paga em dia. Ate o goleiro.',
     stars: 5,
   },
 ]
@@ -108,7 +108,7 @@ const faqs = [
   },
   {
     q: 'Posso ter mais de um tesoureiro?',
-    a: 'Sim! Voce pode promover membros para Tesoureiro ou Administrador nas configuracoes do grupo.',
+    a: 'Sim! Voce pode promover membros para Tesoureiro ou Presidente nas configuracoes do grupo.',
   },
   {
     q: 'Como funciona a prestacao de contas?',
@@ -148,9 +148,11 @@ export default function LandingPage() {
             <div className="hidden md:block"><Logo size="hero" variant="white" /></div>
             <div className="md:hidden"><Logo size="xl" variant="white" /></div>
           </div>
-          <p className="text-lg md:text-2xl text-white/70 max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-            A forma mais simples de gerenciar a tesouraria do seu grupo de futebol.
-            Controle mensalidades, despesas e preste contas com transparencia.
+          <p className="text-lg md:text-2xl text-white/70 max-w-2xl mx-auto mb-4 leading-relaxed font-light animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+            Agora o seu grupo tambem pode ser uma SAF
+          </p>
+          <p className="text-sm md:text-base text-white/50 max-w-xl mx-auto mb-10 leading-relaxed animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+            Chega de anotar no caderninho, cobrar no WhatsApp e ouvir &ldquo;vou pagar semana que vem&rdquo;. O PeladeiroPro resolve.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
             <Link href="/register" className="btn-modern-green text-lg !px-8 !py-4 flex items-center gap-2 animate-pulse-subtle">
@@ -200,7 +202,7 @@ export default function LandingPage() {
               Tudo que voce precisa para organizar a pelada
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Chega de planilha no Excel e anotacao no caderno. Gerencie tudo em um so lugar.
+              Chega de planilha, caderninho e &ldquo;depois eu pago&rdquo;. Seu grupo merece gestao profissional.
             </p>
           </AnimateOnScroll>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -232,9 +234,9 @@ export default function LandingPage() {
           </AnimateOnScroll>
           <div className="grid gap-8 md:grid-cols-3">
             {[
-              { step: '1', title: 'Crie seu grupo', desc: 'Cadastre seu grupo de pelada e adicione os membros em segundos.' },
-              { step: '2', title: 'Gerencie tudo', desc: 'Controle mensalidades, avulsos, despesas e acompanhe em tempo real.' },
-              { step: '3', title: 'Compartilhe', desc: 'Envie o link de prestacao de contas no WhatsApp com um toque.' },
+              { step: '1', title: 'Crie seu grupo', desc: 'Cadastre o grupo, adicione os membros e pronto. Mais rapido que escalar o time no WhatsApp.' },
+              { step: '2', title: 'Gerencie tudo', desc: 'Mensalidades, avulsos, despesas... tudo num so lugar. Seu Excel pode finalmente descansar em paz.' },
+              { step: '3', title: 'Compartilhe', desc: 'Mande o link no grupo e deixe a transparencia fazer o trabalho sujo. Ninguem reclama de dados.' },
             ].map((item, i) => (
               <AnimateOnScroll key={item.step} delay={i * 150} className="text-center group">
                 <div className="relative mx-auto mb-6">

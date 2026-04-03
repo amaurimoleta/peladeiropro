@@ -460,6 +460,11 @@
 /* Tabular numbers */
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
+/* Dark mode contrast overrides */
+.dark .text-brand-navy { color: #e4e7f0; }
+.dark .text-brand-green { color: #00E676; }
+.dark .border-gray-100 { border-color: rgba(255,255,255,0.08); }
+
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

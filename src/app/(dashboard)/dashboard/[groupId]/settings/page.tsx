@@ -46,6 +46,7 @@ import { logAudit } from '@/lib/audit'
 import { InviteManager } from '@/components/dashboard/invite-manager'
 import RecurringExpenses from '@/components/dashboard/recurring-expenses'
 import CustomCategories from '@/components/dashboard/custom-categories'
+import { ImageUpload } from '@/components/shared/image-upload'
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
   update_group_settings: 'Atualizou configuracoes do grupo',
@@ -395,6 +396,25 @@ export default function SettingsPage() {
             <CardTitle className="text-base">Informacoes do Grupo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex justify-center">
+              <ImageUpload
+                currentUrl={group?.cover_url || null}
+                onUpload={async (url) => {
+                  const { error } = await supabase.from('groups').update({ cover_url: url || null }).eq('id', groupId)
+                  if (error) {
+                    toast.error('Erro ao atualizar imagem', { description: error.message })
+                  } else {
+                    toast.success('Imagem atualizada!')
+                    setGroup((prev) => prev ? { ...prev, cover_url: url || null } : null)
+                  }
+                }}
+                bucket="uploads"
+                folder="group-covers"
+                size="lg"
+                shape="rounded"
+                label="Capa do grupo"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Nome do grupo</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required disabled={isReadOnly} />
@@ -460,8 +480,8 @@ export default function SettingsPage() {
                 <ShieldAlert className="h-4 w-4 text-white" />
               </div>
               <div>
-                <CardTitle className="text-base">Administradores</CardTitle>
-                <CardDescription>Gerencie os administradores e tesoureiros do grupo</CardDescription>
+                <CardTitle className="text-base">Presidentes</CardTitle>
+                <CardDescription>Gerencie os presidentes e tesoureiros do grupo</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -516,7 +536,7 @@ export default function SettingsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="treasurer">Tesoureiro</SelectItem>
-                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="admin">Presidente</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

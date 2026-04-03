@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Phone, UserMinus, UserCheck, Pencil, Trash2, History, Check, Clock, AlertCircle, Link2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
+import { ImageUpload } from '@/components/shared/image-upload'
 import { GroupMember, MEMBER_ROLES, MEMBER_TYPES, FEE_STATUSES } from '@/lib/types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -50,6 +51,8 @@ export default function MembersPage() {
   const [phone, setPhone] = useState('')
   const [role, setRole] = useState('member')
   const [memberType, setMemberType] = useState('mensalista')
+  const [team, setTeam] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Edit dialog state
@@ -59,6 +62,8 @@ export default function MembersPage() {
   const [editPhone, setEditPhone] = useState('')
   const [editRole, setEditRole] = useState('member')
   const [editMemberType, setEditMemberType] = useState('mensalista')
+  const [editTeam, setEditTeam] = useState('')
+  const [editAvatarUrl, setEditAvatarUrl] = useState('')
 
   // History dialog state
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
@@ -100,6 +105,8 @@ export default function MembersPage() {
       phone: phone || null,
       role,
       member_type: memberType,
+      team: team || null,
+      avatar_url: avatarUrl || null,
     }).select().single()
     if (error) {
       toast.error('Erro ao adicionar membro', { description: error.message })
@@ -117,6 +124,8 @@ export default function MembersPage() {
       setPhone('')
       setRole('member')
       setMemberType('mensalista')
+      setTeam('')
+      setAvatarUrl('')
       loadMembers()
     }
     setSaving(false)
@@ -133,6 +142,8 @@ export default function MembersPage() {
         phone: editPhone || null,
         role: editRole,
         member_type: editMemberType,
+        team: editTeam || null,
+        avatar_url: editAvatarUrl || null,
       })
       .eq('id', editMember.id)
     if (error) {
@@ -159,6 +170,8 @@ export default function MembersPage() {
     setEditPhone(member.phone || '')
     setEditRole(member.role)
     setEditMemberType(member.member_type)
+    setEditTeam(member.team || '')
+    setEditAvatarUrl(member.avatar_url || '')
     setEditDialogOpen(true)
   }
 
@@ -314,6 +327,17 @@ export default function MembersPage() {
                 <DialogTitle>Novo Membro</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAdd} className="space-y-4">
+                <div className="flex justify-center">
+                  <ImageUpload
+                    currentUrl={avatarUrl || null}
+                    onUpload={(url) => setAvatarUrl(url)}
+                    bucket="uploads"
+                    folder="member-avatars"
+                    size="sm"
+                    shape="circle"
+                    label="Foto"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Nome *</Label>
                   <Input
@@ -340,7 +364,7 @@ export default function MembersPage() {
                     <SelectContent>
                       <SelectItem value="member">Membro</SelectItem>
                       <SelectItem value="treasurer">Tesoureiro</SelectItem>
-                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="admin">Presidente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -355,6 +379,14 @@ export default function MembersPage() {
                       <SelectItem value="avulso">Avulso</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Time</Label>
+                  <Input
+                    placeholder="Ex: Time A, Azul, Vermelho..."
+                    value={team}
+                    onChange={(e) => setTeam(e.target.value)}
+                  />
                 </div>
                 <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
                   {saving ? 'Salvando...' : 'Adicionar'}
@@ -372,6 +404,17 @@ export default function MembersPage() {
             <DialogTitle>Editar Membro</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEdit} className="space-y-4">
+            <div className="flex justify-center">
+              <ImageUpload
+                currentUrl={editAvatarUrl || null}
+                onUpload={(url) => setEditAvatarUrl(url)}
+                bucket="uploads"
+                folder="member-avatars"
+                size="sm"
+                shape="circle"
+                label="Foto"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Nome *</Label>
               <Input
@@ -398,7 +441,7 @@ export default function MembersPage() {
                 <SelectContent>
                   <SelectItem value="member">Membro</SelectItem>
                   <SelectItem value="treasurer">Tesoureiro</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="admin">Presidente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -413,6 +456,14 @@ export default function MembersPage() {
                   <SelectItem value="avulso">Avulso</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Time</Label>
+              <Input
+                placeholder="Ex: Time A, Azul, Vermelho..."
+                value={editTeam}
+                onChange={(e) => setEditTeam(e.target.value)}
+              />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar'}
@@ -516,6 +567,7 @@ export default function MembersPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Telefone</TableHead>
+                <TableHead>Time</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Papel</TableHead>
                 <TableHead>Status</TableHead>
@@ -525,13 +577,13 @@ export default function MembersPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : members.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
                     Nenhum membro ainda. Adicione o primeiro!
                   </TableCell>
                 </TableRow>
@@ -539,13 +591,26 @@ export default function MembersPage() {
                 members.map((member) => (
                   <TableRow key={member.id} className={member.status === 'inactive' ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">
-                      <button
-                        type="button"
-                        className="underline cursor-pointer text-[#1B1F4B] hover:text-[#1B1F4B]/70"
-                        onClick={() => openHistoryDialog(member)}
-                      >
-                        {member.name}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {member.avatar_url ? (
+                          <img
+                            src={member.avatar_url}
+                            alt={member.name}
+                            className="h-7 w-7 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="h-7 w-7 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-xs font-bold text-[#1B1F4B] shrink-0">
+                            {member.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="underline cursor-pointer text-[#1B1F4B] hover:text-[#1B1F4B]/70"
+                          onClick={() => openHistoryDialog(member)}
+                        >
+                          {member.name}
+                        </button>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {member.phone ? (
@@ -568,6 +633,18 @@ export default function MembersPage() {
                             </svg>
                           </a>
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {member.team ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                        >
+                          {member.team}
+                        </Badge>
                       ) : (
                         <span className="text-muted-foreground text-sm">-</span>
                       )}
