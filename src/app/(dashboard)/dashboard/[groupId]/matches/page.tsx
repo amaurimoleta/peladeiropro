@@ -22,7 +22,9 @@ import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
-import type { Match, GuestPlayer, GroupMember, Group } from '@/lib/types'
+import type { Match, GuestPlayer, GroupMember, Group, Tournament } from '@/lib/types'
+import { TOURNAMENT_STATUSES } from '@/lib/types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface AttendanceMap {
   [memberId: string]: { id?: string; present: boolean }
@@ -79,6 +81,11 @@ export default function MatchesPage() {
   const [savingScore, setSavingScore] = useState<Record<string, boolean>>({})
   const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
 
+  // Tournaments
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [newTournamentId, setNewTournamentId] = useState('')
+  const [editTournamentId, setEditTournamentId] = useState('')
+
   // Add guest dialog
   const [guestDialogOpen, setGuestDialogOpen] = useState(false)
   const [guestMatchId, setGuestMatchId] = useState<string | null>(null)
@@ -119,6 +126,20 @@ export default function MatchesPage() {
       setMensalistas(data || [])
     }
     loadMensalistas()
+  }, [groupId])
+
+  // Load active tournaments
+  useEffect(() => {
+    async function loadTournaments() {
+      const { data } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .order('name')
+      setTournaments(data || [])
+    }
+    loadTournaments()
   }, [groupId])
 
   // Load matches and guests separately (same pattern as financeiro)
@@ -260,6 +281,7 @@ export default function MatchesPage() {
       notes: newNotes || null,
       team_a_name: newTeamAName || 'Time A',
       team_b_name: newTeamBName || 'Time B',
+      tournament_id: newTournamentId && newTournamentId !== 'none' ? newTournamentId : null,
     })
     if (error) {
       console.error('Erro ao criar jogo:', error)
@@ -279,6 +301,7 @@ export default function MatchesPage() {
       setNewNotes('')
       setNewTeamAName('Time A')
       setNewTeamBName('Time B')
+      setNewTournamentId('')
       await loadMatches()
     }
     setSaving(false)
@@ -291,6 +314,7 @@ export default function MatchesPage() {
     setEditNotes(match.notes || '')
     setEditTeamAName(match.team_a_name || 'Time A')
     setEditTeamBName(match.team_b_name || 'Time B')
+    setEditTournamentId(match.tournament_id || '')
     setEditDialogOpen(true)
   }
 
@@ -306,6 +330,7 @@ export default function MatchesPage() {
         notes: editNotes || null,
         team_a_name: editTeamAName || 'Time A',
         team_b_name: editTeamBName || 'Time B',
+        tournament_id: editTournamentId && editTournamentId !== 'none' ? editTournamentId : null,
       })
       .eq('id', editingMatch.id)
     if (error) {
@@ -591,6 +616,14 @@ export default function MatchesPage() {
                         {/* Observacoes */}
                         {match.notes && (
                           <p className="text-xs text-muted-foreground ml-6">{match.notes}</p>
+                        )}
+
+                        {/* Tournament badge */}
+                        {match.tournament_id && tournaments.length > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded-full px-2 py-0.5 w-fit">
+                            <Trophy className="h-3 w-3" />
+                            {tournaments.find(t => t.id === match.tournament_id)?.name || 'Campeonato'}
+                          </div>
                         )}
                       </div>
 
@@ -962,6 +995,18 @@ export default function MatchesPage() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label>Campeonato</Label>
+              <Select value={newTournamentId} onValueChange={(v) => setNewTournamentId(v || '')}>
+                <SelectTrigger><SelectValue placeholder="Nenhum (jogo avulso)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum (jogo avulso)</SelectItem>
+                  {tournaments.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Observacoes</Label>
               <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
             </div>
@@ -996,6 +1041,18 @@ export default function MatchesPage() {
                 <Label>Nome do Time B</Label>
                 <Input placeholder="Time B" value={editTeamBName} onChange={(e) => setEditTeamBName(e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Campeonato</Label>
+              <Select value={editTournamentId} onValueChange={(v) => setEditTournamentId(v || '')}>
+                <SelectTrigger><SelectValue placeholder="Nenhum (jogo avulso)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum (jogo avulso)</SelectItem>
+                  {tournaments.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Observacoes</Label>

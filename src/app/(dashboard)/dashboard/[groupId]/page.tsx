@@ -7,6 +7,7 @@ import { AttendanceRanking } from '@/components/dashboard/attendance-ranking'
 import AnnouncementsCard from '@/components/dashboard/announcements-card'
 import FinancialCharts from '@/components/dashboard/financial-charts'
 import type { MonthlyFinancialData, ExpenseCategoryData } from '@/components/dashboard/financial-charts'
+import { DashboardNav } from '@/components/dashboard/dashboard-nav'
 
 const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   court_rental: 'Quadra',
@@ -26,19 +27,28 @@ const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
 
 export default async function GroupDashboard({
   params,
+  searchParams,
 }: {
   params: Promise<{ groupId: string }>
+  searchParams: Promise<{ mes?: string; visao?: string }>
 }) {
   const { groupId } = await params
+  const { mes, visao } = await searchParams
   const supabase = await createClient()
   const now = new Date()
-  const currentMonth = format(now, 'yyyy-MM')
-  const monthLabel = format(now, 'MMMM yyyy', { locale: ptBR })
-  const firstDay = `${currentMonth}-01`
-  const lastDay = format(endOfMonth(now), 'yyyy-MM-dd')
+  const selectedDate = mes ? new Date(mes + '-15T12:00:00') : now
+  const viewMode = visao === 'ano' ? 'year' : 'month'
+  const currentMonth = format(selectedDate, 'yyyy-MM')
+  const year = selectedDate.getFullYear()
+  const monthLabel = viewMode === 'year'
+    ? `Visao Anual - ${year}`
+    : format(selectedDate, 'MMMM yyyy', { locale: ptBR })
+  const firstDay = viewMode === 'year' ? `${year}-01-01` : `${currentMonth}-01`
+  const lastDay = viewMode === 'year' ? `${year}-12-31` : format(endOfMonth(selectedDate), 'yyyy-MM-dd')
 
-  // Build date ranges for last 6 months (for charts)
-  const sixMonthsAgo = format(startOfMonth(subMonths(now, 5)), 'yyyy-MM-dd')
+  // Build date ranges for charts (12 months for year view, 6 for month view)
+  const chartMonthsBack = viewMode === 'year' ? 11 : 5
+  const chartStartDate = format(startOfMonth(subMonths(selectedDate, chartMonthsBack)), 'yyyy-MM-dd')
 
   const [
     { data: group },
@@ -60,7 +70,9 @@ export default async function GroupDashboard({
   ] = await Promise.all([
     supabase.from('groups').select('*').eq('id', groupId).single(),
     supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active'),
-    supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).eq('reference_month', currentMonth),
+    viewMode === 'year'
+      ? supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).gte('reference_month', `${year}-01`).lte('reference_month', `${year}-12`)
+      : supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).eq('reference_month', currentMonth),
     supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay),
     supabase.from('expenses').select('*').eq('group_id', groupId).gte('expense_date', firstDay).lte('expense_date', lastDay),
     supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay).order('match_date', { ascending: false }),
@@ -71,9 +83,9 @@ export default async function GroupDashboard({
     // Match attendance for current month matches
     supabase.from('match_attendance').select('*, member:group_members(name), match:matches(match_date, group_id)').eq('present', true),
     // Chart data: fees, guests, expenses for last 6 months
-    supabase.from('monthly_fees').select('amount, reference_month, status').eq('group_id', groupId).eq('status', 'paid').gte('reference_month', format(subMonths(now, 5), 'yyyy-MM')),
-    supabase.from('guest_players').select('amount, match_date, paid').eq('group_id', groupId).eq('paid', true).gte('match_date', sixMonthsAgo),
-    supabase.from('expenses').select('amount, expense_date, category').eq('group_id', groupId).gte('expense_date', sixMonthsAgo),
+    supabase.from('monthly_fees').select('amount, reference_month, status').eq('group_id', groupId).eq('status', 'paid').gte('reference_month', format(subMonths(selectedDate, chartMonthsBack), 'yyyy-MM')),
+    supabase.from('guest_players').select('amount, match_date, paid').eq('group_id', groupId).eq('paid', true).gte('match_date', chartStartDate),
+    supabase.from('expenses').select('amount, expense_date, category').eq('group_id', groupId).gte('expense_date', chartStartDate),
   ])
 
   // ---- Accumulated balance (all-time) ----
@@ -99,10 +111,10 @@ export default async function GroupDashboard({
   const mensalistas = members?.filter(m => m.member_type === 'mensalista').length || 0
   const avulsos = members?.filter(m => m.member_type === 'avulso').length || 0
 
-  // ---- Chart data: last 6 months ----
+  // ---- Chart data: last N months ----
   const monthlyData: MonthlyFinancialData[] = []
-  for (let i = 5; i >= 0; i--) {
-    const d = subMonths(now, i)
+  for (let i = chartMonthsBack; i >= 0; i--) {
+    const d = subMonths(selectedDate, i)
     const monthKey = format(d, 'yyyy-MM')
     const label = format(d, 'MMM', { locale: ptBR })
 
@@ -200,6 +212,8 @@ export default async function GroupDashboard({
           <span>{matches?.length || 0} jogos no mes</span>
         </div>
       </div>
+
+      <DashboardNav currentMonth={currentMonth} viewMode={viewMode} />
 
       <AnnouncementsCard groupId={groupId} />
 

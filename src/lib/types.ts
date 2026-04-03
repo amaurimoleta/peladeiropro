@@ -70,6 +70,21 @@ export interface GuestPlayer {
   created_at: string
 }
 
+export interface Tournament {
+  id: string
+  group_id: string
+  name: string
+  description: string | null
+  start_date: string | null
+  end_date: string | null
+  status: 'active' | 'finished' | 'cancelled'
+  points_win: number
+  points_draw: number
+  points_loss: number
+  created_at: string
+  updated_at: string
+}
+
 export interface Match {
   id: string
   group_id: string
@@ -80,10 +95,12 @@ export interface Match {
   team_b_name: string | null
   score_a: number | null
   score_b: number | null
+  tournament_id: string | null
   created_at: string
   updated_at: string
   guest_players?: GuestPlayer[]
   attendance?: MatchAttendance[]
+  tournament?: Tournament
 }
 
 export interface MatchAttendance {
@@ -192,6 +209,12 @@ export const MEMBER_ROLES: Record<string, string> = {
 export const MEMBER_TYPES: Record<string, string> = {
   mensalista: 'Mensalista',
   avulso: 'Avulso',
+}
+
+export const TOURNAMENT_STATUSES: Record<string, string> = {
+  active: 'Em andamento',
+  finished: 'Encerrado',
+  cancelled: 'Cancelado',
 }
 
 export const FEE_STATUSES: Record<string, string> = {

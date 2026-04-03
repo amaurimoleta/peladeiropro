@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   User,
+  Trophy,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
@@ -26,6 +27,7 @@ import { GroupSelector } from '@/components/dashboard/group-selector'
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
+  { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
   { href: '/members', icon: Users, label: 'Membros' },
   { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
   { href: '/settings', icon: Settings, label: 'Configurações' },
