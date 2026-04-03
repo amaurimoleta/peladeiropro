@@ -20,7 +20,7 @@ import {
   ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { EXPENSE_CATEGORIES, type Expense, type GroupMember, type Group, type MonthlyFee } from '@/lib/types'
 import { useGroupRole } from '@/hooks/use-group-role'
@@ -123,8 +123,8 @@ export default function FinanceiroPage() {
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active').order('name'),
       supabase.from('monthly_fees').select('*, member:group_members(name, member_type, phone)').eq('group_id', groupId).eq('reference_month', currentMonth),
-      supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`).order('expense_date', { ascending: false }),
-      supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).eq('paid', true),
+      supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('expense_date', { ascending: false }),
+      supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).eq('paid', true),
     ])
     setGroup(groupData)
     setMembers(membersData || [])
@@ -154,7 +154,7 @@ export default function FinanceiroPage() {
   const loadRateio = useCallback(async () => {
     setLoadingRateio(true)
     const startDate = `${currentMonth}-01`
-    const endDate = `${currentMonth}-31`
+    const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd')
 
     // Get matches for the month
     const { data: matchesData } = await supabase

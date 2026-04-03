@@ -18,7 +18,7 @@ import {
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
   ChevronRight, Users, Camera, Share2,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { EXPENSE_CATEGORIES, PIX_KEY_TYPES } from '@/lib/types'
 import { ShareButton } from '@/components/shared/share-button'
@@ -134,9 +134,9 @@ export default function PublicPage() {
       setLoading(true)
       const [{ data: feesData }, { data: guestsData }, { data: expensesData }, { data: matchesData }] = await Promise.all([
         supabase.from('monthly_fees').select('*, member:group_members(name, member_type)').eq('group_id', group.id).eq('reference_month', currentMonth),
-        supabase.from('guest_players').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`),
-        supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`).order('expense_date', { ascending: false }),
-        supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).order('match_date', { ascending: false }),
+        supabase.from('guest_players').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')),
+        supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', `${currentMonth}-01`).lte('expense_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('expense_date', { ascending: false }),
+        supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('match_date', { ascending: false }),
       ])
 
       // Load attendance counts for each match

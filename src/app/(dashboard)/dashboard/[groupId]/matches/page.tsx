@@ -13,24 +13,23 @@ import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
-  MessageCircle, DollarSign, Trophy,
+  MessageCircle, DollarSign, Trophy, Save, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
-import type { Match, GuestPlayer, GroupMember, MatchAttendance, Group } from '@/lib/types'
+import type { Match, GuestPlayer, GroupMember, Group } from '@/lib/types'
 
 interface AttendanceMap {
   [memberId: string]: { id?: string; present: boolean }
 }
 
-interface ExpenseSummary {
-  total: number
-  loading: boolean
+interface MatchWithGuests extends Match {
+  guests: GuestPlayer[]
 }
 
 export default function MatchesPage() {
@@ -40,7 +39,7 @@ export default function MatchesPage() {
   const { isAdmin, isReadOnly } = useGroupRole(groupId)
 
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [matches, setMatches] = useState<Match[]>([])
+  const [matches, setMatches] = useState<MatchWithGuests[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null)
 
@@ -55,7 +54,7 @@ export default function MatchesPage() {
   const [attendanceLoading, setAttendanceLoading] = useState<Record<string, boolean>>({})
 
   // Expense summary per match
-  const [expenseSummaries, setExpenseSummaries] = useState<Record<string, ExpenseSummary>>({})
+  const [expenseSummaries, setExpenseSummaries] = useState<Record<string, { total: number; loading: boolean }>>({})
 
   // New match dialog
   const [newDialogOpen, setNewDialogOpen] = useState(false)
@@ -75,9 +74,10 @@ export default function MatchesPage() {
   const [editTeamAName, setEditTeamAName] = useState('')
   const [editTeamBName, setEditTeamBName] = useState('')
 
-  // Score state per match (local editing)
+  // Score state per match (inline editing)
   const [scoreInputs, setScoreInputs] = useState<Record<string, { a: string; b: string }>>({})
   const [savingScore, setSavingScore] = useState<Record<string, boolean>>({})
+  const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
 
   // Add guest dialog
   const [guestDialogOpen, setGuestDialogOpen] = useState(false)
@@ -121,20 +121,74 @@ export default function MatchesPage() {
     loadMensalistas()
   }, [groupId])
 
-  async function loadMatches() {
+  // Load matches and guests SEPARATELY to avoid FK join issues
+  const loadMatches = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('matches')
-      .select('*, guest_players(*)')
-      .eq('group_id', groupId)
-      .gte('match_date', `${currentMonth}-01`)
-      .lte('match_date', `${currentMonth}-31`)
-      .order('match_date', { ascending: false })
-    setMatches(data || [])
-    setLoading(false)
-  }
 
-  useEffect(() => { loadMatches() }, [groupId, currentMonth])
+    // Calculate correct last day of month (avoids invalid dates like Apr 31)
+    const lastDay = format(endOfMonth(currentDate), 'yyyy-MM-dd')
+    const firstDay = `${currentMonth}-01`
+
+    try {
+      // 1) Load matches (no join)
+      const { data: matchesData, error: matchesError } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('group_id', groupId)
+        .gte('match_date', firstDay)
+        .lte('match_date', lastDay)
+        .order('match_date', { ascending: false })
+
+      if (matchesError) {
+        console.error('Erro ao carregar jogos:', matchesError)
+        toast.error('Erro ao carregar jogos', { description: matchesError.message })
+        setMatches([])
+        setLoading(false)
+        return
+      }
+
+      const loadedMatches = matchesData || []
+
+      // 2) Load guests for matching date range
+      const { data: guestsData, error: guestsError } = await supabase
+        .from('guest_players')
+        .select('*')
+        .eq('group_id', groupId)
+        .gte('match_date', firstDay)
+        .lte('match_date', lastDay)
+
+      if (guestsError) {
+        console.error('Erro ao carregar avulsos:', guestsError)
+      }
+
+      const allGuests = guestsData || []
+
+      // 3) Combine: attach guests to their matches
+      const matchesWithGuests: MatchWithGuests[] = loadedMatches.map((m) => ({
+        ...m,
+        guests: allGuests.filter((g) => g.match_id === m.id),
+      }))
+
+      setMatches(matchesWithGuests)
+
+      // Initialize score inputs for all matches
+      const newScoreInputs: Record<string, { a: string; b: string }> = {}
+      for (const m of matchesWithGuests) {
+        newScoreInputs[m.id] = {
+          a: m.score_a != null ? String(m.score_a) : '',
+          b: m.score_b != null ? String(m.score_b) : '',
+        }
+      }
+      setScoreInputs((prev) => ({ ...prev, ...newScoreInputs }))
+    } catch (err) {
+      console.error('Erro inesperado:', err)
+      toast.error('Erro inesperado ao carregar jogos')
+      setMatches([])
+    }
+    setLoading(false)
+  }, [groupId, currentMonth, currentDate, supabase])
+
+  useEffect(() => { loadMatches() }, [loadMatches])
 
   // Load attendance for a match
   const loadAttendance = useCallback(async (matchId: string) => {
@@ -172,14 +226,6 @@ export default function MatchesPage() {
       const match = matches.find((m) => m.id === expandedMatch)
       if (match) {
         loadExpenses(expandedMatch, match.match_date)
-        // Initialize score inputs from current match data
-        setScoreInputs((prev) => ({
-          ...prev,
-          [expandedMatch]: {
-            a: match.score_a != null ? String(match.score_a) : '',
-            b: match.score_b != null ? String(match.score_b) : '',
-          },
-        }))
       }
     }
   }, [expandedMatch, matches, loadAttendance, loadExpenses])
@@ -247,6 +293,7 @@ export default function MatchesPage() {
       team_b_name: newTeamBName || 'Time B',
     })
     if (error) {
+      console.error('Erro ao criar jogo:', error)
       toast.error('Erro ao criar jogo', { description: error.message })
     } else {
       toast.success('Jogo criado com sucesso!')
@@ -347,7 +394,8 @@ export default function MatchesPage() {
     if (error) {
       toast.error('Erro ao salvar placar', { description: error.message })
     } else {
-      toast.success('Placar salvo com sucesso!')
+      toast.success('Placar salvo!')
+      setEditingScoreId(null)
       await logAudit(supabase, {
         groupId,
         action: 'update_score',
@@ -438,7 +486,7 @@ export default function MatchesPage() {
     return `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`
   }
 
-  // Helpers for cost split
+  // Helpers
   function getAttendanceCount(matchId: string): number {
     const map = attendanceMap[matchId]
     if (!map) return 0
@@ -458,10 +506,6 @@ export default function MatchesPage() {
     return format(new Date(dateStr + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })
   }
 
-  function formatMatchDateShort(dateStr: string): string {
-    return format(new Date(dateStr + 'T12:00:00'), 'dd/MM/yyyy')
-  }
-
   function getTeamAName(match: Match): string {
     return match.team_a_name || 'Time A'
   }
@@ -471,8 +515,8 @@ export default function MatchesPage() {
   }
 
   // Summary
+  const allGuests = matches.flatMap((m) => m.guests || [])
   const totalMatches = matches.length
-  const allGuests = matches.flatMap((m) => m.guest_players || [])
   const totalGuests = allGuests.length
   const totalCollected = allGuests.filter((g) => g.paid).reduce((s, g) => s + Number(g.amount), 0)
   const totalPending = allGuests.filter((g) => !g.paid).reduce((s, g) => s + Number(g.amount), 0)
@@ -481,7 +525,7 @@ export default function MatchesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1B1F4B]">Jogos</h1>
+          <h1 className="text-2xl font-bold text-brand-navy">Jogos</h1>
           <p className="text-muted-foreground">
             {totalMatches} {totalMatches === 1 ? 'jogo' : 'jogos'} | {totalGuests} {totalGuests === 1 ? 'avulso' : 'avulsos'}
           </p>
@@ -503,15 +547,15 @@ export default function MatchesPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="card-modern-elevated">
           <CardContent className="p-4 text-center">
-            <CalendarDays className="h-5 w-5 mx-auto mb-1 text-[#1B1F4B]" />
-            <p className="text-2xl font-bold text-[#1B1F4B]">{totalMatches}</p>
+            <CalendarDays className="h-5 w-5 mx-auto mb-1 text-brand-navy" />
+            <p className="text-2xl font-bold text-brand-navy">{totalMatches}</p>
             <p className="text-xs text-muted-foreground">Jogos</p>
           </CardContent>
         </Card>
         <Card className="card-modern-elevated">
           <CardContent className="p-4 text-center">
-            <Users className="h-5 w-5 mx-auto mb-1 text-[#1B1F4B]" />
-            <p className="text-2xl font-bold text-[#1B1F4B]">{totalGuests}</p>
+            <Users className="h-5 w-5 mx-auto mb-1 text-brand-navy" />
+            <p className="text-2xl font-bold text-brand-navy">{totalGuests}</p>
             <p className="text-xs text-muted-foreground">Avulsos</p>
           </CardContent>
         </Card>
@@ -539,7 +583,7 @@ export default function MatchesPage() {
       ) : (
         <div className="space-y-4">
           {matches.map((match) => {
-            const guests = match.guest_players || []
+            const guests = match.guests || []
             const isExpanded = expandedMatch === match.id
             const matchAttendance = attendanceMap[match.id] || {}
             const presentCount = getAttendanceCount(match.id)
@@ -550,65 +594,34 @@ export default function MatchesPage() {
             const teamB = getTeamBName(match)
             const hasScore = match.score_a != null && match.score_b != null
             const currentScoreInputs = scoreInputs[match.id] || { a: '', b: '' }
+            const isEditingScore = editingScoreId === match.id
 
             return (
               <Card key={match.id} className="card-modern-elevated overflow-hidden">
                 <CardContent className="p-0">
                   {/* Cabecalho do card */}
-                  <div className="p-4">
+                  <div className="p-4 pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         {/* Data */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <CalendarDays className="h-4 w-4 text-[#1B1F4B] shrink-0" />
-                          <span className="font-bold text-lg text-[#1B1F4B] capitalize">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CalendarDays className="h-4 w-4 text-brand-navy shrink-0" />
+                          <span className="font-bold text-lg text-brand-navy capitalize">
                             {formatMatchDate(match.match_date)}
                           </span>
                         </div>
 
                         {/* Local */}
                         {match.location && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
                             <span className="truncate">{match.location}</span>
                           </div>
                         )}
 
-                        {/* Placar */}
-                        <div className="flex items-center gap-3 mt-3 mb-1">
-                          <Trophy className="h-4 w-4 text-[#1B1F4B] shrink-0" />
-                          {hasScore ? (
-                            <div className="flex items-center gap-2 text-lg font-bold">
-                              <span className="text-[#1B1F4B]">{teamA}</span>
-                              <span className="bg-[#1B1F4B] text-white px-2 py-0.5 rounded text-base">
-                                {match.score_a}
-                              </span>
-                              <span className="text-muted-foreground font-normal">x</span>
-                              <span className="bg-[#1B1F4B] text-white px-2 py-0.5 rounded text-base">
-                                {match.score_b}
-                              </span>
-                              <span className="text-[#1B1F4B]">{teamB}</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Placar: --
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Badges */}
-                        <div className="flex items-center gap-2 mt-2">
-                          {guests.length > 0 && (
-                            <Badge variant="secondary" className="bg-[#1B1F4B]/10 text-[#1B1F4B]">
-                              <Users className="h-3 w-3 mr-1" />
-                              {guests.length} {guests.length === 1 ? 'avulso' : 'avulsos'}
-                            </Badge>
-                          )}
-                        </div>
-
                         {/* Observacoes */}
                         {match.notes && (
-                          <p className="text-sm text-muted-foreground mt-2">{match.notes}</p>
+                          <p className="text-xs text-muted-foreground ml-6">{match.notes}</p>
                         )}
                       </div>
 
@@ -616,92 +629,162 @@ export default function MatchesPage() {
                       <div className="flex items-center gap-1 ml-2 shrink-0">
                         {isAdmin && (
                           <>
-                            <Button size="sm" variant="ghost" className="text-[#1B1F4B]" onClick={() => openEdit(match)}>
+                            <Button size="sm" variant="ghost" className="text-brand-navy h-8 w-8 p-0" onClick={() => openEdit(match)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="sm" variant="ghost" className="text-red-500" onClick={() => confirmDelete(match.id)}>
+                            <Button size="sm" variant="ghost" className="text-red-500 h-8 w-8 p-0" onClick={() => confirmDelete(match.id)}>
                               <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-[#00C853]"
-                              onClick={() => openGuestDialog(match.id, match.match_date)}
-                            >
-                              <Plus className="h-3.5 w-3.5" />
                             </Button>
                           </>
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PLACAR - Sempre visivel no card */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-brand-navy/5 to-brand-green/5">
+                    {isEditingScore && isAdmin ? (
+                      /* Modo de edicao do placar */
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs font-semibold text-brand-navy">{teamA}</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-14 h-10 text-center text-lg font-bold border-brand-navy/30"
+                            placeholder="0"
+                            value={currentScoreInputs.a}
+                            onChange={(e) =>
+                              setScoreInputs((prev) => ({
+                                ...prev,
+                                [match.id]: { ...prev[match.id], a: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                        <span className="text-xl font-bold text-muted-foreground mt-4">x</span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs font-semibold text-brand-navy">{teamB}</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="w-14 h-10 text-center text-lg font-bold border-brand-navy/30"
+                            placeholder="0"
+                            value={currentScoreInputs.b}
+                            onChange={(e) =>
+                              setScoreInputs((prev) => ({
+                                ...prev,
+                                [match.id]: { ...prev[match.id], b: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1 ml-3 mt-4">
+                          <Button
+                            size="sm"
+                            className="bg-[#00C853] hover:bg-[#00A843] text-white h-8 px-3"
+                            onClick={() => handleSaveScore(match.id)}
+                            disabled={savingScore[match.id]}
+                          >
+                            {savingScore[match.id] ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Save className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground h-6 px-2 text-xs"
+                            onClick={() => setEditingScoreId(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Exibicao do placar */
+                      <div
+                        className={`flex items-center justify-center gap-3 ${isAdmin ? 'cursor-pointer' : ''}`}
+                        onClick={() => isAdmin && setEditingScoreId(match.id)}
+                        title={isAdmin ? 'Clique para editar o placar' : undefined}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs font-semibold text-brand-navy mb-1">{teamA}</span>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-extrabold ${
+                              hasScore
+                                ? 'bg-brand-navy text-white shadow-md'
+                                : 'bg-gray-100 text-gray-400 border-2 border-dashed border-gray-300'
+                            }`}>
+                              {hasScore ? match.score_a : '-'}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center">
+                            <Trophy className={`h-4 w-4 mb-1 ${hasScore ? 'text-amber-500' : 'text-gray-300'}`} />
+                            <span className="text-lg font-bold text-muted-foreground">x</span>
+                          </div>
+
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs font-semibold text-brand-navy mb-1">{teamB}</span>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-extrabold ${
+                              hasScore
+                                ? 'bg-brand-navy text-white shadow-md'
+                                : 'bg-gray-100 text-gray-400 border-2 border-dashed border-gray-300'
+                            }`}>
+                              {hasScore ? match.score_b : '-'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isAdmin && !hasScore && (
+                          <span className="text-xs text-muted-foreground ml-2 italic">
+                            Toque para registrar
+                          </span>
+                        )}
+                        {isAdmin && hasScore && (
+                          <Pencil className="h-3 w-3 text-muted-foreground ml-2 opacity-50" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Badges + botao expandir */}
+                  <div className="px-4 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {guests.length > 0 && (
+                        <Badge variant="secondary" className="bg-brand-navy/10 text-brand-navy">
+                          <Users className="h-3 w-3 mr-1" />
+                          {guests.length} {guests.length === 1 ? 'avulso' : 'avulsos'}
+                        </Badge>
+                      )}
+                      {isAdmin && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setExpandedMatch(isExpanded ? null : match.id)}
+                          className="text-[#00C853] h-7 text-xs gap-1"
+                          onClick={() => openGuestDialog(match.id, match.match_date)}
                         >
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          <Plus className="h-3 w-3" />
+                          Avulso
                         </Button>
-                      </div>
+                      )}
                     </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground gap-1 text-xs"
+                      onClick={() => setExpandedMatch(isExpanded ? null : match.id)}
+                    >
+                      {isExpanded ? 'Menos' : 'Detalhes'}
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </Button>
                   </div>
 
                   {/* Secoes expandidas */}
                   {isExpanded && (
                     <div className="border-t bg-muted/30 px-4 py-3 space-y-4">
-
-                      {/* Placar */}
-                      {isAdmin && (
-                        <>
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              Placar
-                            </p>
-                            <div className="bg-background rounded-lg px-4 py-3">
-                              <div className="flex items-center justify-center gap-3">
-                                <div className="flex flex-col items-center gap-1">
-                                  <span className="text-sm font-semibold text-[#1B1F4B]">{teamA}</span>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    className="w-16 text-center text-lg font-bold"
-                                    placeholder="0"
-                                    value={currentScoreInputs.a}
-                                    onChange={(e) =>
-                                      setScoreInputs((prev) => ({
-                                        ...prev,
-                                        [match.id]: { ...prev[match.id], a: e.target.value },
-                                      }))
-                                    }
-                                  />
-                                </div>
-                                <span className="text-xl font-bold text-muted-foreground mt-5">x</span>
-                                <div className="flex flex-col items-center gap-1">
-                                  <span className="text-sm font-semibold text-[#1B1F4B]">{teamB}</span>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    className="w-16 text-center text-lg font-bold"
-                                    placeholder="0"
-                                    value={currentScoreInputs.b}
-                                    onChange={(e) =>
-                                      setScoreInputs((prev) => ({
-                                        ...prev,
-                                        [match.id]: { ...prev[match.id], b: e.target.value },
-                                      }))
-                                    }
-                                  />
-                                </div>
-                              </div>
-                              <Button
-                                className="w-full mt-3 bg-[#1B1F4B] hover:bg-[#1B1F4B]/90 text-white"
-                                onClick={() => handleSaveScore(match.id)}
-                                disabled={savingScore[match.id]}
-                              >
-                                {savingScore[match.id] ? 'Salvando...' : 'Salvar Placar'}
-                              </Button>
-                            </div>
-                          </div>
-                          <Separator />
-                        </>
-                      )}
 
                       {/* Presenca */}
                       <div>
@@ -709,7 +792,7 @@ export default function MatchesPage() {
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                             Lista de Presenca
                           </p>
-                          <Badge variant="secondary" className="bg-[#1B1F4B]/10 text-[#1B1F4B]">
+                          <Badge variant="secondary" className="bg-brand-navy/10 text-brand-navy">
                             {presentCount}/{mensalistas.length} presentes
                           </Badge>
                         </div>
@@ -734,7 +817,7 @@ export default function MatchesPage() {
                                     onChange={() => toggleAttendance(match.id, member.id)}
                                     className="h-4 w-4 rounded border-gray-300 text-[#00C853] focus:ring-[#00C853] accent-[#00C853]"
                                   />
-                                  <span className={`text-sm ${isPresent ? 'font-medium text-[#1B1F4B]' : 'text-muted-foreground'}`}>
+                                  <span className={`text-sm ${isPresent ? 'font-medium text-brand-navy' : 'text-muted-foreground'}`}>
                                     {member.name}
                                   </span>
                                 </label>
@@ -768,7 +851,7 @@ export default function MatchesPage() {
                                   className="flex items-center justify-between bg-background rounded-lg px-3 py-2"
                                 >
                                   <div className="flex-1 min-w-0">
-                                    <span className="font-medium text-sm text-[#1B1F4B]">{guest.name}</span>
+                                    <span className="font-medium text-sm text-brand-navy">{guest.name}</span>
                                     {guest.phone && (
                                       <span className="text-xs text-muted-foreground ml-2">{guest.phone}</span>
                                     )}
@@ -844,25 +927,25 @@ export default function MatchesPage() {
                           <div className="bg-background rounded-lg px-4 py-3 space-y-2">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Despesas do dia</span>
-                              <span className="font-medium text-[#1B1F4B]">
+                              <span className="font-medium text-brand-navy">
                                 R$ {(expenseSummary?.total ?? 0).toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Mensalistas presentes</span>
-                              <span className="font-medium text-[#1B1F4B]">{presentCount}</span>
+                              <span className="font-medium text-brand-navy">{presentCount}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Avulsos</span>
-                              <span className="font-medium text-[#1B1F4B]">{guestCount}</span>
+                              <span className="font-medium text-brand-navy">{guestCount}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Total de jogadores</span>
-                              <span className="font-medium text-[#1B1F4B]">{presentCount + guestCount}</span>
+                              <span className="font-medium text-brand-navy">{presentCount + guestCount}</span>
                             </div>
                             <Separator />
                             <div className="flex items-center justify-between">
-                              <span className="font-semibold text-[#1B1F4B] flex items-center gap-1">
+                              <span className="font-semibold text-brand-navy flex items-center gap-1">
                                 <DollarSign className="h-4 w-4" />
                                 Custo por jogador
                               </span>

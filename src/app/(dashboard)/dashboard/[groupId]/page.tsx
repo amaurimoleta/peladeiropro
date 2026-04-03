@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope, Wallet, Activity, BarChart3, UserCheck } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope, Wallet, UserCheck } from 'lucide-react'
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import RankingCard from '@/components/dashboard/ranking-card'
@@ -24,14 +24,6 @@ const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
   other: '#64748b',
 }
 
-const ACTION_ICONS: Record<string, string> = {
-  create: '➕',
-  update: '✏️',
-  delete: '🗑️',
-  payment: '💰',
-  default: '📋',
-}
-
 export default async function GroupDashboard({
   params,
 }: {
@@ -42,6 +34,8 @@ export default async function GroupDashboard({
   const now = new Date()
   const currentMonth = format(now, 'yyyy-MM')
   const monthLabel = format(now, 'MMMM yyyy', { locale: ptBR })
+  const firstDay = `${currentMonth}-01`
+  const lastDay = format(endOfMonth(now), 'yyyy-MM-dd')
 
   // Build date ranges for last 6 months (for charts)
   const sixMonthsAgo = format(startOfMonth(subMonths(now, 5)), 'yyyy-MM-dd')
@@ -57,8 +51,6 @@ export default async function GroupDashboard({
     { data: allFees },
     { data: allGuests },
     { data: allExpenses },
-    // Audit logs
-    { data: auditLogs },
     // Attendance for current month
     { data: matchAttendance },
     // Last 6 months data for charts
@@ -69,15 +61,13 @@ export default async function GroupDashboard({
     supabase.from('groups').select('*').eq('id', groupId).single(),
     supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active'),
     supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).eq('reference_month', currentMonth),
-    supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`),
-    supabase.from('expenses').select('*').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`),
-    supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).order('match_date', { ascending: false }),
+    supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay),
+    supabase.from('expenses').select('*').eq('group_id', groupId).gte('expense_date', firstDay).lte('expense_date', lastDay),
+    supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay).order('match_date', { ascending: false }),
     // All-time for accumulated balance
     supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
     supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
     supabase.from('expenses').select('amount').eq('group_id', groupId),
-    // Audit logs
-    supabase.from('audit_logs').select('*').eq('group_id', groupId).order('created_at', { ascending: false }).limit(10),
     // Match attendance for current month matches
     supabase.from('match_attendance').select('*, member:group_members(name), match:matches(match_date, group_id)').eq('present', true),
     // Chart data: fees, guests, expenses for last 6 months
@@ -394,51 +384,6 @@ export default async function GroupDashboard({
         <AttendanceRanking groupId={groupId} />
       </div>
 
-      {/* Audit Log Preview */}
-      {auditLogs && auditLogs.length > 0 && (
-        <div className="card-modern-elevated mt-8 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center shadow-sm">
-              <Activity className="h-4 w-4 text-white" />
-            </div>
-            <h2 className="font-bold text-brand-navy">Atividade Recente</h2>
-          </div>
-          <div className="relative">
-            {/* Timeline line */}
-            <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-200" />
-            <div className="space-y-4">
-              {auditLogs.map((log: any, index: number) => {
-                const actionKey = log.action?.includes('create') ? 'create'
-                  : log.action?.includes('update') ? 'update'
-                  : log.action?.includes('delete') ? 'delete'
-                  : log.action?.includes('pay') || log.action?.includes('paid') ? 'payment'
-                  : 'default'
-                const icon = ACTION_ICONS[actionKey]
-
-                return (
-                  <div key={log.id} className="flex items-start gap-3 relative pl-1">
-                    <div className="h-6 w-6 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-xs z-10 shrink-0">
-                      {icon}
-                    </div>
-                    <div className="flex-1 min-w-0 pb-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-brand-navy">{log.user_name || 'Sistema'}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(log.created_at), 'dd/MM HH:mm', { locale: ptBR })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {log.action}
-                        {log.entity_type && <span className="ml-1">({log.entity_type})</span>}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
