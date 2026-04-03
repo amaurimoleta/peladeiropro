@@ -5,23 +5,28 @@ interface LogoProps {
   variant?: 'dark' | 'white'
 }
 
-const dimensions = {
-  sm: 36,
-  md: 48,
-  lg: 64,
-  xl: 80,
-  hero: 110,
+// Logo SVG is 600x110 (aspect ratio ~5.45:1)
+// Heights defined per size, widths calculated from aspect ratio
+const heights = {
+  sm: 28,
+  md: 36,
+  lg: 48,
+  xl: 56,
+  hero: 72,
 }
 
+const ASPECT_RATIO = 600 / 110 // ~5.45
+
 export function Logo({ size = 'md', variant = 'dark' }: LogoProps) {
-  const h = dimensions[size]
+  const h = heights[size]
+  const w = Math.round(h * ASPECT_RATIO)
   const src = variant === 'white' ? '/logo-white.svg' : '/logo.svg'
 
   return (
     <Image
       src={src}
       alt="PeladeiroPro"
-      width={h}
+      width={w}
       height={h}
       className="select-none"
       priority={size === 'hero' || size === 'xl'}
