@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import RankingCard from '@/components/dashboard/ranking-card'
 
 export default async function GroupDashboard({
   params,
@@ -208,6 +209,11 @@ export default async function GroupDashboard({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Ranking Card */}
+      <div className="mt-8">
+        <RankingCard groupId={groupId} />
       </div>
     </div>
   )

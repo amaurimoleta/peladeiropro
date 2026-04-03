@@ -7,15 +7,11 @@ import {
   LayoutDashboard,
   Users,
   CreditCard,
-  UserPlus,
-  Receipt,
-  Trophy,
+  CalendarDays,
   Settings,
   LogOut,
   Menu,
   X,
-  CalendarDays,
-  BarChart3,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -27,11 +23,7 @@ const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/members', icon: Users, label: 'Membros' },
-  { href: '/payments', icon: CreditCard, label: 'Mensalidades' },
-  { href: '/guests', icon: UserPlus, label: 'Avulsos' },
-  { href: '/expenses', icon: Receipt, label: 'Despesas' },
-  { href: '/dre', icon: BarChart3, label: 'DRE' },
-  { href: '/ranking', icon: Trophy, label: 'Ranking' },
+  { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
   { href: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 
@@ -93,7 +85,6 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
 
   return (
     <>
-      {/* Mobile toggle */}
       <Button
         variant="ghost"
         size="icon"
@@ -103,7 +94,6 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </Button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
@@ -111,7 +101,6 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
         />
       )}
 
-      {/* Sidebar - mobile */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-40 w-64 bg-white/95 backdrop-blur-xl border-r border-gray-100 shadow-2xl transform transition-transform duration-300 ease-out lg:hidden',
@@ -121,7 +110,6 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
         {nav}
       </aside>
 
-      {/* Sidebar - desktop */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-gray-100 bg-white/80 backdrop-blur-xl h-screen sticky top-0">
         {nav}
       </aside>
