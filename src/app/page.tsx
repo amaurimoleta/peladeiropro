@@ -69,8 +69,8 @@ export default function LandingPage() {
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-32 pb-20 md:pt-40 md:pb-32 text-center relative z-10">
           <div className="flex justify-center mb-8">
-            <div className="hidden md:block"><Logo size="hero" /></div>
-            <div className="md:hidden"><Logo size="xl" /></div>
+            <div className="hidden md:block"><Logo size="hero" variant="white" /></div>
+            <div className="md:hidden"><Logo size="xl" variant="white" /></div>
           </div>
           <p className="text-lg md:text-2xl text-white/70 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
             A forma mais simples de gerenciar a tesouraria do seu grupo de futebol.

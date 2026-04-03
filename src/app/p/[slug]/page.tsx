@@ -194,7 +194,7 @@ export default function PublicPage() {
       <header className="gradient-brand-hero text-white">
         <div className="max-w-2xl mx-auto px-4 py-8 text-center">
           <div className="flex justify-center mb-4">
-            <Logo size="md" />
+            <Logo size="md" variant="white" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight">{group.name}</h1>
           <p className="text-white/50 text-sm capitalize mt-2 tracking-wide">Prestacao de contas</p>
