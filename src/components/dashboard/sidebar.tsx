@@ -18,6 +18,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
+import { ThemeToggle } from '@/components/shared/theme-toggle'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
@@ -41,7 +42,7 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
 
   const nav = (
     <nav className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
         <Link href="/dashboard">
           <Logo size="sm" />
         </Link>
@@ -62,7 +63,7 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                 isActive
                   ? 'bg-gradient-to-r from-brand-green/10 to-brand-green/5 text-brand-green shadow-sm'
-                  : 'text-muted-foreground hover:bg-gray-50 hover:text-brand-navy'
+                  : 'text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-brand-navy dark:hover:text-gray-200'
               )}
             >
               <item.icon className={cn('h-4 w-4', isActive && 'text-brand-green')} />
@@ -71,10 +72,14 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
           )
         })}
       </div>
-      <div className="p-3 border-t border-gray-100">
+      <div className="p-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+        <div className="flex items-center gap-3 px-3 py-1">
+          <ThemeToggle />
+          <span className="text-sm font-medium text-muted-foreground">Tema</span>
+        </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 w-full transition-all duration-200"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 w-full transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Sair
@@ -88,7 +93,7 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden bg-white/80 backdrop-blur-sm shadow-sm rounded-xl"
+        className="fixed top-3 left-3 z-50 lg:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm rounded-xl"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -103,14 +108,14 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-64 bg-white/95 backdrop-blur-xl border-r border-gray-100 shadow-2xl transform transition-transform duration-300 ease-out lg:hidden',
+          'fixed inset-y-0 left-0 z-40 w-64 bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-r border-gray-100 dark:border-gray-800 shadow-2xl transform transition-transform duration-300 ease-out lg:hidden',
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {nav}
       </aside>
 
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-gray-100 bg-white/80 backdrop-blur-xl h-screen sticky top-0">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl h-screen sticky top-0">
         {nav}
       </aside>
     </>

@@ -1,22 +1,79 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, ExternalLink, Share2, Globe } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog'
+import {
+  Copy,
+  ExternalLink,
+  Share2,
+  Globe,
+  Shield,
+  ShieldAlert,
+  UserCog,
+  Clock,
+  Settings,
+  Trash2,
+  AlertTriangle,
+  UserPlus,
+  DollarSign,
+  Users,
+  FileText,
+  Edit,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import { PIX_KEY_TYPES, type Group } from '@/lib/types'
+import { PIX_KEY_TYPES, MEMBER_ROLES, type Group, type GroupMember, type AuditLog } from '@/lib/types'
+import { useGroupRole } from '@/hooks/use-group-role'
+import { logAudit } from '@/lib/audit'
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  update_group_settings: 'Atualizou configuracoes do grupo',
+  promote_member: 'Promoveu membro',
+  delete_group: 'Excluiu grupo',
+  add_member: 'Adicionou membro',
+  remove_member: 'Removeu membro',
+  record_payment: 'Registrou pagamento',
+  add_expense: 'Adicionou despesa',
+  create_match: 'Criou partida',
+}
+
+const AUDIT_ACTION_ICONS: Record<string, typeof Settings> = {
+  update_group_settings: Settings,
+  promote_member: UserCog,
+  delete_group: Trash2,
+  add_member: UserPlus,
+  remove_member: Users,
+  record_payment: DollarSign,
+  add_expense: DollarSign,
+  create_match: FileText,
+}
 
 export default function SettingsPage() {
   const params = useParams()
+  const router = useRouter()
   const groupId = params.groupId as string
   const supabase = createClient()
+
+  const { role, isAdmin, isReadOnly, loading: roleLoading } = useGroupRole(groupId)
+
   const [group, setGroup] = useState<Group | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -29,6 +86,21 @@ export default function SettingsPage() {
   const [pixKey, setPixKey] = useState('')
   const [pixKeyType, setPixKeyType] = useState('')
   const [pixBeneficiary, setPixBeneficiary] = useState('')
+
+  // Members state (for admin management)
+  const [members, setMembers] = useState<GroupMember[]>([])
+  const [selectedMemberId, setSelectedMemberId] = useState('')
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [savingRole, setSavingRole] = useState(false)
+
+  // Audit logs
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
+
+  // Delete group
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -48,9 +120,56 @@ export default function SettingsPage() {
     load()
   }, [groupId])
 
+  // Load members for admin management
+  useEffect(() => {
+    async function loadMembers() {
+      const { data } = await supabase
+        .from('group_members')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .order('name')
+      if (data) setMembers(data)
+    }
+    if (!roleLoading) loadMembers()
+  }, [groupId, roleLoading])
+
+  // Load audit logs
+  const loadAuditLogs = useCallback(async () => {
+    setLoadingLogs(true)
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (data) setAuditLogs(data)
+    setLoadingLogs(false)
+  }, [groupId])
+
+  useEffect(() => {
+    if (!roleLoading) loadAuditLogs()
+  }, [roleLoading, loadAuditLogs])
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (isReadOnly) return
     setSaving(true)
+
+    // Track what changed for audit
+    const changes: Record<string, { from: any; to: any }> = {}
+    if (group) {
+      if (name !== group.name) changes.name = { from: group.name, to: name }
+      if ((description || null) !== group.description) changes.description = { from: group.description, to: description || null }
+      const newFee = parseFloat(monthlyFee) || 0
+      if (newFee !== group.monthly_fee_amount) changes.monthly_fee_amount = { from: group.monthly_fee_amount, to: newFee }
+      const newDueDay = parseInt(dueDay) || 10
+      if (newDueDay !== group.due_day) changes.due_day = { from: group.due_day, to: newDueDay }
+      if ((pixKey || null) !== group.pix_key) changes.pix_key = { from: group.pix_key, to: pixKey || null }
+      if ((pixKeyType || null) !== group.pix_key_type) changes.pix_key_type = { from: group.pix_key_type, to: pixKeyType || null }
+      if ((pixBeneficiary || null) !== group.pix_beneficiary_name) changes.pix_beneficiary_name = { from: group.pix_beneficiary_name, to: pixBeneficiary || null }
+    }
+
     const { error } = await supabase.from('groups').update({
       name,
       description: description || null,
@@ -65,8 +184,91 @@ export default function SettingsPage() {
       toast.error('Erro ao salvar', { description: error.message })
     } else {
       toast.success('Configuracoes salvas!')
+      // Update local group state
+      setGroup((prev) => prev ? {
+        ...prev,
+        name,
+        description: description || null,
+        monthly_fee_amount: parseFloat(monthlyFee) || 0,
+        due_day: parseInt(dueDay) || 10,
+        pix_key: pixKey || null,
+        pix_key_type: (pixKeyType || null) as Group['pix_key_type'],
+        pix_beneficiary_name: pixBeneficiary || null,
+      } : null)
+
+      // Log audit with details of what changed
+      if (Object.keys(changes).length > 0) {
+        await logAudit(supabase, {
+          groupId,
+          action: 'update_group_settings',
+          entityType: 'group',
+          entityId: groupId,
+          details: { changes },
+        })
+        loadAuditLogs()
+      }
     }
     setSaving(false)
+  }
+
+  async function handleRoleChange() {
+    if (!selectedMemberId || !selectedRole || isReadOnly) return
+    setSavingRole(true)
+
+    const member = members.find((m) => m.id === selectedMemberId)
+
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role: selectedRole })
+      .eq('id', selectedMemberId)
+      .eq('group_id', groupId)
+
+    if (error) {
+      toast.error('Erro ao alterar cargo', { description: error.message })
+    } else {
+      toast.success('Cargo alterado com sucesso!')
+      setMembers((prev) => prev.map((m) => m.id === selectedMemberId ? { ...m, role: selectedRole as GroupMember['role'] } : m))
+      await logAudit(supabase, {
+        groupId,
+        action: 'promote_member',
+        entityType: 'group_member',
+        entityId: selectedMemberId,
+        details: {
+          member_name: member?.name,
+          new_role: selectedRole,
+          old_role: member?.role,
+        },
+      })
+      loadAuditLogs()
+      setSelectedMemberId('')
+      setSelectedRole('')
+    }
+    setSavingRole(false)
+  }
+
+  async function handleDeleteGroup() {
+    if (deleteConfirmName !== group?.name) {
+      toast.error('Nome do grupo nao confere')
+      return
+    }
+    setDeleting(true)
+
+    await logAudit(supabase, {
+      groupId,
+      action: 'delete_group',
+      entityType: 'group',
+      entityId: groupId,
+      details: { group_name: group?.name },
+    })
+
+    const { error } = await supabase.from('groups').delete().eq('id', groupId)
+    if (error) {
+      toast.error('Erro ao excluir grupo', { description: error.message })
+      setDeleting(false)
+    } else {
+      toast.success('Grupo excluido com sucesso')
+      router.push('/dashboard')
+    }
   }
 
   function getPublicLink() {
@@ -90,11 +292,45 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+  function formatTimestamp(dateStr: string) {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Agora'
+    if (diffMins < 60) return `${diffMins}min atras`
+    if (diffHours < 24) return `${diffHours}h atras`
+    if (diffDays < 7) return `${diffDays}d atras`
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  function getAuditActionLabel(action: string) {
+    return AUDIT_ACTION_LABELS[action] || action
+  }
+
+  function getAuditIcon(action: string) {
+    return AUDIT_ACTION_ICONS[action] || Edit
+  }
+
+  const adminMembers = members.filter((m) => m.role === 'admin' || m.role === 'treasurer')
+  const promotableMembers = members.filter((m) => m.role === 'member')
+
+  if (loading || roleLoading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-[#1B1F4B] mb-6">Configuracoes</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-[#1B1F4B]">Configuracoes</h1>
+        {isReadOnly && (
+          <Badge variant="secondary">
+            <Shield className="h-3 w-3 mr-1" />
+            Somente leitura
+          </Badge>
+        )}
+      </div>
 
       {/* Public Link - Prominent */}
       <Card className="mb-6 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent">
@@ -138,6 +374,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Group Settings Form */}
       <form onSubmit={handleSave} className="space-y-6">
         <Card>
           <CardHeader>
@@ -146,20 +383,20 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Nome do grupo</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input value={name} onChange={(e) => setName(e.target.value)} required disabled={isReadOnly} />
             </div>
             <div className="space-y-2">
               <Label>Descricao</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descricao do grupo" />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descricao do grupo" disabled={isReadOnly} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Mensalidade (R$)</Label>
-                <Input type="number" step="0.01" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} />
+                <Input type="number" step="0.01" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} disabled={isReadOnly} />
               </div>
               <div className="space-y-2">
                 <Label>Dia de vencimento</Label>
-                <Input type="number" min="1" max="28" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
+                <Input type="number" min="1" max="28" value={dueDay} onChange={(e) => setDueDay(e.target.value)} disabled={isReadOnly} />
               </div>
             </div>
           </CardContent>
@@ -173,7 +410,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Tipo de chave</Label>
-              <Select value={pixKeyType} onValueChange={(v) => v && setPixKeyType(v)}>
+              <Select value={pixKeyType} onValueChange={(v) => v && setPixKeyType(v)} disabled={isReadOnly}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(PIX_KEY_TYPES).map(([key, label]) => (
@@ -184,19 +421,254 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label>Chave PIX</Label>
-              <Input placeholder="Sua chave PIX" value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
+              <Input placeholder="Sua chave PIX" value={pixKey} onChange={(e) => setPixKey(e.target.value)} disabled={isReadOnly} />
             </div>
             <div className="space-y-2">
               <Label>Nome do beneficiario</Label>
-              <Input placeholder="Nome que aparece no PIX" value={pixBeneficiary} onChange={(e) => setPixBeneficiary(e.target.value)} />
+              <Input placeholder="Nome que aparece no PIX" value={pixBeneficiary} onChange={(e) => setPixBeneficiary(e.target.value)} disabled={isReadOnly} />
             </div>
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Configuracoes'}
-        </Button>
+        {isAdmin && (
+          <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar Configuracoes'}
+          </Button>
+        )}
       </form>
+
+      {/* Administrators Section */}
+      <div className="mt-6 space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-[#1B1F4B] flex items-center justify-center shadow-sm">
+                <ShieldAlert className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Administradores</CardTitle>
+                <CardDescription>Gerencie os administradores e tesoureiros do grupo</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Current admins/treasurers list */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">Membros com cargo</Label>
+              {adminMembers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum administrador encontrado.</p>
+              ) : (
+                <div className="space-y-2">
+                  {adminMembers.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-sm font-medium text-[#1B1F4B]">
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{member.name}</p>
+                          {member.phone && <p className="text-xs text-muted-foreground">{member.phone}</p>}
+                        </div>
+                      </div>
+                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                        {MEMBER_ROLES[member.role]}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Promote member form - only for admins */}
+            {isAdmin && promotableMembers.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-muted-foreground">Promover membro</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select value={selectedMemberId} onValueChange={(v) => v && setSelectedMemberId(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o membro" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {promotableMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedRole} onValueChange={(v) => v && setSelectedRole(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o cargo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="treasurer">Tesoureiro</SelectItem>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={!selectedMemberId || !selectedRole || savingRole}
+                    onClick={handleRoleChange}
+                  >
+                    <UserCog className="h-4 w-4 mr-2" />
+                    {savingRole ? 'Salvando...' : 'Alterar Cargo'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Audit Log Viewer */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
+                <Clock className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Historico de Atividades</CardTitle>
+                <CardDescription>Ultimas 20 acoes registradas no grupo</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingLogs ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Carregando historico...</p>
+            ) : auditLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade registrada.</p>
+            ) : (
+              <div className="relative">
+                {/* Timeline line */}
+                <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+
+                <div className="space-y-4">
+                  {auditLogs.map((log) => {
+                    const IconComponent = getAuditIcon(log.action)
+                    return (
+                      <div key={log.id} className="relative flex gap-4 pl-0">
+                        {/* Icon circle */}
+                        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background shadow-sm">
+                          <IconComponent className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pb-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium leading-tight">
+                                {getAuditActionLabel(log.action)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                por {log.user_name || 'Sistema'}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                              {formatTimestamp(log.created_at)}
+                            </span>
+                          </div>
+
+                          {/* Details */}
+                          {log.details && (
+                            <div className="mt-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                              {log.details.changes && Object.entries(log.details.changes).map(([field, change]: [string, any]) => (
+                                <div key={field}>
+                                  <span className="font-medium">{field}</span>: {String(change.from ?? '-')} → {String(change.to ?? '-')}
+                                </div>
+                              ))}
+                              {log.details.member_name && (
+                                <div>
+                                  <span className="font-medium">Membro:</span> {log.details.member_name}
+                                  {log.details.new_role && <> → {MEMBER_ROLES[log.details.new_role] || log.details.new_role}</>}
+                                </div>
+                              )}
+                              {log.details.group_name && !log.details.changes && !log.details.member_name && (
+                                <div>
+                                  <span className="font-medium">Grupo:</span> {log.details.group_name}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Danger Zone - admin only */}
+        {isAdmin && (
+          <Card className="border-destructive/30">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center shadow-sm">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                </div>
+                <div>
+                  <CardTitle className="text-base text-destructive">Zona de Perigo</CardTitle>
+                  <CardDescription>Acoes irreversiveis para o grupo</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+                <div>
+                  <p className="text-sm font-medium">Excluir grupo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Todos os dados serao permanentemente excluidos. Esta acao nao pode ser desfeita.
+                  </p>
+                </div>
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogTrigger render={
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir
+                    </Button>
+                  } />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Excluir grupo permanentemente</DialogTitle>
+                      <DialogDescription>
+                        Esta acao e irreversivel. Todos os membros, mensalidades, despesas e dados do grupo serao excluidos permanentemente.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      <Label>
+                        Para confirmar, digite o nome do grupo: <span className="font-bold">{group?.name}</span>
+                      </Label>
+                      <Input
+                        placeholder="Nome do grupo"
+                        value={deleteConfirmName}
+                        onChange={(e) => setDeleteConfirmName(e.target.value)}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <DialogClose render={
+                        <Button variant="outline" onClick={() => setDeleteConfirmName('')}>
+                          Cancelar
+                        </Button>
+                      } />
+                      <Button
+                        variant="destructive"
+                        disabled={deleteConfirmName !== group?.name || deleting}
+                        onClick={handleDeleteGroup}
+                      >
+                        {deleting ? 'Excluindo...' : 'Excluir Grupo'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

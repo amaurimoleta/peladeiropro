@@ -11,11 +11,13 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Phone, UserMinus, UserCheck, Pencil, Trash2, History, Check, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Phone, UserMinus, UserCheck, Pencil, Trash2, History, Check, Clock, AlertCircle, Link2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { GroupMember, MEMBER_ROLES, MEMBER_TYPES, FEE_STATUSES } from '@/lib/types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useGroupRole } from '@/hooks/use-group-role'
+import { logAudit } from '@/lib/audit'
 
 interface MonthlyFeeRecord {
   id: string
@@ -25,12 +27,22 @@ interface MonthlyFeeRecord {
   paid_at: string | null
 }
 
+interface AttendanceStats {
+  totalMatches: number
+  attended: number
+  percentage: number
+}
+
 export default function MembersPage() {
   const params = useParams()
   const groupId = params.groupId as string
   const supabase = createClient()
+  const { isAdmin, isReadOnly, loading: roleLoading } = useGroupRole(groupId)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Group info for public link
+  const [publicSlug, setPublicSlug] = useState<string | null>(null)
 
   // Add dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -53,6 +65,7 @@ export default function MembersPage() {
   const [historyMember, setHistoryMember] = useState<GroupMember | null>(null)
   const [feeHistory, setFeeHistory] = useState<MonthlyFeeRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [attendanceStats, setAttendanceStats] = useState<AttendanceStats | null>(null)
 
   async function loadMembers() {
     const { data } = await supabase
@@ -64,22 +77,41 @@ export default function MembersPage() {
     setLoading(false)
   }
 
-  useEffect(() => { loadMembers() }, [groupId])
+  async function loadGroupInfo() {
+    const { data } = await supabase
+      .from('groups')
+      .select('public_slug')
+      .eq('id', groupId)
+      .single()
+    setPublicSlug(data?.public_slug || null)
+  }
+
+  useEffect(() => {
+    loadMembers()
+    loadGroupInfo()
+  }, [groupId])
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('group_members').insert({
+    const { data: inserted, error } = await supabase.from('group_members').insert({
       group_id: groupId,
       name,
       phone: phone || null,
       role,
       member_type: memberType,
-    })
+    }).select().single()
     if (error) {
       toast.error('Erro ao adicionar membro', { description: error.message })
     } else {
       toast.success('Membro adicionado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'add_member',
+        entityType: 'group_member',
+        entityId: inserted?.id,
+        details: { name, role, member_type: memberType },
+      })
       setAddDialogOpen(false)
       setName('')
       setPhone('')
@@ -107,6 +139,13 @@ export default function MembersPage() {
       toast.error('Erro ao editar membro', { description: error.message })
     } else {
       toast.success('Membro atualizado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_member',
+        entityType: 'group_member',
+        entityId: editMember.id,
+        details: { name: editName, role: editRole, member_type: editMemberType },
+      })
       setEditDialogOpen(false)
       setEditMember(null)
       loadMembers()
@@ -127,16 +166,30 @@ export default function MembersPage() {
     const newStatus = member.status === 'active' ? 'inactive' : 'active'
     await supabase.from('group_members').update({ status: newStatus }).eq('id', member.id)
     toast.success(newStatus === 'active' ? 'Membro reativado' : 'Membro desativado')
+    await logAudit(supabase, {
+      groupId,
+      action: 'toggle_member_status',
+      entityType: 'group_member',
+      entityId: member.id,
+      details: { name: member.name, old_status: member.status, new_status: newStatus },
+    })
     loadMembers()
   }
 
   async function handleDelete(member: GroupMember) {
-    if (!confirm(`Tem certeza que deseja excluir ${member.name}? Esta ação não pode ser desfeita.`)) return
+    if (!confirm(`Tem certeza que deseja excluir ${member.name}? Esta acao nao pode ser desfeita.`)) return
     const { error } = await supabase.from('group_members').delete().eq('id', member.id)
     if (error) {
       toast.error('Erro ao excluir membro', { description: error.message })
     } else {
-      toast.success('Membro excluído!')
+      toast.success('Membro excluido!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'delete_member',
+        entityType: 'group_member',
+        entityId: member.id,
+        details: { name: member.name },
+      })
       loadMembers()
     }
   }
@@ -145,12 +198,34 @@ export default function MembersPage() {
     setHistoryMember(member)
     setHistoryDialogOpen(true)
     setHistoryLoading(true)
-    const { data } = await supabase
+    setAttendanceStats(null)
+
+    // Fetch fee history
+    const { data: fees } = await supabase
       .from('monthly_fees')
       .select('*')
       .eq('member_id', member.id)
       .order('reference_month', { ascending: false })
-    setFeeHistory(data || [])
+    setFeeHistory(fees || [])
+
+    // Fetch attendance stats
+    const { data: attendance } = await supabase
+      .from('match_attendance')
+      .select('present')
+      .eq('member_id', member.id)
+
+    if (attendance && attendance.length > 0) {
+      const totalMatches = attendance.length
+      const attended = attendance.filter((a) => a.present).length
+      setAttendanceStats({
+        totalMatches,
+        attended,
+        percentage: Math.round((attended / totalMatches) * 100),
+      })
+    } else {
+      setAttendanceStats({ totalMatches: 0, attended: 0, percentage: 0 })
+    }
+
     setHistoryLoading(false)
   }
 
@@ -174,73 +249,120 @@ export default function MembersPage() {
     }
   }
 
+  function formatPhone(phone: string): string {
+    return phone.replace(/\D/g, '')
+  }
+
+  function copyPublicLink() {
+    if (!publicSlug) return
+    const url = `${window.location.origin}/p/${publicSlug}`
+    navigator.clipboard.writeText(url)
+    toast.success('Link copiado!')
+  }
+
   const activeMembers = members.filter(m => m.status === 'active')
 
   return (
     <div>
+      {/* Invite Link Section - visible only for admins */}
+      {isAdmin && publicSlug && (
+        <Card className="mb-6 border-dashed border-[#1B1F4B]/20">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="flex-shrink-0 rounded-full bg-[#1B1F4B]/5 p-2">
+              <Link2 className="h-5 w-5 text-[#1B1F4B]" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-[#1B1F4B]">Link publico do grupo</p>
+              <p className="text-xs text-muted-foreground">
+                Compartilhe o link publico do grupo para que membros possam ver a prestacao de contas
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyPublicLink}
+              className="flex-shrink-0"
+            >
+              <Link2 className="h-4 w-4 mr-2" />
+              Copiar link
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1B1F4B]">Membros</h1>
-          <p className="text-muted-foreground">{activeMembers.length} ativos</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-[#1B1F4B]">Membros</h1>
+            <p className="text-muted-foreground">{activeMembers.length} ativos</p>
+          </div>
+          {isReadOnly && (
+            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
+              <Eye className="h-3 w-3 mr-1" />
+              Somente leitura
+            </Badge>
+          )}
         </div>
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Membro
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Membro</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome *</Label>
-                <Input
-                  placeholder="Nome do jogador"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input
-                  placeholder="(99) 99999-9999"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Papel</Label>
-                <Select value={role} onValueChange={(v) => v && setRole(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="member">Membro</SelectItem>
-                    <SelectItem value="treasurer">Tesoureiro</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={memberType} onValueChange={(v) => v && setMemberType(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mensalista">Mensalista</SelectItem>
-                    <SelectItem value="avulso">Avulso</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-                {saving ? 'Salvando...' : 'Adicionar'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {isAdmin && (
+          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Membro
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Membro</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAdd} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome *</Label>
+                  <Input
+                    placeholder="Nome do jogador"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input
+                    placeholder="(99) 99999-9999"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Papel</Label>
+                  <Select value={role} onValueChange={(v) => v && setRole(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Membro</SelectItem>
+                      <SelectItem value="treasurer">Tesoureiro</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={memberType} onValueChange={(v) => v && setMemberType(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mensalista">Mensalista</SelectItem>
+                      <SelectItem value="avulso">Avulso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
+                  {saving ? 'Salvando...' : 'Adicionar'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Edit Dialog */}
@@ -306,52 +428,82 @@ export default function MembersPage() {
             <DialogTitle>
               <span className="flex items-center gap-2">
                 <History className="h-4 w-4" />
-                Histórico - {historyMember?.name}
+                Historico - {historyMember?.name}
               </span>
             </DialogTitle>
           </DialogHeader>
           {historyLoading ? (
             <p className="text-center text-muted-foreground py-4">Carregando...</p>
-          ) : feeHistory.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">Nenhuma mensalidade encontrada.</p>
           ) : (
-            <div className="max-h-80 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data Pgto</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {feeHistory.map((fee) => (
-                    <TableRow key={fee.id}>
-                      <TableCell className="capitalize">
-                        {format(new Date(fee.reference_month + '-01'), 'MMMM yyyy', { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        R$ {fee.amount.toFixed(2).replace('.', ',')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={feeStatusColor(fee.status)}
-                        >
-                          {feeStatusIcon(fee.status)}
-                          <span className="ml-1">{FEE_STATUSES[fee.status] || fee.status}</span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {fee.paid_at
-                          ? format(new Date(fee.paid_at), 'dd/MM/yyyy')
-                          : '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {/* Attendance Stats */}
+              {attendanceStats && (
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-sm font-medium text-[#1B1F4B] mb-2">Presenca em Peladas</p>
+                  {attendanceStats.totalMatches === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum registro de presenca.</p>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-[#1B1F4B]">{attendanceStats.attended}</p>
+                        <p className="text-xs text-muted-foreground">Presencas</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-[#1B1F4B]">{attendanceStats.totalMatches}</p>
+                        <p className="text-xs text-muted-foreground">Total</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-[#00C853]">{attendanceStats.percentage}%</p>
+                        <p className="text-xs text-muted-foreground">Frequencia</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Fee History */}
+              {feeHistory.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">Nenhuma mensalidade encontrada.</p>
+              ) : (
+                <div className="max-h-80 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mes</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data Pgto</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {feeHistory.map((fee) => (
+                        <TableRow key={fee.id}>
+                          <TableCell className="capitalize">
+                            {format(new Date(fee.reference_month + '-01'), 'MMMM yyyy', { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>
+                            R$ {fee.amount.toFixed(2).replace('.', ',')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={feeStatusColor(fee.status)}
+                            >
+                              {feeStatusIcon(fee.status)}
+                              <span className="ml-1">{FEE_STATUSES[fee.status] || fee.status}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {fee.paid_at
+                              ? format(new Date(fee.paid_at), 'dd/MM/yyyy')
+                              : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -367,19 +519,19 @@ export default function MembersPage() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Papel</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                {isAdmin && <TableHead className="text-right">Acoes</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : members.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
                     Nenhum membro ainda. Adicione o primeiro!
                   </TableCell>
                 </TableRow>
@@ -400,6 +552,21 @@ export default function MembersPage() {
                         <span className="flex items-center gap-1 text-sm">
                           <Phone className="h-3 w-3" />
                           {member.phone}
+                          <a
+                            href={`https://wa.me/55${formatPhone(member.phone)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Abrir WhatsApp"
+                            className="ml-1 inline-flex items-center justify-center rounded-full hover:bg-green-100 p-0.5 transition-colors"
+                          >
+                            <svg
+                              className="h-4 w-4 text-[#25D366]"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                            >
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                            </svg>
+                          </a>
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-sm">-</span>
@@ -430,38 +597,40 @@ export default function MembersPage() {
                         {member.status === 'active' ? 'Ativo' : 'Inativo'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditDialog(member)}
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => toggleStatus(member)}
-                          title={member.status === 'active' ? 'Desativar' : 'Reativar'}
-                        >
-                          {member.status === 'active' ? (
-                            <UserMinus className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <UserCheck className="h-4 w-4 text-[#00C853]" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => handleDelete(member)}
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditDialog(member)}
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => toggleStatus(member)}
+                            title={member.status === 'active' ? 'Desativar' : 'Reativar'}
+                          >
+                            {member.status === 'active' ? (
+                              <UserMinus className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <UserCheck className="h-4 w-4 text-[#00C853]" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => handleDelete(member)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

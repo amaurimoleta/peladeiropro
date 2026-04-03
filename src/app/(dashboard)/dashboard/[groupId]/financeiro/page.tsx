@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,11 +16,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
+  MessageCircle, Send, Image, Eye, Wallet, Users, Calculator, ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { EXPENSE_CATEGORIES, type Expense, type GroupMember, type Group, type MonthlyFee } from '@/lib/types'
+import { useGroupRole } from '@/hooks/use-group-role'
+import { uploadReceipt } from '@/lib/upload-receipt'
+import { logAudit } from '@/lib/audit'
 
 type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES
 
@@ -32,10 +36,22 @@ const categoryColors: Record<string, string> = {
   other: 'bg-gray-100 text-gray-700',
 }
 
+interface RateioMatch {
+  id: string
+  match_date: string
+  location: string | null
+  total_expenses: number
+  attendance_count: number
+  guest_count: number
+  total_players: number
+  cost_per_player: number
+}
+
 export default function FinanceiroPage() {
   const params = useParams()
   const groupId = params.groupId as string
   const supabase = createClient()
+  const { role, isAdmin, isReadOnly } = useGroupRole(groupId)
 
   // Shared state
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -44,7 +60,7 @@ export default function FinanceiroPage() {
   const [members, setMembers] = useState<GroupMember[]>([])
 
   // Mensalidades state
-  const [fees, setFees] = useState<(MonthlyFee & { member?: { name: string; member_type: string } })[]>([])
+  const [fees, setFees] = useState<(MonthlyFee & { member?: { name: string; member_type: string; phone?: string | null } })[]>([])
   const [generating, setGenerating] = useState(false)
 
   // Despesas state
@@ -63,9 +79,32 @@ export default function FinanceiroPage() {
   // DRE state
   const [paidGuests, setPaidGuests] = useState<any[]>([])
 
+  // Saldo Acumulado state
+  const [allTimeFees, setAllTimeFees] = useState(0)
+  const [allTimeGuests, setAllTimeGuests] = useState(0)
+  const [allTimeExpenses, setAllTimeExpenses] = useState(0)
+
+  // WhatsApp cobranca state
+  const [cobrancaDialogOpen, setCobrancaDialogOpen] = useState(false)
+
+  // Receipt upload state
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [payingFeeId, setPayingFeeId] = useState<string | null>(null)
+  const [payingFeeName, setPayingFeeName] = useState<string>('')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const receiptInputRef = useRef<HTMLInputElement>(null)
+
+  // Receipt viewer state
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
+
+  // Rateio state
+  const [rateioMatches, setRateioMatches] = useState<RateioMatch[]>([])
+  const [loadingRateio, setLoadingRateio] = useState(false)
+
   const currentMonth = format(currentDate, 'yyyy-MM')
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [
       { data: groupData },
@@ -76,7 +115,7 @@ export default function FinanceiroPage() {
     ] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active').order('name'),
-      supabase.from('monthly_fees').select('*, member:group_members(name, member_type)').eq('group_id', groupId).eq('reference_month', currentMonth),
+      supabase.from('monthly_fees').select('*, member:group_members(name, member_type, phone)').eq('group_id', groupId).eq('reference_month', currentMonth),
       supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`).order('expense_date', { ascending: false }),
       supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).eq('paid', true),
     ])
@@ -86,9 +125,103 @@ export default function FinanceiroPage() {
     setExpenses(expensesData || [])
     setPaidGuests(guestsData || [])
     setLoading(false)
-  }
+  }, [groupId, currentMonth])
 
-  useEffect(() => { loadData() }, [groupId, currentMonth])
+  // Load accumulated balance (all-time)
+  const loadAccumulatedBalance = useCallback(async () => {
+    const [
+      { data: allFees },
+      { data: allGuests },
+      { data: allExpenses },
+    ] = await Promise.all([
+      supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
+      supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
+      supabase.from('expenses').select('amount').eq('group_id', groupId),
+    ])
+    setAllTimeFees((allFees || []).reduce((sum, f) => sum + Number(f.amount), 0))
+    setAllTimeGuests((allGuests || []).reduce((sum, g) => sum + Number(g.amount), 0))
+    setAllTimeExpenses((allExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0))
+  }, [groupId])
+
+  // Load rateio data
+  const loadRateio = useCallback(async () => {
+    setLoadingRateio(true)
+    const startDate = `${currentMonth}-01`
+    const endDate = `${currentMonth}-31`
+
+    // Get matches for the month
+    const { data: matchesData } = await supabase
+      .from('matches')
+      .select('id, match_date, location')
+      .eq('group_id', groupId)
+      .gte('match_date', startDate)
+      .lte('match_date', endDate)
+      .order('match_date')
+
+    if (!matchesData || matchesData.length === 0) {
+      setRateioMatches([])
+      setLoadingRateio(false)
+      return
+    }
+
+    const matchIds = matchesData.map(m => m.id)
+
+    // Get attendance and guests for these matches
+    const [{ data: attendanceData }, { data: guestData }, { data: expensesForDates }] = await Promise.all([
+      supabase
+        .from('match_attendance')
+        .select('match_id, present')
+        .in('match_id', matchIds)
+        .eq('present', true),
+      supabase
+        .from('guest_players')
+        .select('match_id, match_date')
+        .eq('group_id', groupId)
+        .gte('match_date', startDate)
+        .lte('match_date', endDate),
+      supabase
+        .from('expenses')
+        .select('amount, expense_date')
+        .eq('group_id', groupId)
+        .gte('expense_date', startDate)
+        .lte('expense_date', endDate),
+    ])
+
+    // Build rateio per match
+    const rateio: RateioMatch[] = matchesData.map(match => {
+      const attendanceCount = (attendanceData || []).filter(a => a.match_id === match.id).length
+      const guestCount = (guestData || []).filter(g => g.match_id === match.id || g.match_date === match.match_date).length
+      const totalPlayers = attendanceCount + guestCount
+
+      // Expenses for that specific date
+      const dateExpenses = (expensesForDates || [])
+        .filter(e => e.expense_date === match.match_date)
+        .reduce((sum, e) => sum + Number(e.amount), 0)
+
+      return {
+        id: match.id,
+        match_date: match.match_date,
+        location: match.location,
+        total_expenses: dateExpenses,
+        attendance_count: attendanceCount,
+        guest_count: guestCount,
+        total_players: totalPlayers,
+        cost_per_player: totalPlayers > 0 ? dateExpenses / totalPlayers : 0,
+      }
+    })
+
+    setRateioMatches(rateio)
+    setLoadingRateio(false)
+  }, [groupId, currentMonth])
+
+  useEffect(() => {
+    loadData()
+    loadAccumulatedBalance()
+  }, [loadData, loadAccumulatedBalance])
+
+  useEffect(() => {
+    loadRateio()
+  }, [loadRateio])
 
   // ── Mensalidades handlers ──
 
@@ -120,25 +253,72 @@ export default function FinanceiroPage() {
       toast.error('Erro ao gerar mensalidades', { description: error.message })
     } else {
       toast.success(`${newFees.length} mensalidades geradas!`)
+      await logAudit(supabase, {
+        groupId,
+        action: 'generate_fees',
+        entityType: 'monthly_fee',
+        details: { month: currentMonth, count: newFees.length },
+      })
       loadData()
+      loadAccumulatedBalance()
     }
     setGenerating(false)
   }
 
-  async function markAsPaid(feeId: string) {
+  function openPaymentDialog(feeId: string, memberName: string) {
+    setPayingFeeId(feeId)
+    setPayingFeeName(memberName)
+    setReceiptFile(null)
+    setPaymentDialogOpen(true)
+  }
+
+  async function confirmPayment() {
+    if (!payingFeeId) return
+    setConfirmingPayment(true)
+
+    let receiptUrl: string | null = null
+    if (receiptFile) {
+      receiptUrl = await uploadReceipt(supabase, receiptFile, groupId)
+      if (!receiptUrl) {
+        toast.error('Erro ao enviar comprovante. Pagamento sera marcado sem comprovante.')
+      }
+    }
+
+    const updateData: Record<string, any> = {
+      status: 'paid',
+      paid_at: new Date().toISOString(),
+      payment_method: 'pix',
+    }
+    if (receiptUrl) {
+      updateData.receipt_url = receiptUrl
+    }
+
     const { error } = await supabase
       .from('monthly_fees')
-      .update({ status: 'paid', paid_at: new Date().toISOString(), payment_method: 'pix' })
-      .eq('id', feeId)
+      .update(updateData)
+      .eq('id', payingFeeId)
+
     if (error) {
       toast.error('Erro ao marcar pagamento')
     } else {
       toast.success('Pagamento confirmado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'mark_fee_paid',
+        entityType: 'monthly_fee',
+        entityId: payingFeeId,
+        details: { member: payingFeeName, month: currentMonth, has_receipt: !!receiptUrl },
+      })
       loadData()
+      loadAccumulatedBalance()
     }
+    setConfirmingPayment(false)
+    setPaymentDialogOpen(false)
+    setPayingFeeId(null)
+    setReceiptFile(null)
   }
 
-  async function markAsDmLeave(feeId: string) {
+  async function markAsDmLeave(feeId: string, memberName?: string) {
     const { error } = await supabase
       .from('monthly_fees')
       .update({ status: 'dm_leave' })
@@ -147,11 +327,18 @@ export default function FinanceiroPage() {
       toast.error('Erro ao marcar afastamento DM')
     } else {
       toast.success('Membro marcado como afastado (DM).')
+      await logAudit(supabase, {
+        groupId,
+        action: 'mark_fee_dm',
+        entityType: 'monthly_fee',
+        entityId: feeId,
+        details: { member: memberName, month: currentMonth },
+      })
       loadData()
     }
   }
 
-  async function markAsWaived(feeId: string) {
+  async function markAsWaived(feeId: string, memberName?: string) {
     const { error } = await supabase
       .from('monthly_fees')
       .update({ status: 'waived' })
@@ -160,6 +347,13 @@ export default function FinanceiroPage() {
       toast.error('Erro ao dispensar mensalidade')
     } else {
       toast.success('Mensalidade dispensada.')
+      await logAudit(supabase, {
+        groupId,
+        action: 'mark_fee_waived',
+        entityType: 'monthly_fee',
+        entityId: feeId,
+        details: { member: memberName, month: currentMonth },
+      })
       loadData()
     }
   }
@@ -179,6 +373,34 @@ export default function FinanceiroPage() {
     }
   }
 
+  // ── WhatsApp cobranca ──
+
+  function buildWhatsAppUrl(phone: string, name: string, monthLabel: string, feeAmount: number) {
+    if (!group) return ''
+    const cleanPhone = phone.replace(/\D/g, '')
+    const message = `Ola ${name}! 👋\n\nSua mensalidade de ${monthLabel} no valor de R$ ${feeAmount.toFixed(2)} esta pendente.\n\nChave PIX: ${group.pix_key || 'Nao configurada'}\nFavor: ${group.pix_beneficiary_name || 'Nao configurado'}\n\nObrigado! ⚽\n- ${group.name}`
+    return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
+  }
+
+  const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'overdue')
+  const pendingFeesWithPhone = pendingFees.filter(f => f.member?.phone)
+
+  function cobrarTodos() {
+    const monthLabel = format(currentDate, 'MMMM/yyyy')
+    pendingFeesWithPhone.forEach((fee, index) => {
+      setTimeout(() => {
+        const url = buildWhatsAppUrl(
+          fee.member!.phone!,
+          fee.member!.name,
+          monthLabel,
+          Number(fee.amount)
+        )
+        window.open(url, '_blank')
+      }, index * 800)
+    })
+    setCobrancaDialogOpen(false)
+  }
+
   // ── Despesas handlers ──
 
   function resetExpenseForm() {
@@ -193,7 +415,7 @@ export default function FinanceiroPage() {
   async function handleAddExpense(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('expenses').insert({
+    const { data: newExpense, error } = await supabase.from('expenses').insert({
       group_id: groupId,
       category,
       description,
@@ -201,14 +423,22 @@ export default function FinanceiroPage() {
       expense_date: expenseDate,
       paid_by_member_id: paidBy || null,
       notes: notes || null,
-    })
+    }).select().single()
     if (error) {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Despesa registrada!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'create_expense',
+        entityType: 'expense',
+        entityId: newExpense?.id,
+        details: { description, amount: parseFloat(amount), category },
+      })
       setDialogOpen(false)
       resetExpenseForm()
       loadData()
+      loadAccumulatedBalance()
     }
     setSaving(false)
   }
@@ -240,19 +470,35 @@ export default function FinanceiroPage() {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Despesa atualizada!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_expense',
+        entityType: 'expense',
+        entityId: editingExpense.id,
+        details: { description, amount: parseFloat(amount), category },
+      })
       setEditDialogOpen(false)
       setEditingExpense(null)
       resetExpenseForm()
       loadData()
+      loadAccumulatedBalance()
     }
     setSaving(false)
   }
 
-  async function deleteExpense(id: string) {
+  async function deleteExpense(id: string, desc?: string) {
     if (!confirm('Remover esta despesa?')) return
     await supabase.from('expenses').delete().eq('id', id)
+    await logAudit(supabase, {
+      groupId,
+      action: 'delete_expense',
+      entityType: 'expense',
+      entityId: id,
+      details: { description: desc },
+    })
     toast.success('Despesa removida!')
     loadData()
+    loadAccumulatedBalance()
   }
 
   // ── Computed values ──
@@ -287,6 +533,10 @@ export default function FinanceiroPage() {
     ...Object.values(dreExpensesByCategory),
   ].filter(v => v > 0)
   const dreMaxValue = Math.max(...allDreValues, 1)
+
+  // Saldo Acumulado
+  const allTimeIncome = allTimeFees + allTimeGuests
+  const accumulatedBalance = allTimeIncome - allTimeExpenses
 
   function formatCurrency(value: number) {
     return `R$ ${value.toFixed(2)}`
@@ -391,9 +641,47 @@ export default function FinanceiroPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
-        <p className="text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado financeiro</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
+            <p className="text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado financeiro</p>
+          </div>
+          {isReadOnly && (
+            <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
+              <ShieldAlert className="h-3 w-3 mr-1" />
+              Somente leitura
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* ── Caixa do Grupo (Accumulated Balance) ── */}
+      <Card className="mb-6 border-2 border-[#1B1F4B]/10 shadow-lg">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="rounded-full bg-[#1B1F4B]/10 p-2">
+              <Wallet className="h-5 w-5 text-[#1B1F4B]" />
+            </div>
+            <h2 className="text-lg font-bold text-[#1B1F4B]">Caixa do Grupo</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Total Receitas</span>
+              <span className="text-lg font-bold text-[#00C853]">{formatCurrency(allTimeIncome)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Total Despesas</span>
+              <span className="text-lg font-bold text-red-500">{formatCurrency(allTimeExpenses)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Saldo Atual</span>
+              <span className={`text-xl font-bold ${accumulatedBalance >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                {accumulatedBalance >= 0 ? '+' : ''}{formatCurrency(accumulatedBalance)}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
@@ -411,24 +699,146 @@ export default function FinanceiroPage() {
             <BarChart3 className="h-4 w-4 mr-1.5" />
             DRE
           </TabsTrigger>
+          <TabsTrigger value="rateio">
+            <Calculator className="h-4 w-4 mr-1.5" />
+            Rateio
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Mensalidades ── */}
         <TabsContent value="mensalidades">
           <div className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm text-muted-foreground">
                 {paidCount}/{fees.length} pagas | R$ {totalFeesAmount.toFixed(2)} recebido{dmCount > 0 ? ` | ${dmCount} afastados DM` : ''}
               </p>
-              <Button
-                className="bg-[#00C853] hover:bg-[#00A843] text-white"
-                onClick={generateFees}
-                disabled={generating}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                {generating ? 'Gerando...' : 'Gerar Mensalidades'}
-              </Button>
+              <div className="flex gap-2">
+                {isAdmin && pendingFees.length > 0 && (
+                  <Dialog open={cobrancaDialogOpen} onOpenChange={setCobrancaDialogOpen}>
+                    <DialogTrigger render={<Button variant="outline" className="text-green-600 border-green-400 hover:bg-green-50" />}>
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Cobrar Pendentes
+                    </DialogTrigger>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Cobrar Pendentes via WhatsApp</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {pendingFees.map(fee => {
+                          const phone = fee.member?.phone
+                          const cleanPhone = phone?.replace(/\D/g, '')
+                          const monthLabel = format(currentDate, 'MMMM/yyyy')
+                          return (
+                            <div key={fee.id} className="flex items-center justify-between p-3 rounded-lg border">
+                              <div>
+                                <p className="font-medium text-sm">{fee.member?.name}</p>
+                                <p className="text-xs text-muted-foreground">{phone || 'Sem telefone'}</p>
+                                <p className="text-xs text-red-500">R$ {Number(fee.amount).toFixed(2)}</p>
+                              </div>
+                              {phone && cleanPhone ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 border-green-400 hover:bg-green-50"
+                                  onClick={() => {
+                                    const url = buildWhatsAppUrl(phone, fee.member!.name, monthLabel, Number(fee.amount))
+                                    window.open(url, '_blank')
+                                  }}
+                                >
+                                  <Send className="h-3 w-3 mr-1" />
+                                  WhatsApp
+                                </Button>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground text-xs">Sem telefone</Badge>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {pendingFeesWithPhone.length > 0 && (
+                        <Button
+                          className="w-full bg-green-600 hover:bg-green-700 text-white mt-2"
+                          onClick={cobrarTodos}
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          Cobrar Todos ({pendingFeesWithPhone.length})
+                        </Button>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                )}
+                {isAdmin && (
+                  <Button
+                    className="bg-[#00C853] hover:bg-[#00A843] text-white"
+                    onClick={generateFees}
+                    disabled={generating}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    {generating ? 'Gerando...' : 'Gerar Mensalidades'}
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* Payment confirmation dialog with receipt upload */}
+            <Dialog open={paymentDialogOpen} onOpenChange={(v) => { setPaymentDialogOpen(v); if (!v) { setPayingFeeId(null); setReceiptFile(null) } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirmar Pagamento</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Confirmar pagamento de <span className="font-semibold text-foreground">{payingFeeName}</span>?
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Comprovante (opcional)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        ref={receiptInputRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                        className="text-sm"
+                      />
+                    </div>
+                    {receiptFile && (
+                      <p className="text-xs text-muted-foreground">
+                        <Image className="h-3 w-3 inline mr-1" />
+                        {receiptFile.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-[#00C853] hover:bg-[#00A843] text-white"
+                      onClick={confirmPayment}
+                      disabled={confirmingPayment}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      {confirmingPayment ? 'Confirmando...' : 'Confirmar Pagamento'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Receipt viewer dialog */}
+            <Dialog open={!!viewingReceipt} onOpenChange={(v) => { if (!v) setViewingReceipt(null) }}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Comprovante</DialogTitle>
+                </DialogHeader>
+                {viewingReceipt && (
+                  <div className="flex justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={viewingReceipt} alt="Comprovante" className="max-w-full max-h-[500px] rounded-lg object-contain" />
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
 
             <Card>
               <CardContent className="p-0">
@@ -457,7 +867,20 @@ export default function FinanceiroPage() {
                     ) : (
                       fees.map((fee) => (
                         <TableRow key={fee.id}>
-                          <TableCell className="font-medium">{fee.member?.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-1.5">
+                              {fee.member?.name}
+                              {fee.status === 'paid' && fee.receipt_url && (
+                                <button
+                                  onClick={() => setViewingReceipt(fee.receipt_url!)}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors"
+                                  title="Ver comprovante"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>R$ {Number(fee.amount).toFixed(2)}</TableCell>
                           <TableCell>{format(new Date(fee.due_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>{statusBadge(fee.status)}</TableCell>
@@ -465,17 +888,17 @@ export default function FinanceiroPage() {
                             {fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            {fee.status === 'pending' || fee.status === 'overdue' ? (
+                            {(fee.status === 'pending' || fee.status === 'overdue') && isAdmin ? (
                               <div className="flex gap-1 justify-end">
-                                <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => markAsPaid(fee.id)}>
+                                <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => openPaymentDialog(fee.id, fee.member?.name || '')}>
                                   <Check className="h-3 w-3 mr-1" />
                                   Pago
                                 </Button>
-                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50" onClick={() => markAsDmLeave(fee.id)}>
+                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
                                   <Stethoscope className="h-3 w-3 mr-1" />
                                   DM
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markAsWaived(fee.id)}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
                                   Dispensar
                                 </Button>
                               </div>
@@ -496,18 +919,20 @@ export default function FinanceiroPage() {
           <div className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">Total: R$ {totalExpensesAmount.toFixed(2)}</p>
-              <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) resetExpenseForm() }}>
-                <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Despesa
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Registrar Despesa</DialogTitle>
-                  </DialogHeader>
-                  {expenseForm(false)}
-                </DialogContent>
-              </Dialog>
+              {isAdmin && (
+                <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) resetExpenseForm() }}>
+                  <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Despesa
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Despesa</DialogTitle>
+                    </DialogHeader>
+                    {expenseForm(false)}
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             {/* Edit Dialog */}
@@ -568,14 +993,16 @@ export default function FinanceiroPage() {
                           <TableCell>{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>{exp.paid_by_member?.name || '-'}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
-                              <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => openEditExpense(exp)}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteExpense(exp.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {isAdmin && (
+                              <div className="flex gap-1 justify-end">
+                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => openEditExpense(exp)}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteExpense(exp.id, exp.description)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -742,6 +1169,100 @@ export default function FinanceiroPage() {
                   </CardContent>
                 </Card>
               </>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Tab: Rateio ── */}
+        <TabsContent value="rateio">
+          <div className="space-y-4 mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Calculator className="h-5 w-5 text-[#1B1F4B]" />
+              <h2 className="text-lg font-bold text-[#1B1F4B]">Rateio por Jogo</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Custo dividido por jogador presente em cada partida do mes.
+            </p>
+
+            {loadingRateio ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                Carregando...
+              </div>
+            ) : rateioMatches.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Users className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    Registre a presenca nos jogos para calcular o rateio
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Local</TableHead>
+                        <TableHead>Despesas do Dia</TableHead>
+                        <TableHead>Presentes</TableHead>
+                        <TableHead>Convidados</TableHead>
+                        <TableHead>Total Jogadores</TableHead>
+                        <TableHead className="text-right">Custo/Jogador</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rateioMatches.map((match) => (
+                        <TableRow key={match.id}>
+                          <TableCell className="font-medium">
+                            {format(new Date(match.match_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                          </TableCell>
+                          <TableCell>{match.location || '-'}</TableCell>
+                          <TableCell className="text-red-500 font-medium">
+                            {formatCurrency(match.total_expenses)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{match.attendance_count}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{match.guest_count}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="bg-[#1B1F4B]/10 text-[#1B1F4B]">{match.total_players}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {match.total_players > 0 ? (
+                              <span className="font-bold text-[#1B1F4B]">
+                                {formatCurrency(match.cost_per_player)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {/* Totals row */}
+                      <TableRow className="bg-muted/30 font-semibold">
+                        <TableCell colSpan={2}>Total do Mes</TableCell>
+                        <TableCell className="text-red-500">
+                          {formatCurrency(rateioMatches.reduce((s, m) => s + m.total_expenses, 0))}
+                        </TableCell>
+                        <TableCell>{rateioMatches.reduce((s, m) => s + m.attendance_count, 0)}</TableCell>
+                        <TableCell>{rateioMatches.reduce((s, m) => s + m.guest_count, 0)}</TableCell>
+                        <TableCell>{rateioMatches.reduce((s, m) => s + m.total_players, 0)}</TableCell>
+                        <TableCell className="text-right text-[#1B1F4B]">
+                          {(() => {
+                            const totalExp = rateioMatches.reduce((s, m) => s + m.total_expenses, 0)
+                            const totalPlayers = rateioMatches.reduce((s, m) => s + m.total_players, 0)
+                            return totalPlayers > 0 ? formatCurrency(totalExp / totalPlayers) : '-'
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             )}
           </div>
         </TabsContent>

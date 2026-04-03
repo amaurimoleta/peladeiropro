@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,22 +9,51 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
+  MessageCircle, DollarSign,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
-import type { Match, GuestPlayer } from '@/lib/types'
+import { useGroupRole } from '@/hooks/use-group-role'
+import { logAudit } from '@/lib/audit'
+import type { Match, GuestPlayer, GroupMember, MatchAttendance, Group } from '@/lib/types'
+
+interface AttendanceMap {
+  [memberId: string]: { id?: string; present: boolean }
+}
+
+interface ExpenseSummary {
+  total: number
+  loading: boolean
+}
 
 export default function MatchesPage() {
   const params = useParams()
   const groupId = params.groupId as string
   const supabase = createClient()
+  const { isAdmin, isReadOnly } = useGroupRole(groupId)
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null)
+
+  // Group data (for PIX info)
+  const [groupData, setGroupData] = useState<Group | null>(null)
+
+  // Active mensalista members
+  const [mensalistas, setMensalistas] = useState<GroupMember[]>([])
+
+  // Attendance state per match
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceMap>>({})
+  const [attendanceLoading, setAttendanceLoading] = useState<Record<string, boolean>>({})
+
+  // Expense summary per match
+  const [expenseSummaries, setExpenseSummaries] = useState<Record<string, ExpenseSummary>>({})
 
   // New match dialog
   const [newDialogOpen, setNewDialogOpen] = useState(false)
@@ -54,6 +83,34 @@ export default function MatchesPage() {
 
   const currentMonth = format(currentDate, 'yyyy-MM')
 
+  // Load group data
+  useEffect(() => {
+    async function loadGroup() {
+      const { data } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', groupId)
+        .single()
+      setGroupData(data)
+    }
+    loadGroup()
+  }, [groupId])
+
+  // Load mensalista members
+  useEffect(() => {
+    async function loadMensalistas() {
+      const { data } = await supabase
+        .from('group_members')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .eq('member_type', 'mensalista')
+        .order('name')
+      setMensalistas(data || [])
+    }
+    loadMensalistas()
+  }, [groupId])
+
   async function loadMatches() {
     setLoading(true)
     const { data } = await supabase
@@ -69,19 +126,119 @@ export default function MatchesPage() {
 
   useEffect(() => { loadMatches() }, [groupId, currentMonth])
 
+  // Load attendance for a match
+  const loadAttendance = useCallback(async (matchId: string) => {
+    setAttendanceLoading((prev) => ({ ...prev, [matchId]: true }))
+    const { data } = await supabase
+      .from('match_attendance')
+      .select('*')
+      .eq('match_id', matchId)
+
+    const map: AttendanceMap = {}
+    for (const row of data || []) {
+      map[row.member_id] = { id: row.id, present: row.present }
+    }
+    setAttendanceMap((prev) => ({ ...prev, [matchId]: map }))
+    setAttendanceLoading((prev) => ({ ...prev, [matchId]: false }))
+  }, [supabase])
+
+  // Load expenses for a match date
+  const loadExpenses = useCallback(async (matchId: string, matchDate: string) => {
+    setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total: 0, loading: true } }))
+    const { data } = await supabase
+      .from('expenses')
+      .select('amount')
+      .eq('group_id', groupId)
+      .eq('expense_date', matchDate)
+
+    const total = (data || []).reduce((sum, e) => sum + Number(e.amount), 0)
+    setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total, loading: false } }))
+  }, [supabase, groupId])
+
+  // When a match is expanded, load attendance and expenses
+  useEffect(() => {
+    if (expandedMatch) {
+      loadAttendance(expandedMatch)
+      const match = matches.find((m) => m.id === expandedMatch)
+      if (match) {
+        loadExpenses(expandedMatch, match.match_date)
+      }
+    }
+  }, [expandedMatch, matches, loadAttendance, loadExpenses])
+
+  async function toggleAttendance(matchId: string, memberId: string) {
+    const current = attendanceMap[matchId]?.[memberId]
+    const newPresent = !(current?.present ?? false)
+
+    if (current?.id) {
+      // Update existing
+      await supabase
+        .from('match_attendance')
+        .update({ present: newPresent })
+        .eq('id', current.id)
+    } else {
+      // Insert new
+      const { data } = await supabase
+        .from('match_attendance')
+        .insert({ match_id: matchId, member_id: memberId, present: newPresent })
+        .select('id')
+        .single()
+      if (data) {
+        setAttendanceMap((prev) => ({
+          ...prev,
+          [matchId]: {
+            ...prev[matchId],
+            [memberId]: { id: data.id, present: newPresent },
+          },
+        }))
+        await logAudit(supabase, {
+          groupId,
+          action: 'update_attendance',
+          entityType: 'match_attendance',
+          entityId: matchId,
+          details: { member_id: memberId, present: newPresent },
+        })
+        return
+      }
+    }
+
+    setAttendanceMap((prev) => ({
+      ...prev,
+      [matchId]: {
+        ...prev[matchId],
+        [memberId]: { ...current, present: newPresent },
+      },
+    }))
+
+    await logAudit(supabase, {
+      groupId,
+      action: 'update_attendance',
+      entityType: 'match_attendance',
+      entityId: matchId,
+      details: { member_id: memberId, present: newPresent },
+    })
+  }
+
   async function handleAddMatch(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('matches').insert({
+    const { data, error } = await supabase.from('matches').insert({
       group_id: groupId,
       match_date: newMatchDate,
       location: newLocation || null,
       notes: newNotes || null,
-    })
+    }).select('id').single()
     if (error) {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Jogo criado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'create_match',
+        entityType: 'match',
+        entityId: data?.id,
+        details: { match_date: newMatchDate, location: newLocation },
+      })
       setNewDialogOpen(false)
       setNewMatchDate(format(new Date(), 'yyyy-MM-dd'))
       setNewLocation('')
@@ -115,6 +272,13 @@ export default function MatchesPage() {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Jogo atualizado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_match',
+        entityType: 'match',
+        entityId: editingMatch.id,
+        details: { match_date: editMatchDate, location: editLocation },
+      })
       setEditDialogOpen(false)
       setEditingMatch(null)
       loadMatches()
@@ -134,6 +298,12 @@ export default function MatchesPage() {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Jogo removido!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'delete_match',
+        entityType: 'match',
+        entityId: deletingMatchId,
+      })
       setDeleteDialogOpen(false)
       setDeletingMatchId(null)
       loadMatches()
@@ -153,18 +323,25 @@ export default function MatchesPage() {
     e.preventDefault()
     if (!guestMatchId) return
     setSaving(true)
-    const { error } = await supabase.from('guest_players').insert({
+    const { data, error } = await supabase.from('guest_players').insert({
       group_id: groupId,
       match_id: guestMatchId,
       name: guestName,
       phone: guestPhone || null,
       match_date: guestMatchDate,
       amount: parseFloat(guestAmount) || 0,
-    })
+    }).select('id').single()
     if (error) {
       toast.error('Erro', { description: error.message })
     } else {
       toast.success('Jogador avulso adicionado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'add_guest',
+        entityType: 'guest_player',
+        entityId: data?.id,
+        details: { name: guestName, amount: guestAmount, match_id: guestMatchId },
+      })
       setGuestDialogOpen(false)
       loadMatches()
     }
@@ -177,13 +354,54 @@ export default function MatchesPage() {
       .update({ paid: true, paid_at: new Date().toISOString() })
       .eq('id', guestId)
     toast.success('Pagamento confirmado!')
+    await logAudit(supabase, {
+      groupId,
+      action: 'mark_guest_paid',
+      entityType: 'guest_player',
+      entityId: guestId,
+    })
     loadMatches()
   }
 
   async function deleteGuest(guestId: string) {
     await supabase.from('guest_players').delete().eq('id', guestId)
     toast.success('Avulso removido!')
+    await logAudit(supabase, {
+      groupId,
+      action: 'delete_guest',
+      entityType: 'guest_player',
+      entityId: guestId,
+    })
     loadMatches()
+  }
+
+  function buildWhatsAppUrl(guest: GuestPlayer, matchDate: string) {
+    const dateFormatted = format(new Date(matchDate + 'T12:00:00'), 'dd/MM/yyyy')
+    const amount = Number(guest.amount).toFixed(2)
+    const pixKey = groupData?.pix_key || ''
+    const pixBeneficiary = groupData?.pix_beneficiary_name || ''
+
+    const message = `Ola ${guest.name}! Sua participacao na pelada de ${dateFormatted} ficou em R$ ${amount}.\n\nChave PIX: ${pixKey}\nFavor: ${pixBeneficiary}\n\nObrigado! ⚽`
+
+    const phone = (guest.phone || '').replace(/\D/g, '')
+    const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`
+    return `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`
+  }
+
+  // Helpers for cost split
+  function getAttendanceCount(matchId: string): number {
+    const map = attendanceMap[matchId]
+    if (!map) return 0
+    return Object.values(map).filter((a) => a.present).length
+  }
+
+  function getCostPerPlayer(matchId: string, guestCount: number): number | null {
+    const expenses = expenseSummaries[matchId]
+    if (!expenses || expenses.loading) return null
+    const presentCount = getAttendanceCount(matchId)
+    const totalPlayers = presentCount + guestCount
+    if (totalPlayers === 0) return null
+    return expenses.total / totalPlayers
   }
 
   // Summary
@@ -202,34 +420,36 @@ export default function MatchesPage() {
             {totalMatches} {totalMatches === 1 ? 'jogo' : 'jogos'} | {totalGuests} {totalGuests === 1 ? 'avulso' : 'avulsos'}
           </p>
         </div>
-        <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
-          <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Jogo
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Jogo</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddMatch} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Data do jogo *</Label>
-                <Input type="date" value={newMatchDate} onChange={(e) => setNewMatchDate(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Local</Label>
-                <Input placeholder="Ex: Quadra Society ABC" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-                {saving ? 'Salvando...' : 'Criar Jogo'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {isAdmin && (
+          <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+            <DialogTrigger render={<Button className="bg-[#00C853] hover:bg-[#00A843] text-white" />}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Jogo
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Jogo</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddMatch} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Data do jogo *</Label>
+                  <Input type="date" value={newMatchDate} onChange={(e) => setNewMatchDate(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Local</Label>
+                  <Input placeholder="Ex: Quadra Society ABC" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
+                </div>
+                <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
+                  {saving ? 'Salvando...' : 'Criar Jogo'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
@@ -276,6 +496,11 @@ export default function MatchesPage() {
           {matches.map((match) => {
             const guests = match.guest_players || []
             const isExpanded = expandedMatch === match.id
+            const matchAttendance = attendanceMap[match.id] || {}
+            const presentCount = getAttendanceCount(match.id)
+            const guestCount = guests.length
+            const costPerPlayer = getCostPerPlayer(match.id, guestCount)
+            const expenseSummary = expenseSummaries[match.id]
 
             return (
               <Card key={match.id} className="card-modern-elevated overflow-hidden">
@@ -307,85 +532,202 @@ export default function MatchesPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-1 ml-2 shrink-0">
-                        <Button size="sm" variant="ghost" className="text-[#1B1F4B]" onClick={() => openEdit(match)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-red-500" onClick={() => confirmDelete(match.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button size="sm" variant="ghost" className="text-[#1B1F4B]" onClick={() => openEdit(match)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-500" onClick={() => confirmDelete(match.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-[#00C853]"
+                              onClick={() => openGuestDialog(match.id, match.match_date)}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-[#00C853]"
-                          onClick={() => openGuestDialog(match.id, match.match_date)}
+                          onClick={() => setExpandedMatch(isExpanded ? null : match.id)}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </Button>
-                        {guests.length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setExpandedMatch(isExpanded ? null : match.id)}
-                          >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Expanded guest players */}
-                  {isExpanded && guests.length > 0 && (
-                    <div className="border-t bg-muted/30 px-4 py-3 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Jogadores Avulsos
-                      </p>
-                      {guests.map((guest) => (
-                        <div
-                          key={guest.id}
-                          className="flex items-center justify-between bg-background rounded-lg px-3 py-2"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium text-sm text-[#1B1F4B]">{guest.name}</span>
-                            {guest.phone && (
-                              <span className="text-xs text-muted-foreground ml-2">{guest.phone}</span>
-                            )}
-                            <span className="text-sm text-muted-foreground ml-2">
-                              R$ {Number(guest.amount).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {guest.paid ? (
-                              <Badge className="bg-[#00C853]/10 text-[#00C853]">
-                                <Check className="h-3 w-3 mr-1" />
-                                Pago
-                              </Badge>
-                            ) : (
-                              <>
-                                <Badge variant="outline" className="text-orange-500 border-orange-300">
-                                  Pendente
-                                </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-[#00C853] border-[#00C853] h-7 px-2"
-                                  onClick={() => markGuestPaid(guest.id)}
-                                >
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                              </>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 h-7 px-2"
-                              onClick={() => deleteGuest(guest.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
+                  {/* Expanded sections */}
+                  {isExpanded && (
+                    <div className="border-t bg-muted/30 px-4 py-3 space-y-4">
+                      {/* Attendance Section */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Presença
+                          </p>
+                          <Badge variant="secondary" className="bg-[#1B1F4B]/10 text-[#1B1F4B]">
+                            {presentCount}/{mensalistas.length} presentes
+                          </Badge>
                         </div>
-                      ))}
+                        {attendanceLoading[match.id] ? (
+                          <p className="text-sm text-muted-foreground">Carregando...</p>
+                        ) : mensalistas.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Nenhum mensalista cadastrado.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                            {mensalistas.map((member) => {
+                              const isPresent = matchAttendance[member.id]?.present ?? false
+                              return (
+                                <label
+                                  key={member.id}
+                                  className={`flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+                                    isPresent ? 'bg-[#00C853]/10' : 'bg-background'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isPresent}
+                                    onChange={() => toggleAttendance(match.id, member.id)}
+                                    className="h-4 w-4 rounded border-gray-300 text-[#00C853] focus:ring-[#00C853] accent-[#00C853]"
+                                  />
+                                  <span className={`text-sm ${isPresent ? 'font-medium text-[#1B1F4B]' : 'text-muted-foreground'}`}>
+                                    {member.name}
+                                  </span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator />
+
+                      {/* Guests Section */}
+                      {guests.length > 0 && (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                              Avulsos
+                            </p>
+                            <div className="space-y-2">
+                              {guests.map((guest) => (
+                                <div
+                                  key={guest.id}
+                                  className="flex items-center justify-between bg-background rounded-lg px-3 py-2"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span className="font-medium text-sm text-[#1B1F4B]">{guest.name}</span>
+                                    {guest.phone && (
+                                      <span className="text-xs text-muted-foreground ml-2">{guest.phone}</span>
+                                    )}
+                                    <span className="text-sm text-muted-foreground ml-2">
+                                      R$ {Number(guest.amount).toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {guest.paid ? (
+                                      <Badge className="bg-[#00C853]/10 text-[#00C853]">
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Pago
+                                      </Badge>
+                                    ) : (
+                                      <>
+                                        <Badge variant="outline" className="text-orange-500 border-orange-300">
+                                          Pendente
+                                        </Badge>
+                                        {guest.phone && (
+                                          <a
+                                            href={buildWhatsAppUrl(guest, match.match_date)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-green-600 border-green-400 h-7 px-2"
+                                            >
+                                              <MessageCircle className="h-3 w-3" />
+                                            </Button>
+                                          </a>
+                                        )}
+                                        {isAdmin && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-[#00C853] border-[#00C853] h-7 px-2"
+                                            onClick={() => markGuestPaid(guest.id)}
+                                          >
+                                            <Check className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                    {isAdmin && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-500 h-7 px-2"
+                                        onClick={() => deleteGuest(guest.id)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Separator />
+                        </>
+                      )}
+
+                      {/* Cost Split (Rateio) Section */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Rateio
+                        </p>
+                        {expenseSummary?.loading ? (
+                          <p className="text-sm text-muted-foreground">Calculando...</p>
+                        ) : (
+                          <div className="bg-background rounded-lg px-4 py-3 space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Despesas do dia</span>
+                              <span className="font-medium text-[#1B1F4B]">
+                                R$ {(expenseSummary?.total ?? 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Mensalistas presentes</span>
+                              <span className="font-medium text-[#1B1F4B]">{presentCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Avulsos</span>
+                              <span className="font-medium text-[#1B1F4B]">{guestCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Total de jogadores</span>
+                              <span className="font-medium text-[#1B1F4B]">{presentCount + guestCount}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-[#1B1F4B] flex items-center gap-1">
+                                <DollarSign className="h-4 w-4" />
+                                Custo por jogador
+                              </span>
+                              <span className="text-lg font-bold text-[#00C853]">
+                                {costPerPlayer !== null
+                                  ? `R$ ${costPerPlayer.toFixed(2)}`
+                                  : 'R$ 0.00'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>

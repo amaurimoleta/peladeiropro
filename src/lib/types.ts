@@ -44,6 +44,7 @@ export interface MonthlyFee {
   due_date: string
   paid_at: string | null
   payment_method: string | null
+  receipt_url: string | null
   status: 'pending' | 'paid' | 'overdue' | 'waived' | 'dm_leave'
   notes: string | null
   created_at: string
@@ -60,6 +61,7 @@ export interface GuestPlayer {
   amount: number
   paid: boolean
   paid_at: string | null
+  receipt_url: string | null
   notes: string | null
   created_at: string
 }
@@ -73,6 +75,16 @@ export interface Match {
   created_at: string
   updated_at: string
   guest_players?: GuestPlayer[]
+  attendance?: MatchAttendance[]
+}
+
+export interface MatchAttendance {
+  id: string
+  match_id: string
+  member_id: string
+  present: boolean
+  created_at: string
+  member?: GroupMember
 }
 
 export interface Expense {
@@ -86,6 +98,18 @@ export interface Expense {
   notes: string | null
   created_at: string
   paid_by_member?: GroupMember
+}
+
+export interface AuditLog {
+  id: string
+  group_id: string
+  user_id: string | null
+  user_name: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  details: Record<string, any> | null
+  created_at: string
 }
 
 export const EXPENSE_CATEGORIES: Record<Expense['category'], string> = {

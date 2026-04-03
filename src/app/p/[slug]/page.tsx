@@ -1,15 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
   DollarSign, TrendingUp, TrendingDown, CheckCircle2, Clock,
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
-  ChevronRight, Users,
+  ChevronRight, Users, Camera, Share2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -18,6 +25,71 @@ import { ShareButton } from '@/components/shared/share-button'
 import { CopyPixButton } from '@/components/shared/copy-pix-button'
 import { Logo } from '@/components/shared/logo'
 import { MonthNavigator } from '@/components/shared/month-navigator'
+import { ExportPdf } from '@/components/shared/export-pdf'
+
+// ── Animated Number Component ──
+function AnimatedNumber({ value, prefix = '', suffix = '', className = '' }: {
+  value: number
+  prefix?: string
+  suffix?: string
+  className?: string
+}) {
+  const [display, setDisplay] = useState(0)
+  const prevValue = useRef(0)
+
+  useEffect(() => {
+    const start = prevValue.current
+    const end = value
+    const duration = 600
+    const startTime = performance.now()
+
+    function animate(currentTime: number) {
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const current = start + (end - start) * eased
+      setDisplay(current)
+      if (progress < 1) {
+        requestAnimationFrame(animate)
+      } else {
+        prevValue.current = end
+      }
+    }
+
+    requestAnimationFrame(animate)
+  }, [value])
+
+  return <span className={className}>{prefix}{display.toFixed(2)}{suffix}</span>
+}
+
+// ── Receipt Modal Component ──
+function ReceiptViewer({ receiptUrl, memberName }: { receiptUrl: string; memberName: string }) {
+  return (
+    <Dialog>
+      <DialogTrigger>
+        <button
+          className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"
+          title="Ver comprovante"
+        >
+          <Camera className="h-3 w-3" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Comprovante - {memberName}</DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-center p-2">
+          <img
+            src={receiptUrl}
+            alt={`Comprovante de ${memberName}`}
+            className="max-w-full max-h-[60vh] rounded-lg object-contain"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export default function PublicPage() {
   const params = useParams()
@@ -29,8 +101,10 @@ export default function PublicPage() {
   const [guests, setGuests] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
+  const [matchAttendance, setMatchAttendance] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [activeTab, setActiveTab] = useState('mensal')
 
   // Annual view state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -63,10 +137,27 @@ export default function PublicPage() {
         supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`).order('expense_date', { ascending: false }),
         supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).order('match_date', { ascending: false }),
       ])
+
+      // Load attendance counts for each match
+      const matchIds = (matchesData || []).map((m: any) => m.id)
+      const attendanceCounts: Record<string, number> = {}
+      if (matchIds.length > 0) {
+        const { data: attendanceData } = await supabase
+          .from('match_attendance')
+          .select('match_id')
+          .in('match_id', matchIds)
+        if (attendanceData) {
+          attendanceData.forEach((a: any) => {
+            attendanceCounts[a.match_id] = (attendanceCounts[a.match_id] || 0) + 1
+          })
+        }
+      }
+
       setFees(feesData || [])
       setGuests(guestsData || [])
       setExpenses(expensesData || [])
       setMatches(matchesData || [])
+      setMatchAttendance(attendanceCounts)
       setLoading(false)
     }
     loadData()
@@ -188,30 +279,38 @@ export default function PublicPage() {
     return 'bg-red-50'
   }
 
+  function handleWhatsAppShare() {
+    const url = `${window.location.origin}/p/${slug}`
+    const text = `Confira a prestacao de contas da ${group.name}`
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`
+    window.open(waUrl, '_blank')
+  }
+
   return (
-    <div className="min-h-screen gradient-surface">
-      {/* Header */}
-      <header className="gradient-brand-hero text-white">
-        <div className="max-w-2xl mx-auto px-4 py-8 text-center">
-          <div className="flex justify-center mb-4">
+    <div className="min-h-screen gradient-surface pb-20 sm:pb-8">
+      {/* ── Sticky Header with blur ── */}
+      <header className="gradient-brand-hero text-white sticky top-0 z-40">
+        <div className="absolute inset-0 backdrop-blur-sm" />
+        <div className="relative max-w-2xl mx-auto px-4 py-6 sm:py-8 text-center">
+          <div className="flex justify-center mb-3 sm:mb-4">
             <Logo size="md" variant="white" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">{group.name}</h1>
-          <p className="text-white/50 text-sm capitalize mt-2 tracking-wide">Prestacao de contas</p>
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">{group.name}</h1>
+          <p className="text-white/50 text-xs sm:text-sm capitalize mt-1.5 sm:mt-2 tracking-wide">Prestacao de contas</p>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
         {/* View Toggle */}
-        <Tabs defaultValue="mensal">
-          <TabsList className="w-full">
-            <TabsTrigger value="mensal" className="flex-1">Mensal</TabsTrigger>
-            <TabsTrigger value="anual" className="flex-1">Resumo Anual</TabsTrigger>
+        <Tabs defaultValue="mensal" onValueChange={setActiveTab}>
+          <TabsList className="w-full transition-all duration-300">
+            <TabsTrigger value="mensal" className="flex-1 transition-all duration-200">Mensal</TabsTrigger>
+            <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Resumo Anual</TabsTrigger>
           </TabsList>
 
           {/* ===================== MONTHLY VIEW ===================== */}
-          <TabsContent value="mensal">
-            <div className="space-y-4 pt-4">
+          <TabsContent value="mensal" className="transition-all duration-300">
+            <div className="space-y-3 sm:space-y-4 pt-4">
               {/* Month navigation */}
               <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
@@ -220,35 +319,37 @@ export default function PublicPage() {
               ) : (
                 <>
                   {/* Balance Cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <TrendingUp className="h-4 w-4 text-white" />
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Entradas</p>
-                      <p className="text-lg font-bold text-brand-green">R$ {totalIncome.toFixed(2)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Entradas</p>
+                      <AnimatedNumber value={totalIncome} prefix="R$ " className="text-base sm:text-lg font-bold text-brand-green" />
                     </div>
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <TrendingDown className="h-4 w-4 text-white" />
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Saidas</p>
-                      <p className="text-lg font-bold text-red-500">R$ {totalExpenses_.toFixed(2)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saidas</p>
+                      <AnimatedNumber value={totalExpenses_} prefix="R$ " className="text-base sm:text-lg font-bold text-red-500" />
                     </div>
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <DollarSign className="h-4 w-4 text-white" />
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Saldo</p>
-                      <p className={`text-lg font-bold ${balance >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
-                        R$ {balance.toFixed(2)}
-                      </p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo</p>
+                      <AnimatedNumber
+                        value={balance}
+                        prefix="R$ "
+                        className={`text-base sm:text-lg font-bold ${balance >= 0 ? 'text-brand-green' : 'text-red-500'}`}
+                      />
                     </div>
                   </div>
 
                   {/* Jogos do Mes */}
                   {matches.length > 0 && (
-                    <div className="card-modern-elevated p-5">
+                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="font-bold text-brand-navy">Jogos do Mes</h2>
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">{matches.length} jogos</span>
@@ -268,6 +369,13 @@ export default function PublicPage() {
                                 </span>
                               )}
                             </div>
+                            {/* Attendance count */}
+                            {matchAttendance[match.id] != null && matchAttendance[match.id] > 0 && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground bg-gray-50 px-2 py-0.5 rounded-full">
+                                <Users className="h-3 w-3" />
+                                {matchAttendance[match.id]}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -275,7 +383,7 @@ export default function PublicPage() {
                   )}
 
                   {/* Mensalidades */}
-                  <div className="card-modern-elevated p-5">
+                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '280ms' }}>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="font-bold text-brand-navy">Mensalidades</h2>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{paidCount}/{totalFeesCount}</span>
@@ -289,7 +397,12 @@ export default function PublicPage() {
                               <Badge variant="outline" className="text-[10px] py-0 px-1">Avulso</Badge>
                             )}
                           </div>
-                          {feeStatusDisplay(fee)}
+                          <div className="flex items-center gap-2">
+                            {fee.receipt_url && (
+                              <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
+                            )}
+                            {feeStatusDisplay(fee)}
+                          </div>
                         </div>
                       ))}
                       {fees.length === 0 && (
@@ -299,7 +412,7 @@ export default function PublicPage() {
                   </div>
 
                   {/* Despesas */}
-                  <div className="card-modern-elevated p-5">
+                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '360ms' }}>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="font-bold text-brand-navy">Despesas do Mes</h2>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {totalExpenses_.toFixed(2)}</span>
@@ -324,7 +437,7 @@ export default function PublicPage() {
 
                   {/* Avulsos */}
                   {guests.length > 0 && (
-                    <div className="card-modern-elevated p-5">
+                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '440ms' }}>
                       <h2 className="font-bold text-brand-navy mb-4">Jogadores Avulsos</h2>
                       <div className="space-y-2.5">
                         {guests.map((guest: any) => (
@@ -346,7 +459,7 @@ export default function PublicPage() {
 
                   {/* PIX info */}
                   {group.pix_key && (
-                    <div className="card-modern-elevated p-5 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent">
+                    <div className="card-modern-elevated p-4 sm:p-5 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent animate-fade-in-up animate-pulse-subtle" style={{ animationDelay: '520ms' }}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="h-8 w-8 rounded-lg gradient-green flex items-center justify-center shadow-sm">
                           <DollarSign className="h-4 w-4 text-white" />
@@ -363,7 +476,7 @@ export default function PublicPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Chave:</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-brand-navy">{group.pix_key}</span>
+                            <span className="font-mono font-semibold text-brand-navy text-xs sm:text-sm break-all">{group.pix_key}</span>
                             <CopyPixButton pixKey={group.pix_key} />
                           </div>
                         </div>
@@ -377,8 +490,23 @@ export default function PublicPage() {
                     </div>
                   )}
 
+                  {/* Export PDF - Monthly */}
+                  <div className="flex justify-center animate-fade-in-up" style={{ animationDelay: '580ms' }}>
+                    <ExportPdf
+                      type="monthly"
+                      groupName={group.name}
+                      month={currentMonth}
+                      fees={fees.map(f => ({ memberName: f.member?.name || '', amount: Number(f.amount), status: f.status, paidAt: f.paid_at }))}
+                      guests={guests.map(g => ({ name: g.name, matchDate: g.match_date, amount: Number(g.amount), paid: g.paid }))}
+                      expenses={expenses.map(e => ({ description: e.description, category: e.category, amount: Number(e.amount), date: e.expense_date }))}
+                      totalIncome={totalIncome}
+                      totalExpenses={totalExpenses_}
+                      balance={balance}
+                    />
+                  </div>
+
                   {/* Share button */}
-                  <div className="flex justify-center pt-4 pb-8">
+                  <div className="flex justify-center pt-2 sm:pt-4 pb-8">
                     <ShareButton groupName={group.name} slug={slug} />
                   </div>
                 </>
@@ -387,8 +515,8 @@ export default function PublicPage() {
           </TabsContent>
 
           {/* ===================== ANNUAL VIEW ===================== */}
-          <TabsContent value="anual">
-            <div className="space-y-4 pt-4">
+          <TabsContent value="anual" className="transition-all duration-300">
+            <div className="space-y-3 sm:space-y-4 pt-4">
               {/* Year navigation */}
               <div className="flex items-center justify-center gap-4 mb-6">
                 <Button variant="outline" size="icon" onClick={() => setSelectedYear(y => y - 1)}>
@@ -405,37 +533,39 @@ export default function PublicPage() {
               ) : (
                 <>
                   {/* Annual Summary Cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <TrendingUp className="h-4 w-4 text-white" />
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Total Receitas</p>
-                      <p className="text-lg font-bold text-brand-green">R$ {annualTotalIncome.toFixed(2)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Receitas</p>
+                      <AnimatedNumber value={annualTotalIncome} prefix="R$ " className="text-base sm:text-lg font-bold text-brand-green" />
                     </div>
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <TrendingDown className="h-4 w-4 text-white" />
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Total Despesas</p>
-                      <p className="text-lg font-bold text-red-500">R$ {annualTotalExpense.toFixed(2)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Despesas</p>
+                      <AnimatedNumber value={annualTotalExpense} prefix="R$ " className="text-base sm:text-lg font-bold text-red-500" />
                     </div>
-                    <div className="card-modern-elevated p-4 text-center">
-                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
-                        <DollarSign className="h-4 w-4 text-white" />
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-xs text-muted-foreground font-medium">Saldo Anual</p>
-                      <p className={`text-lg font-bold ${annualBalance >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
-                        R$ {annualBalance.toFixed(2)}
-                      </p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo Anual</p>
+                      <AnimatedNumber
+                        value={annualBalance}
+                        prefix="R$ "
+                        className={`text-base sm:text-lg font-bold ${annualBalance >= 0 ? 'text-brand-green' : 'text-red-500'}`}
+                      />
                     </div>
                   </div>
 
                   {/* Month-by-month breakdown table */}
-                  <div className="card-modern-elevated p-5">
+                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                     <h2 className="font-bold text-brand-navy mb-4">Resumo por Mes</h2>
                     {monthsData.length > 0 ? (
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto -mx-2">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
@@ -476,7 +606,7 @@ export default function PublicPage() {
 
                   {/* Member payment compliance */}
                   {memberCompliance.length > 0 && (
-                    <div className="card-modern-elevated p-5">
+                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '280ms' }}>
                       <div className="flex items-center gap-2 mb-4">
                         <Users className="h-4 w-4 text-brand-navy" />
                         <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
@@ -501,7 +631,7 @@ export default function PublicPage() {
 
                   {/* Total matches and guest revenue */}
                   {(annualTotalMatches > 0 || annualGuestRevenue > 0) && (
-                    <div className="card-modern-elevated p-5">
+                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '360ms' }}>
                       <h2 className="font-bold text-brand-navy mb-4">Jogos e Avulsos</h2>
                       <div className="space-y-2.5 text-sm">
                         <div className="flex justify-between">
@@ -526,7 +656,7 @@ export default function PublicPage() {
 
                   {/* PIX info */}
                   {group.pix_key && (
-                    <div className="card-modern-elevated p-5 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent">
+                    <div className="card-modern-elevated p-4 sm:p-5 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent animate-fade-in-up animate-pulse-subtle" style={{ animationDelay: '440ms' }}>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="h-8 w-8 rounded-lg gradient-green flex items-center justify-center shadow-sm">
                           <DollarSign className="h-4 w-4 text-white" />
@@ -543,7 +673,7 @@ export default function PublicPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Chave:</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-brand-navy">{group.pix_key}</span>
+                            <span className="font-mono font-semibold text-brand-navy text-xs sm:text-sm break-all">{group.pix_key}</span>
                             <CopyPixButton pixKey={group.pix_key} />
                           </div>
                         </div>
@@ -557,8 +687,26 @@ export default function PublicPage() {
                     </div>
                   )}
 
+                  {/* Export PDF - Annual */}
+                  <div className="flex justify-center animate-fade-in-up" style={{ animationDelay: '500ms' }}>
+                    <ExportPdf
+                      type="annual"
+                      groupName={group.name}
+                      year={selectedYear}
+                      monthlyData={monthsData.map(m => ({
+                        month: m.month,
+                        income: m.income,
+                        expenses: m.expense,
+                        balance: m.balance,
+                      }))}
+                      totalIncome={annualTotalIncome}
+                      totalExpenses={annualTotalExpense}
+                      balance={annualBalance}
+                    />
+                  </div>
+
                   {/* Share button */}
-                  <div className="flex justify-center pt-4 pb-8">
+                  <div className="flex justify-center pt-2 sm:pt-4 pb-8">
                     <ShareButton groupName={group.name} slug={slug} />
                   </div>
                 </>
@@ -575,6 +723,17 @@ export default function PublicPage() {
           <p className="text-xs text-muted-foreground">Gestao de tesouraria para peladas</p>
         </div>
       </main>
+
+      {/* ── Bottom Floating WhatsApp Share Button (mobile) ── */}
+      <div className="fixed bottom-4 right-4 z-50 sm:hidden">
+        <button
+          onClick={handleWhatsAppShare}
+          className="h-14 w-14 rounded-full bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 active:scale-95"
+          aria-label="Compartilhar via WhatsApp"
+        >
+          <Share2 className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   )
 }

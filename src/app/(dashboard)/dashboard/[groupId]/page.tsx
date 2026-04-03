@@ -1,8 +1,34 @@
 import { createClient } from '@/lib/supabase/server'
-import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope } from 'lucide-react'
-import { format } from 'date-fns'
+import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope, Wallet, Activity, BarChart3, UserCheck } from 'lucide-react'
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import RankingCard from '@/components/dashboard/ranking-card'
+import FinancialCharts from '@/components/dashboard/financial-charts'
+import type { MonthlyFinancialData, ExpenseCategoryData } from '@/components/dashboard/financial-charts'
+
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  court_rental: 'Quadra',
+  goalkeeper: 'Goleiro',
+  equipment: 'Equipamento',
+  drinks: 'Bebidas',
+  other: 'Outros',
+}
+
+const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
+  court_rental: '#6366f1',
+  goalkeeper: '#f59e0b',
+  equipment: '#8b5cf6',
+  drinks: '#ec4899',
+  other: '#64748b',
+}
+
+const ACTION_ICONS: Record<string, string> = {
+  create: '➕',
+  update: '✏️',
+  delete: '🗑️',
+  payment: '💰',
+  default: '📋',
+}
 
 export default async function GroupDashboard({
   params,
@@ -11,8 +37,12 @@ export default async function GroupDashboard({
 }) {
   const { groupId } = await params
   const supabase = await createClient()
-  const currentMonth = format(new Date(), 'yyyy-MM')
-  const monthLabel = format(new Date(), 'MMMM yyyy', { locale: ptBR })
+  const now = new Date()
+  const currentMonth = format(now, 'yyyy-MM')
+  const monthLabel = format(now, 'MMMM yyyy', { locale: ptBR })
+
+  // Build date ranges for last 6 months (for charts)
+  const sixMonthsAgo = format(startOfMonth(subMonths(now, 5)), 'yyyy-MM-dd')
 
   const [
     { data: group },
@@ -21,6 +51,18 @@ export default async function GroupDashboard({
     { data: guests },
     { data: expenses },
     { data: matches },
+    // All-time queries for accumulated balance
+    { data: allFees },
+    { data: allGuests },
+    { data: allExpenses },
+    // Audit logs
+    { data: auditLogs },
+    // Attendance for current month
+    { data: matchAttendance },
+    // Last 6 months data for charts
+    { data: chartFees },
+    { data: chartGuests },
+    { data: chartExpenses },
   ] = await Promise.all([
     supabase.from('groups').select('*').eq('id', groupId).single(),
     supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active'),
@@ -28,8 +70,27 @@ export default async function GroupDashboard({
     supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`),
     supabase.from('expenses').select('*').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`),
     supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).order('match_date', { ascending: false }),
+    // All-time for accumulated balance
+    supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
+    supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
+    supabase.from('expenses').select('amount').eq('group_id', groupId),
+    // Audit logs
+    supabase.from('audit_logs').select('*').eq('group_id', groupId).order('created_at', { ascending: false }).limit(10),
+    // Match attendance for current month matches
+    supabase.from('match_attendance').select('*, member:group_members(name), match:matches(match_date, group_id)').eq('present', true),
+    // Chart data: fees, guests, expenses for last 6 months
+    supabase.from('monthly_fees').select('amount, reference_month, status').eq('group_id', groupId).eq('status', 'paid').gte('reference_month', format(subMonths(now, 5), 'yyyy-MM')),
+    supabase.from('guest_players').select('amount, match_date, paid').eq('group_id', groupId).eq('paid', true).gte('match_date', sixMonthsAgo),
+    supabase.from('expenses').select('amount, expense_date, category').eq('group_id', groupId).gte('expense_date', sixMonthsAgo),
   ])
 
+  // ---- Accumulated balance (all-time) ----
+  const totalAllFeesPaid = allFees?.reduce((acc, f) => acc + Number(f.amount), 0) || 0
+  const totalAllGuestsPaid = allGuests?.reduce((acc, g) => acc + Number(g.amount), 0) || 0
+  const totalAllExpenses = allExpenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0
+  const accumulatedBalance = totalAllFeesPaid + totalAllGuestsPaid - totalAllExpenses
+
+  // ---- Current month calculations ----
   const totalFeesPaid = fees?.filter(f => f.status === 'paid').reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalFeesPending = fees?.filter(f => f.status !== 'paid' && f.status !== 'waived' && f.status !== 'dm_leave').reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalGuests = guests?.filter(g => g.paid).reduce((acc, g) => acc + Number(g.amount), 0) || 0
@@ -45,6 +106,61 @@ export default async function GroupDashboard({
 
   const mensalistas = members?.filter(m => m.member_type === 'mensalista').length || 0
   const avulsos = members?.filter(m => m.member_type === 'avulso').length || 0
+
+  // ---- Chart data: last 6 months ----
+  const monthlyData: MonthlyFinancialData[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = subMonths(now, i)
+    const monthKey = format(d, 'yyyy-MM')
+    const label = format(d, 'MMM', { locale: ptBR })
+
+    const monthIncome =
+      (chartFees?.filter(f => f.reference_month === monthKey).reduce((acc, f) => acc + Number(f.amount), 0) || 0) +
+      (chartGuests?.filter(g => g.match_date?.startsWith(monthKey)).reduce((acc, g) => acc + Number(g.amount), 0) || 0)
+
+    const monthExpenses =
+      chartExpenses?.filter(e => e.expense_date?.startsWith(monthKey)).reduce((acc, e) => acc + Number(e.amount), 0) || 0
+
+    monthlyData.push({
+      month: monthKey,
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      income: monthIncome,
+      expenses: monthExpenses,
+    })
+  }
+
+  // ---- Expense breakdown by category (current month) ----
+  const categoryTotals: Record<string, number> = {}
+  expenses?.forEach((e: any) => {
+    const cat = e.category || 'other'
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(e.amount)
+  })
+  const expenseBreakdown: ExpenseCategoryData[] = Object.entries(categoryTotals).map(([cat, value]) => ({
+    name: EXPENSE_CATEGORY_LABELS[cat] || cat,
+    value,
+    color: EXPENSE_CATEGORY_COLORS[cat] || '#64748b',
+  }))
+
+  // ---- Attendance stats (current month) ----
+  const currentMonthMatchIds = new Set(matches?.map(m => m.id) || [])
+  const currentMonthAttendance = matchAttendance?.filter(
+    (a: any) => a.match?.group_id === groupId && currentMonthMatchIds.has(a.match_id)
+  ) || []
+  const totalMatchesThisMonth = matches?.length || 0
+  const averageAttendance = totalMatchesThisMonth > 0
+    ? Math.round(currentMonthAttendance.length / totalMatchesThisMonth)
+    : 0
+
+  // Most frequent player
+  const playerCounts: Record<string, { name: string; count: number }> = {}
+  currentMonthAttendance.forEach((a: any) => {
+    const name = a.member?.name || 'Desconhecido'
+    if (!playerCounts[a.member_id]) {
+      playerCounts[a.member_id] = { name, count: 0 }
+    }
+    playerCounts[a.member_id].count++
+  })
+  const mostFrequentPlayer = Object.values(playerCounts).sort((a, b) => b.count - a.count)[0]
 
   const summaryCards = [
     {
@@ -93,6 +209,26 @@ export default async function GroupDashboard({
         </div>
       </div>
 
+      {/* Caixa do Grupo - Accumulated Balance */}
+      <div className="card-modern-elevated mb-8 p-6 border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-green-50/50">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-sm">
+            <Wallet className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="font-bold text-brand-navy text-lg">Caixa do Grupo</h2>
+            <p className="text-xs text-muted-foreground">Saldo acumulado de todos os meses</p>
+          </div>
+        </div>
+        <div className={`text-4xl font-extrabold tracking-tight ${accumulatedBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          R$ {accumulatedBalance.toFixed(2)}
+        </div>
+        <div className="flex gap-6 mt-3 text-xs text-muted-foreground">
+          <span>Receitas totais: <span className="font-semibold text-emerald-600">R$ {(totalAllFeesPaid + totalAllGuestsPaid).toFixed(2)}</span></span>
+          <span>Despesas totais: <span className="font-semibold text-red-500">R$ {totalAllExpenses.toFixed(2)}</span></span>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         {summaryCards.map((card) => (
@@ -110,6 +246,39 @@ export default async function GroupDashboard({
           </div>
         ))}
       </div>
+
+      {/* Attendance Stats */}
+      {totalMatchesThisMonth > 0 && (
+        <div className="card-modern-elevated mb-8 p-5 border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-violet-50/50">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
+              <UserCheck className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="font-bold text-brand-navy">Frequencia do Mes</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-brand-navy">{totalMatchesThisMonth}</div>
+              <p className="text-xs text-muted-foreground mt-1">Jogos no mes</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-brand-navy">{averageAttendance}</div>
+              <p className="text-xs text-muted-foreground mt-1">Media por jogo</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-extrabold text-brand-navy truncate">
+                {mostFrequentPlayer ? mostFrequentPlayer.name.split(' ')[0] : '-'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {mostFrequentPlayer ? `${mostFrequentPlayer.count} presenças` : 'Mais frequente'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Financial Charts */}
+      <FinancialCharts monthlyData={monthlyData} expenseBreakdown={expenseBreakdown} />
 
       {/* Matches this month */}
       {matches && matches.length > 0 && (
@@ -215,6 +384,52 @@ export default async function GroupDashboard({
       <div className="mt-8">
         <RankingCard groupId={groupId} />
       </div>
+
+      {/* Audit Log Preview */}
+      {auditLogs && auditLogs.length > 0 && (
+        <div className="card-modern-elevated mt-8 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center shadow-sm">
+              <Activity className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="font-bold text-brand-navy">Atividade Recente</h2>
+          </div>
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-200" />
+            <div className="space-y-4">
+              {auditLogs.map((log: any, index: number) => {
+                const actionKey = log.action?.includes('create') ? 'create'
+                  : log.action?.includes('update') ? 'update'
+                  : log.action?.includes('delete') ? 'delete'
+                  : log.action?.includes('pay') || log.action?.includes('paid') ? 'payment'
+                  : 'default'
+                const icon = ACTION_ICONS[actionKey]
+
+                return (
+                  <div key={log.id} className="flex items-start gap-3 relative pl-1">
+                    <div className="h-6 w-6 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-xs z-10 shrink-0">
+                      {icon}
+                    </div>
+                    <div className="flex-1 min-w-0 pb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-brand-navy">{log.user_name || 'Sistema'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(log.created_at), 'dd/MM HH:mm', { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {log.action}
+                        {log.entity_type && <span className="ml-1">({log.entity_type})</span>}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
