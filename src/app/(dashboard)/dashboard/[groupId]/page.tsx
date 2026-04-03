@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -19,16 +19,18 @@ export default async function GroupDashboard({
     { data: fees },
     { data: guests },
     { data: expenses },
+    { data: matches },
   ] = await Promise.all([
     supabase.from('groups').select('*').eq('id', groupId).single(),
     supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active'),
     supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).eq('reference_month', currentMonth),
     supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`),
     supabase.from('expenses').select('*').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', `${currentMonth}-31`),
+    supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', `${currentMonth}-31`).order('match_date', { ascending: false }),
   ])
 
   const totalFeesPaid = fees?.filter(f => f.status === 'paid').reduce((acc, f) => acc + Number(f.amount), 0) || 0
-  const totalFeesPending = fees?.filter(f => f.status !== 'paid' && f.status !== 'waived').reduce((acc, f) => acc + Number(f.amount), 0) || 0
+  const totalFeesPending = fees?.filter(f => f.status !== 'paid' && f.status !== 'waived' && f.status !== 'dm_leave').reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalGuests = guests?.filter(g => g.paid).reduce((acc, g) => acc + Number(g.amount), 0) || 0
   const totalGuestsPending = guests?.filter(g => !g.paid).reduce((acc, g) => acc + Number(g.amount), 0) || 0
   const totalExpenses = expenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0
@@ -36,12 +38,16 @@ export default async function GroupDashboard({
   const balance = totalIncome - totalExpenses
 
   const paidCount = fees?.filter(f => f.status === 'paid').length || 0
+  const dmCount = fees?.filter(f => f.status === 'dm_leave').length || 0
   const totalFeesCount = fees?.length || 0
   const overdueFees = fees?.filter(f => f.status === 'overdue' || (f.status === 'pending' && new Date(f.due_date) < new Date())) || []
 
+  const mensalistas = members?.filter(m => m.member_type === 'mensalista').length || 0
+  const avulsos = members?.filter(m => m.member_type === 'avulso').length || 0
+
   const summaryCards = [
     {
-      label: 'Saldo do Mês',
+      label: 'Saldo do Mes',
       value: `R$ ${balance.toFixed(2)}`,
       subtitle: 'Entradas - Despesas',
       icon: DollarSign,
@@ -51,7 +57,7 @@ export default async function GroupDashboard({
     {
       label: 'Mensalidades',
       value: `R$ ${totalFeesPaid.toFixed(2)}`,
-      subtitle: `${paidCount}/${totalFeesCount} pagas | R$ ${totalFeesPending.toFixed(2)} pendente`,
+      subtitle: `${paidCount}/${totalFeesCount} pagas${dmCount > 0 ? ` | ${dmCount} DM` : ''} | R$ ${totalFeesPending.toFixed(2)} pendente`,
       icon: TrendingUp,
       gradient: 'from-emerald-500 to-green-600',
       valueColor: 'text-brand-navy',
@@ -67,7 +73,7 @@ export default async function GroupDashboard({
     {
       label: 'Despesas',
       value: `R$ ${totalExpenses.toFixed(2)}`,
-      subtitle: `${expenses?.length || 0} despesas no mês`,
+      subtitle: `${expenses?.length || 0} despesas no mes`,
       icon: TrendingDown,
       gradient: 'from-red-500 to-rose-600',
       valueColor: 'text-red-500',
@@ -79,6 +85,11 @@ export default async function GroupDashboard({
       <div className="mb-8">
         <h1 className="text-2xl font-extrabold text-brand-navy tracking-tight">{group?.name}</h1>
         <p className="text-muted-foreground capitalize mt-1">{monthLabel}</p>
+        <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+          <span>{mensalistas} mensalistas</span>
+          <span>{avulsos} avulsos</span>
+          <span>{matches?.length || 0} jogos no mes</span>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -98,6 +109,28 @@ export default async function GroupDashboard({
           </div>
         ))}
       </div>
+
+      {/* Matches this month */}
+      {matches && matches.length > 0 && (
+        <div className="card-modern-elevated mb-8 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+              <CalendarDays className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="font-bold text-brand-navy">Jogos do Mes ({matches.length})</h2>
+          </div>
+          <div className="space-y-2.5">
+            {matches.slice(0, 5).map((match: any) => (
+              <div key={match.id} className="flex items-center justify-between text-sm py-1">
+                <span className="font-medium text-brand-navy">
+                  {format(new Date(match.match_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                  {match.location && <span className="text-muted-foreground ml-2">- {match.location}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Overdue section */}
       {overdueFees.length > 0 && (
@@ -119,12 +152,32 @@ export default async function GroupDashboard({
         </div>
       )}
 
+      {/* DM Leave section */}
+      {dmCount > 0 && (
+        <div className="card-modern-elevated mb-8 p-5 border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50/50">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+              <Stethoscope className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="font-bold text-blue-600">Afastados pelo DM ({dmCount})</h2>
+          </div>
+          <div className="space-y-2.5">
+            {fees?.filter(f => f.status === 'dm_leave').map((fee: any) => (
+              <div key={fee.id} className="flex items-center justify-between text-sm py-1">
+                <span className="font-medium text-blue-800">{fee.member?.name}</span>
+                <span className="text-xs text-blue-500">Sem cobranca</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Recent activity */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card-modern-elevated p-5">
-          <h2 className="font-bold text-brand-navy mb-4">Últimos Pagamentos</h2>
+          <h2 className="font-bold text-brand-navy mb-4">Ultimos Pagamentos</h2>
           {fees?.filter(f => f.status === 'paid').length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Nenhum pagamento neste mês.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Nenhum pagamento neste mes.</p>
           ) : (
             <div className="space-y-3">
               {fees?.filter(f => f.status === 'paid').slice(0, 5).map((fee: any) => (
@@ -143,7 +196,7 @@ export default async function GroupDashboard({
         <div className="card-modern-elevated p-5">
           <h2 className="font-bold text-brand-navy mb-4">Despesas Recentes</h2>
           {!expenses || expenses.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa neste mês.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa neste mes.</p>
           ) : (
             <div className="space-y-3">
               {expenses.slice(0, 5).map((expense: any) => (

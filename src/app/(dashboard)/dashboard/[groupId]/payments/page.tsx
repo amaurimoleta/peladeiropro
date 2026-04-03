@@ -3,15 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Check, Clock, AlertCircle, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, Clock, AlertCircle, Zap, Stethoscope } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, addMonths, subMonths } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { format } from 'date-fns'
+import { MonthNavigator } from '@/components/shared/month-navigator'
 import type { MonthlyFee, GroupMember, Group } from '@/lib/types'
 
 export default function PaymentsPage() {
@@ -19,21 +18,30 @@ export default function PaymentsPage() {
   const groupId = params.groupId as string
   const supabase = createClient()
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [fees, setFees] = useState<any[]>([])
+  const [fees, setFees] = useState<(MonthlyFee & { member?: { name: string; member_type: string } })[]>([])
   const [members, setMembers] = useState<GroupMember[]>([])
   const [group, setGroup] = useState<Group | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
 
   const currentMonth = format(currentDate, 'yyyy-MM')
-  const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR })
 
   async function loadData() {
     setLoading(true)
     const [{ data: groupData }, { data: membersData }, { data: feesData }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
-      supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active').order('name'),
-      supabase.from('monthly_fees').select('*, member:group_members(name)').eq('group_id', groupId).eq('reference_month', currentMonth),
+      supabase
+        .from('group_members')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .eq('member_type', 'mensalista')
+        .order('name'),
+      supabase
+        .from('monthly_fees')
+        .select('*, member:group_members(name, member_type)')
+        .eq('group_id', groupId)
+        .eq('reference_month', currentMonth),
     ])
     setGroup(groupData)
     setMembers(membersData || [])
@@ -88,6 +96,19 @@ export default function PaymentsPage() {
     }
   }
 
+  async function markAsDmLeave(feeId: string) {
+    const { error } = await supabase
+      .from('monthly_fees')
+      .update({ status: 'dm_leave' })
+      .eq('id', feeId)
+    if (error) {
+      toast.error('Erro ao marcar afastamento DM')
+    } else {
+      toast.success('Membro marcado como afastado (DM).')
+      loadData()
+    }
+  }
+
   async function markAsWaived(feeId: string) {
     const { error } = await supabase
       .from('monthly_fees')
@@ -109,6 +130,8 @@ export default function PaymentsPage() {
         return <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Atrasado</Badge>
       case 'waived':
         return <Badge variant="secondary">Dispensado</Badge>
+      case 'dm_leave':
+        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400"><Stethoscope className="h-3 w-3 mr-1" />Afastado DM</Badge>
       default:
         return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>
     }
@@ -116,13 +139,16 @@ export default function PaymentsPage() {
 
   const paidCount = fees.filter(f => f.status === 'paid').length
   const totalAmount = fees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
+  const dmCount = fees.filter(f => f.status === 'dm_leave').length
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#1B1F4B]">Mensalidades</h1>
-          <p className="text-muted-foreground">{paidCount}/{fees.length} pagas | R$ {totalAmount.toFixed(2)} recebido</p>
+          <p className="text-muted-foreground">
+            {paidCount}/{fees.length} pagas | R$ {totalAmount.toFixed(2)} recebido{dmCount > 0 ? ` | ${dmCount} afastados DM` : ''}
+          </p>
         </div>
         <Button
           className="bg-[#00C853] hover:bg-[#00A843] text-white"
@@ -134,16 +160,7 @@ export default function PaymentsPage() {
         </Button>
       </div>
 
-      {/* Month navigation */}
-      <div className="flex items-center justify-center gap-4 mb-6">
-        <Button variant="outline" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-lg font-semibold capitalize min-w-[200px] text-center">{monthLabel}</span>
-        <Button variant="outline" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
       <Card>
         <CardContent className="p-0">
@@ -155,7 +172,7 @@ export default function PaymentsPage() {
                 <TableHead>Vencimento</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Data Pgto</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -170,7 +187,7 @@ export default function PaymentsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                fees.map((fee: any) => (
+                fees.map((fee) => (
                   <TableRow key={fee.id}>
                     <TableCell className="font-medium">{fee.member?.name}</TableCell>
                     <TableCell>R$ {Number(fee.amount).toFixed(2)}</TableCell>
@@ -185,6 +202,10 @@ export default function PaymentsPage() {
                           <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => markAsPaid(fee.id)}>
                             <Check className="h-3 w-3 mr-1" />
                             Pago
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50" onClick={() => markAsDmLeave(fee.id)}>
+                            <Stethoscope className="h-3 w-3 mr-1" />
+                            DM
                           </Button>
                           <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markAsWaived(fee.id)}>
                             Dispensar

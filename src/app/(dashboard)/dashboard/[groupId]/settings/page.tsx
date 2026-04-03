@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Copy, ExternalLink } from 'lucide-react'
+import { Copy, ExternalLink, Share2, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { PIX_KEY_TYPES, type Group } from '@/lib/types'
 
@@ -65,16 +64,29 @@ export default function SettingsPage() {
     if (error) {
       toast.error('Erro ao salvar', { description: error.message })
     } else {
-      toast.success('Configurações salvas!')
+      toast.success('Configuracoes salvas!')
     }
     setSaving(false)
   }
 
+  function getPublicLink() {
+    if (!group?.public_slug) return ''
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${group.public_slug}`
+  }
+
   function copyPublicLink() {
-    if (group?.public_slug) {
-      const link = `${window.location.origin}/p/${group.public_slug}`
+    const link = getPublicLink()
+    if (link) {
       navigator.clipboard.writeText(link)
       toast.success('Link copiado!')
+    }
+  }
+
+  function shareWhatsApp() {
+    const link = getPublicLink()
+    if (link) {
+      const text = `Prestacao de contas - ${name}\n\n${link}`
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
     }
   }
 
@@ -82,12 +94,54 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-[#1B1F4B] mb-6">Configurações</h1>
+      <h1 className="text-2xl font-bold text-[#1B1F4B] mb-6">Configuracoes</h1>
+
+      {/* Public Link - Prominent */}
+      <Card className="mb-6 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg gradient-green flex items-center justify-center shadow-sm">
+              <Globe className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Link Publico de Prestacao de Contas</CardTitle>
+              <CardDescription>Compartilhe com os membros para transparencia total</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={getPublicLink() || 'Gerando...'}
+              className="bg-white font-mono text-sm"
+            />
+            <Button type="button" variant="outline" size="icon" onClick={copyPublicLink} title="Copiar link">
+              <Copy className="h-4 w-4" />
+            </Button>
+            {group?.public_slug && (
+              <a href={`/p/${group.public_slug}`} target="_blank" rel="noopener noreferrer">
+                <Button type="button" variant="outline" size="icon" title="Abrir pagina">
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </a>
+            )}
+          </div>
+          <Button type="button" variant="outline" className="w-full text-[#25D366] border-[#25D366] hover:bg-[#25D366]/10" onClick={shareWhatsApp}>
+            <Share2 className="h-4 w-4 mr-2" />
+            Compartilhar via WhatsApp
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Este link mostra um resumo financeiro do grupo com mensalidades, despesas, saldo e informacoes de PIX.
+            Qualquer pessoa com o link pode visualizar - nao precisa de login.
+          </p>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSave} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Informações do Grupo</CardTitle>
+            <CardTitle className="text-base">Informacoes do Grupo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -95,8 +149,8 @@ export default function SettingsPage() {
               <Input value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição do grupo" />
+              <Label>Descricao</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descricao do grupo" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -114,7 +168,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Dados PIX</CardTitle>
-            <CardDescription>Informações de pagamento exibidas na prestação de contas</CardDescription>
+            <CardDescription>Informacoes de pagamento exibidas na prestacao de contas</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -133,40 +187,14 @@ export default function SettingsPage() {
               <Input placeholder="Sua chave PIX" value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Nome do beneficiário</Label>
+              <Label>Nome do beneficiario</Label>
               <Input placeholder="Nome que aparece no PIX" value={pixBeneficiary} onChange={(e) => setPixBeneficiary(e.target.value)} />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Link Público</CardTitle>
-            <CardDescription>Compartilhe para prestação de contas transparente</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Input
-                readOnly
-                value={group?.public_slug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${group.public_slug}` : 'Gerando...'}
-                className="bg-gray-50"
-              />
-              <Button type="button" variant="outline" size="icon" onClick={copyPublicLink}>
-                <Copy className="h-4 w-4" />
-              </Button>
-              {group?.public_slug && (
-                <a href={`/p/${group.public_slug}`} target="_blank" rel="noopener noreferrer">
-                  <Button type="button" variant="outline" size="icon">
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </a>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
         <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Configurações'}
+          {saving ? 'Salvando...' : 'Salvar Configuracoes'}
         </Button>
       </form>
     </div>

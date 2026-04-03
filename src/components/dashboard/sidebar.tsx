@@ -14,6 +14,8 @@ import {
   LogOut,
   Menu,
   X,
+  CalendarDays,
+  BarChart3,
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -23,12 +25,14 @@ import { Logo } from '@/components/shared/logo'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/members', icon: Users, label: 'Membros' },
   { href: '/payments', icon: CreditCard, label: 'Mensalidades' },
   { href: '/guests', icon: UserPlus, label: 'Avulsos' },
   { href: '/expenses', icon: Receipt, label: 'Despesas' },
+  { href: '/dre', icon: BarChart3, label: 'DRE' },
   { href: '/ranking', icon: Trophy, label: 'Ranking' },
-  { href: '/settings', icon: Settings, label: 'Configurações' },
+  { href: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 
 export function Sidebar({ groupId, groupName }: { groupId: string; groupName: string }) {
@@ -51,7 +55,7 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
         </Link>
         <p className="text-xs text-muted-foreground mt-2 truncate font-medium">{groupName}</p>
       </div>
-      <div className="flex-1 py-4 space-y-1 px-3">
+      <div className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
         {navItems.map((item) => {
           const fullHref = `/dashboard/${groupId}${item.href}`
           const isActive = item.href === ''

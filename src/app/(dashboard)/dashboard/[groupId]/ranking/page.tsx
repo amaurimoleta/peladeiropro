@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, Medal, Award, TrendingUp, AlertTriangle } from 'lucide-react'
 
 interface RankedMember {
   name: string
   memberId: string
+  memberType: string
   totalFees: number
   paidOnTime: number
   paidLate: number
@@ -34,10 +35,15 @@ export default function RankingPage() {
 
       if (!members || !fees) { setLoading(false); return }
 
-      const ranked: RankedMember[] = members.map(member => {
+      // Only rank mensalistas
+      const mensalistas = members.filter(m => m.member_type === 'mensalista')
+
+      const ranked: RankedMember[] = mensalistas.map(member => {
         const memberFees = fees.filter(f => f.member_id === member.id)
-        const paidFees = memberFees.filter(f => f.status === 'paid')
-        const unpaidFees = memberFees.filter(f => f.status === 'pending' || f.status === 'overdue')
+        // Exclude dm_leave and waived from scoring
+        const scorableFees = memberFees.filter(f => f.status !== 'dm_leave' && f.status !== 'waived')
+        const paidFees = scorableFees.filter(f => f.status === 'paid')
+        const unpaidFees = scorableFees.filter(f => f.status === 'pending' || f.status === 'overdue')
 
         let totalDaysEarly = 0
         let paidOnTime = 0
@@ -55,16 +61,18 @@ export default function RankingPage() {
         })
 
         const avgDaysEarly = paidFees.length > 0 ? totalDaysEarly / paidFees.length : 0
-        // Score: % of on-time payments * 70 + average days early * 30 (weighted)
-        const onTimeRate = memberFees.length > 0 ? (paidOnTime / memberFees.length) : 0
-        const score = memberFees.length > 0
+        const onTimeRate = scorableFees.length > 0 ? (paidOnTime / scorableFees.length) : 0
+        const score = scorableFees.length > 0
           ? Math.round(onTimeRate * 70 + Math.min(avgDaysEarly, 10) * 3)
           : 0
+
+        const dmCount = memberFees.filter(f => f.status === 'dm_leave').length
 
         return {
           name: member.name,
           memberId: member.id,
-          totalFees: memberFees.length,
+          memberType: member.member_type,
+          totalFees: scorableFees.length,
           paidOnTime,
           paidLate,
           unpaid: unpaidFees.length,
@@ -100,7 +108,7 @@ export default function RankingPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1B1F4B]">Ranking de Pagadores</h1>
-        <p className="text-muted-foreground">Quem paga em dia sobe no ranking!</p>
+        <p className="text-muted-foreground">Quem paga em dia sobe no ranking! (Apenas mensalistas)</p>
       </div>
 
       {loading ? (
@@ -110,7 +118,7 @@ export default function RankingPage() {
       ) : (
         <div className="space-y-3">
           {ranking.map((member, index) => (
-            <Card key={member.memberId} className={index === 0 ? 'border-yellow-300 bg-yellow-50/50' : ''}>
+            <Card key={member.memberId} className={index === 0 && member.score > 0 ? 'border-yellow-300 bg-yellow-50/50' : ''}>
               <CardContent className="flex items-center gap-4 py-4">
                 <div className="flex-shrink-0">
                   {getIcon(index)}
@@ -135,7 +143,7 @@ export default function RankingPage() {
                       <span className="text-red-500">{member.unpaid} pendente{member.unpaid > 1 ? 's' : ''}</span>
                     )}
                     {member.avgDaysEarly > 0 && (
-                      <span>{member.avgDaysEarly}d de antecedência</span>
+                      <span>{member.avgDaysEarly}d de antecedencia</span>
                     )}
                   </div>
                 </div>
