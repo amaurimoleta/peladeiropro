@@ -121,72 +121,41 @@ export default function MatchesPage() {
     loadMensalistas()
   }, [groupId])
 
-  // Load matches and guests SEPARATELY to avoid FK join issues
+  // Load matches and guests separately (same pattern as financeiro)
   const loadMatches = useCallback(async () => {
     setLoading(true)
-
-    // Calculate correct last day of month (avoids invalid dates like Apr 31)
-    const lastDay = format(endOfMonth(currentDate), 'yyyy-MM-dd')
     const firstDay = `${currentMonth}-01`
+    const lastDay = format(endOfMonth(currentDate), 'yyyy-MM-dd')
 
-    try {
-      // 1) Load matches (no join)
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('group_id', groupId)
-        .gte('match_date', firstDay)
-        .lte('match_date', lastDay)
-        .order('match_date', { ascending: false })
+    const [
+      { data: matchesData },
+      { data: guestsData },
+    ] = await Promise.all([
+      supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay).order('match_date', { ascending: false }),
+      supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay),
+    ])
 
-      if (matchesError) {
-        console.error('Erro ao carregar jogos:', matchesError)
-        toast.error('Erro ao carregar jogos', { description: matchesError.message })
-        setMatches([])
-        setLoading(false)
-        return
+    const loadedMatches = matchesData || []
+    const allGuestsData = guestsData || []
+
+    const matchesWithGuests: MatchWithGuests[] = loadedMatches.map((m) => ({
+      ...m,
+      guests: allGuestsData.filter((g) => g.match_id === m.id),
+    }))
+
+    setMatches(matchesWithGuests)
+
+    // Initialize score inputs
+    const newScoreInputs: Record<string, { a: string; b: string }> = {}
+    for (const m of matchesWithGuests) {
+      newScoreInputs[m.id] = {
+        a: m.score_a != null ? String(m.score_a) : '',
+        b: m.score_b != null ? String(m.score_b) : '',
       }
-
-      const loadedMatches = matchesData || []
-
-      // 2) Load guests for matching date range
-      const { data: guestsData, error: guestsError } = await supabase
-        .from('guest_players')
-        .select('*')
-        .eq('group_id', groupId)
-        .gte('match_date', firstDay)
-        .lte('match_date', lastDay)
-
-      if (guestsError) {
-        console.error('Erro ao carregar avulsos:', guestsError)
-      }
-
-      const allGuests = guestsData || []
-
-      // 3) Combine: attach guests to their matches
-      const matchesWithGuests: MatchWithGuests[] = loadedMatches.map((m) => ({
-        ...m,
-        guests: allGuests.filter((g) => g.match_id === m.id),
-      }))
-
-      setMatches(matchesWithGuests)
-
-      // Initialize score inputs for all matches
-      const newScoreInputs: Record<string, { a: string; b: string }> = {}
-      for (const m of matchesWithGuests) {
-        newScoreInputs[m.id] = {
-          a: m.score_a != null ? String(m.score_a) : '',
-          b: m.score_b != null ? String(m.score_b) : '',
-        }
-      }
-      setScoreInputs((prev) => ({ ...prev, ...newScoreInputs }))
-    } catch (err) {
-      console.error('Erro inesperado:', err)
-      toast.error('Erro inesperado ao carregar jogos')
-      setMatches([])
     }
+    setScoreInputs((prev) => ({ ...prev, ...newScoreInputs }))
     setLoading(false)
-  }, [groupId, currentMonth, currentDate, supabase])
+  }, [groupId, currentMonth])
 
   useEffect(() => { loadMatches() }, [loadMatches])
 
@@ -204,7 +173,7 @@ export default function MatchesPage() {
     }
     setAttendanceMap((prev) => ({ ...prev, [matchId]: map }))
     setAttendanceLoading((prev) => ({ ...prev, [matchId]: false }))
-  }, [supabase])
+  }, [groupId])
 
   // Load expenses for a match date
   const loadExpenses = useCallback(async (matchId: string, matchDate: string) => {
@@ -217,7 +186,7 @@ export default function MatchesPage() {
 
     const total = (data || []).reduce((sum, e) => sum + Number(e.amount), 0)
     setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total, loading: false } }))
-  }, [supabase, groupId])
+  }, [groupId])
 
   // When a match is expanded, load attendance and expenses
   useEffect(() => {

@@ -91,6 +91,11 @@ export default function FinanceiroPage() {
   const [allTimeGuests, setAllTimeGuests] = useState(0)
   const [allTimeExpenses, setAllTimeExpenses] = useState(0)
 
+  // Saldo Inicial do mes (tudo antes do mes atual)
+  const [priorFees, setPriorFees] = useState(0)
+  const [priorGuests, setPriorGuests] = useState(0)
+  const [priorExpenses, setPriorExpenses] = useState(0)
+
   // WhatsApp cobranca state
   const [cobrancaDialogOpen, setCobrancaDialogOpen] = useState(false)
 
@@ -134,21 +139,36 @@ export default function FinanceiroPage() {
     setLoading(false)
   }, [groupId, currentMonth])
 
-  // Load accumulated balance (all-time)
+  // Load accumulated balance (all-time) and prior-month balance
   const loadAccumulatedBalance = useCallback(async () => {
+    const firstDay = `${currentMonth}-01`
+
     const [
       { data: allFees },
       { data: allGuests },
       { data: allExpenses },
+      // Prior to current month (for saldo inicial)
+      { data: priorFeesData },
+      { data: priorGuestsData },
+      { data: priorExpensesData },
     ] = await Promise.all([
       supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
       supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
       supabase.from('expenses').select('amount').eq('group_id', groupId),
+      // Fees paid before current month
+      supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid').lt('reference_month', currentMonth),
+      // Guests paid before current month
+      supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true).lt('match_date', firstDay),
+      // Expenses before current month
+      supabase.from('expenses').select('amount').eq('group_id', groupId).lt('expense_date', firstDay),
     ])
     setAllTimeFees((allFees || []).reduce((sum, f) => sum + Number(f.amount), 0))
     setAllTimeGuests((allGuests || []).reduce((sum, g) => sum + Number(g.amount), 0))
     setAllTimeExpenses((allExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0))
-  }, [groupId])
+    setPriorFees((priorFeesData || []).reduce((sum, f) => sum + Number(f.amount), 0))
+    setPriorGuests((priorGuestsData || []).reduce((sum, g) => sum + Number(g.amount), 0))
+    setPriorExpenses((priorExpensesData || []).reduce((sum, e) => sum + Number(e.amount), 0))
+  }, [groupId, currentMonth])
 
   // Load rateio data
   const loadRateio = useCallback(async () => {
@@ -590,6 +610,12 @@ export default function FinanceiroPage() {
   const allTimeIncome = allTimeFees + allTimeGuests
   const accumulatedBalance = allTimeIncome - allTimeExpenses
 
+  // Saldo Inicial (tudo antes do mes selecionado) e Saldo Final
+  const saldoInicial = (priorFees + priorGuests) - priorExpenses
+  const receitasDoMes = dreTotalIncome
+  const despesasDoMes = dreTotalExpenses
+  const saldoFinal = saldoInicial + receitasDoMes - despesasDoMes
+
   function formatCurrency(value: number) {
     return `R$ ${value.toFixed(2)}`
   }
@@ -707,30 +733,51 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
-      {/* ── Caixa do Grupo (Accumulated Balance) ── */}
+      {/* ── Caixa do Grupo (Saldo Inicial / Final) ── */}
       <Card className="mb-6 border-2 border-[#1B1F4B]/10 shadow-lg">
         <CardContent className="pt-4 pb-4">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-4">
             <div className="rounded-full bg-[#1B1F4B]/10 p-2">
               <Wallet className="h-5 w-5 text-[#1B1F4B]" />
             </div>
             <h2 className="text-lg font-bold text-[#1B1F4B]">Caixa do Grupo</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Total Receitas</span>
-              <span className="text-lg font-bold text-[#00C853]">{formatCurrency(allTimeIncome)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Total Despesas</span>
-              <span className="text-lg font-bold text-red-500">{formatCurrency(allTimeExpenses)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Saldo Atual</span>
-              <span className={`text-xl font-bold ${accumulatedBalance >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
-                {accumulatedBalance >= 0 ? '+' : ''}{formatCurrency(accumulatedBalance)}
+
+          {/* Saldo Inicial → Movimentacao → Saldo Final */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-center">
+            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-slate-50">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Saldo Inicial</span>
+              <span className={`text-lg font-bold ${saldoInicial >= 0 ? 'text-[#1B1F4B]' : 'text-red-500'}`}>
+                {formatCurrency(saldoInicial)}
               </span>
             </div>
+
+            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-green-50">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">+ Receitas</span>
+              <span className="text-lg font-bold text-[#00C853]">{formatCurrency(receitasDoMes)}</span>
+            </div>
+
+            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-red-50">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">- Despesas</span>
+              <span className="text-lg font-bold text-red-500">{formatCurrency(despesasDoMes)}</span>
+            </div>
+
+            <div className="hidden sm:flex items-center justify-center text-2xl text-muted-foreground">=</div>
+
+            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-[#1B1F4B]/5 border-2 border-[#1B1F4B]/20">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Saldo Final</span>
+              <span className={`text-xl font-extrabold ${saldoFinal >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                {saldoFinal >= 0 ? '+' : ''}{formatCurrency(saldoFinal)}
+              </span>
+            </div>
+          </div>
+
+          {/* Saldo geral acumulado */}
+          <div className="mt-3 pt-3 border-t border-muted/50 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Saldo acumulado geral (todos os meses)</span>
+            <span className={`text-sm font-bold ${accumulatedBalance >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+              {formatCurrency(accumulatedBalance)}
+            </span>
           </div>
         </CardContent>
       </Card>
