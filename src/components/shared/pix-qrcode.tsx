@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from 'qrcode.react'
 import { generatePixBrCode, type PixPayload } from '@/lib/pix'
-import { Copy, Check, QrCode } from 'lucide-react'
+import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,8 @@ interface PixQrCodeProps {
   city?: string
   size?: number
   showCopyPaste?: boolean
+  /** Raw BR Code (PIX Copia e Cola) pasted by user — takes priority over generated */
+  manualBrCode?: string | null
 }
 
 export function PixQrCode({
@@ -27,19 +29,21 @@ export function PixQrCode({
   city,
   size = 200,
   showCopyPaste = true,
+  manualBrCode,
 }: PixQrCodeProps) {
   const [copied, setCopied] = useState(false)
 
-  const payload: PixPayload = {
-    pixKey,
-    pixKeyType,
-    beneficiaryName,
-    amount,
-    description,
-    city,
-  }
-
-  const brCode = generatePixBrCode(payload)
+  // Use manual BR Code if provided, otherwise generate from key
+  const brCode = manualBrCode && manualBrCode.trim().length > 20
+    ? manualBrCode.trim()
+    : generatePixBrCode({
+        pixKey,
+        pixKeyType,
+        beneficiaryName,
+        amount,
+        description,
+        city,
+      })
 
   async function copyToClipboard() {
     try {

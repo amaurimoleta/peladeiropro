@@ -20,9 +20,10 @@ import {
 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { EXPENSE_CATEGORIES, PIX_KEY_TYPES, TOURNAMENT_STATUSES, TOURNAMENT_FORMATS } from '@/lib/types'
+import { EXPENSE_CATEGORIES, REVENUE_CATEGORIES, PIX_KEY_TYPES, TOURNAMENT_STATUSES, TOURNAMENT_FORMATS } from '@/lib/types'
 import { ShareButton } from '@/components/shared/share-button'
 import { CopyPixButton } from '@/components/shared/copy-pix-button'
+import { PixQrCode } from '@/components/shared/pix-qrcode'
 import { Logo } from '@/components/shared/logo'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { ExportPdf } from '@/components/shared/export-pdf'
@@ -100,6 +101,7 @@ export default function PublicPage() {
   const [fees, setFees] = useState<any[]>([])
   const [guests, setGuests] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
+  const [revenues, setRevenues] = useState<any[]>([])
   const [matches, setMatches] = useState<any[]>([])
   const [matchAttendance, setMatchAttendance] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -122,6 +124,7 @@ export default function PublicPage() {
   const [annualFees, setAnnualFees] = useState<any[]>([])
   const [annualGuests, setAnnualGuests] = useState<any[]>([])
   const [annualExpenses, setAnnualExpenses] = useState<any[]>([])
+  const [annualRevenues, setAnnualRevenues] = useState<any[]>([])
   const [annualMatches, setAnnualMatches] = useState<any[]>([])
   const [annualMembers, setAnnualMembers] = useState<any[]>([])
   const [annualLoading, setAnnualLoading] = useState(false)
@@ -166,17 +169,19 @@ export default function PublicPage() {
       const lastDayOfMonth = format(endOfMonth(currentDate), 'yyyy-MM-dd')
 
       const [
-        { data: feesData }, { data: guestsData }, { data: expensesData }, { data: matchesData },
-        { data: priorFees }, { data: priorGuests }, { data: priorExpenses },
+        { data: feesData }, { data: guestsData }, { data: expensesData }, { data: revenuesData }, { data: matchesData },
+        { data: priorFees }, { data: priorGuests }, { data: priorExpenses }, { data: priorRevenues },
       ] = await Promise.all([
         supabase.from('monthly_fees').select('*, member:group_members(name, member_type)').eq('group_id', group.id).eq('reference_month', currentMonth),
         supabase.from('guest_players').select('*').eq('group_id', group.id).gte('match_date', firstDayOfMonth).lte('match_date', lastDayOfMonth),
         supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', firstDayOfMonth).lte('expense_date', lastDayOfMonth).order('expense_date', { ascending: false }),
+        supabase.from('revenues').select('*').eq('group_id', group.id).gte('revenue_date', firstDayOfMonth).lte('revenue_date', lastDayOfMonth).order('revenue_date', { ascending: false }),
         supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', firstDayOfMonth).lte('match_date', lastDayOfMonth).order('match_date', { ascending: false }),
         // Prior data for saldo inicial
         supabase.from('monthly_fees').select('amount').eq('group_id', group.id).eq('status', 'paid').lt('reference_month', currentMonth),
         supabase.from('guest_players').select('amount').eq('group_id', group.id).eq('paid', true).lt('match_date', firstDayOfMonth),
         supabase.from('expenses').select('amount').eq('group_id', group.id).lt('expense_date', firstDayOfMonth),
+        supabase.from('revenues').select('amount').eq('group_id', group.id).lt('revenue_date', firstDayOfMonth),
       ])
 
       // Load attendance counts for each match
@@ -199,11 +204,13 @@ export default function PublicPage() {
       const priorFeesTotal = (priorFees || []).reduce((s: number, f: any) => s + Number(f.amount), 0)
       const priorGuestsTotal = (priorGuests || []).reduce((s: number, g: any) => s + Number(g.amount), 0)
       const priorExpensesTotal = (priorExpenses || []).reduce((s: number, e: any) => s + Number(e.amount), 0)
-      setPriorBalance(initBal + priorFeesTotal + priorGuestsTotal - priorExpensesTotal)
+      const priorRevenuesTotal = (priorRevenues || []).reduce((s: number, r: any) => s + Number(r.amount), 0)
+      setPriorBalance(initBal + priorFeesTotal + priorGuestsTotal + priorRevenuesTotal - priorExpensesTotal)
 
       setFees(feesData || [])
       setGuests(guestsData || [])
       setExpenses(expensesData || [])
+      setRevenues(revenuesData || [])
       setMatches(matchesData || [])
       setMatchAttendance(attendanceCounts)
       setLoading(false)
@@ -217,13 +224,15 @@ export default function PublicPage() {
     async function loadAnnualData() {
       setAnnualLoading(true)
       const year = selectedYear
-      const [{ data: feesData }, { data: guestsData }, { data: expensesData }, { data: matchesData }, { data: membersData }] = await Promise.all([
+      const [{ data: feesData }, { data: guestsData }, { data: expensesData }, { data: revenuesData }, { data: matchesData }, { data: membersData }] = await Promise.all([
         supabase.from('monthly_fees').select('*, member:group_members(name, member_type)').eq('group_id', group.id)
           .gte('reference_month', `${year}-01`).lte('reference_month', `${year}-12`),
         supabase.from('guest_players').select('*').eq('group_id', group.id)
           .gte('match_date', `${year}-01-01`).lte('match_date', `${year}-12-31`),
         supabase.from('expenses').select('*').eq('group_id', group.id)
           .gte('expense_date', `${year}-01-01`).lte('expense_date', `${year}-12-31`),
+        supabase.from('revenues').select('*').eq('group_id', group.id)
+          .gte('revenue_date', `${year}-01-01`).lte('revenue_date', `${year}-12-31`),
         supabase.from('matches').select('*').eq('group_id', group.id)
           .gte('match_date', `${year}-01-01`).lte('match_date', `${year}-12-31`),
         supabase.from('group_members').select('*').eq('group_id', group.id).eq('status', 'active').eq('member_type', 'mensalista'),
@@ -231,6 +240,7 @@ export default function PublicPage() {
       setAnnualFees(feesData || [])
       setAnnualGuests(guestsData || [])
       setAnnualExpenses(expensesData || [])
+      setAnnualRevenues(revenuesData || [])
       setAnnualMatches(matchesData || [])
       setAnnualMembers(membersData || [])
       setAnnualLoading(false)
@@ -343,7 +353,8 @@ export default function PublicPage() {
   // Monthly calculations
   const totalFeesPaid = fees.filter(f => f.status === 'paid').reduce((s: number, f: any) => s + Number(f.amount), 0)
   const totalGuestsPaid = guests.filter(g => g.paid).reduce((s: number, g: any) => s + Number(g.amount), 0)
-  const totalIncome = totalFeesPaid + totalGuestsPaid
+  const totalRevenuesAmount = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
+  const totalIncome = totalFeesPaid + totalGuestsPaid + totalRevenuesAmount
   const totalExpenses_ = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
   const balance = totalIncome - totalExpenses_
   const saldoFinal = priorBalance + balance
@@ -357,9 +368,11 @@ export default function PublicPage() {
     const monthFees = annualFees?.filter(f => f.reference_month === month && f.status === 'paid') || []
     const monthGuests = annualGuests?.filter(g => g.match_date.startsWith(month) && g.paid) || []
     const monthExpenses = annualExpenses?.filter(e => e.expense_date.startsWith(month)) || []
+    const monthRevenues = annualRevenues?.filter(r => r.revenue_date.startsWith(month)) || []
     const feeIncome = monthFees.reduce((s: number, f: any) => s + Number(f.amount), 0)
     const guestIncome = monthGuests.reduce((s: number, g: any) => s + Number(g.amount), 0)
-    const income = feeIncome + guestIncome
+    const revenueIncome = monthRevenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
+    const income = feeIncome + guestIncome + revenueIncome
     const expense = monthExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
     return { month, monthIndex: i, income, expense, balance: income - expense, saldoInicial: 0, saldoFinal: 0 }
   })
@@ -381,6 +394,7 @@ export default function PublicPage() {
   // Detailed revenue breakdown for annual view
   const annualFeeRevenue = annualFees.filter(f => f.status === 'paid').reduce((s: number, f: any) => s + Number(f.amount), 0)
   const annualGuestRevenue = annualGuests.filter(g => g.paid).reduce((s: number, g: any) => s + Number(g.amount), 0)
+  const annualOtherRevenue = annualRevenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
 
   // Detailed expense breakdown by category for annual view
   const annualExpenseByCategory: Record<string, number> = {}
@@ -667,6 +681,26 @@ export default function PublicPage() {
                             </div>
                           </div>
                         )}
+                        {/* Outras receitas */}
+                        {revenues.length > 0 && (
+                          <div>
+                            <div className="flex justify-between text-sm py-1 mb-1">
+                              <span className="text-muted-foreground">Outras receitas</span>
+                              <span className="font-semibold text-brand-green">R$ {totalRevenuesAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="space-y-1 pl-3 border-l-2 border-indigo-100">
+                              {revenues.map((rev: any) => (
+                                <div key={rev.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <span className="text-brand-navy">{rev.description} {rev.revenue_date ? `- ${format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM')}` : ''}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium">R$ {Number(rev.amount).toFixed(2)}</span>
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{REVENUE_CATEGORIES[rev.category] || rev.category}</Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {totalIncome === 0 && (
                           <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mes.</p>
                         )}
@@ -822,24 +856,76 @@ export default function PublicPage() {
                         </div>
                         <h2 className="font-bold text-brand-navy">Pagar via PIX</h2>
                       </div>
+
+                      {/* QR Code from BR Code */}
+                      {(group.pix_brcode || group.pix_key) && (
+                        <div className="flex justify-center mb-4">
+                          <PixQrCode
+                            pixKey={group.pix_key}
+                            pixKeyType={group.pix_key_type}
+                            beneficiaryName={group.pix_beneficiary_name || group.name}
+                            amount={Number(group.monthly_fee_amount) || undefined}
+                            manualBrCode={group.pix_brcode}
+                            size={180}
+                          />
+                        </div>
+                      )}
+
+                      {group.pix_beneficiary_name && (
+                        <div className="flex justify-between text-sm mb-3">
+                          <span className="text-muted-foreground">Beneficiario:</span>
+                          <span className="font-semibold">{group.pix_beneficiary_name}</span>
+                        </div>
+                      )}
+
+                      {/* All PIX keys */}
                       <div className="space-y-2.5 text-sm">
-                        {group.pix_key_type && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Tipo:</span>
-                            <span className="font-semibold">{PIX_KEY_TYPES[group.pix_key_type]}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Chave:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-brand-navy text-xs sm:text-sm break-all">{group.pix_key}</span>
+                        {/* Key 1 - Principal */}
+                        <div className="p-2.5 rounded-lg bg-white/60 dark:bg-white/5 border border-brand-green/10">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-1.5">
+                              {group.pix_key_type && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                                  {PIX_KEY_TYPES[group.pix_key_type]}
+                                </Badge>
+                              )}
+                            </div>
                             <CopyPixButton pixKey={group.pix_key} />
                           </div>
+                          <p className="font-mono font-semibold text-brand-navy text-xs break-all mt-1">{group.pix_key}</p>
                         </div>
-                        {group.pix_beneficiary_name && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Beneficiario:</span>
-                            <span className="font-semibold">{group.pix_beneficiary_name}</span>
+
+                        {/* Key 2 */}
+                        {group.pix_key_2 && (
+                          <div className="p-2.5 rounded-lg bg-white/60 dark:bg-white/5 border border-brand-green/10">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-1.5">
+                                {group.pix_key_type_2 && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                                    {PIX_KEY_TYPES[group.pix_key_type_2]}
+                                  </Badge>
+                                )}
+                              </div>
+                              <CopyPixButton pixKey={group.pix_key_2} />
+                            </div>
+                            <p className="font-mono font-semibold text-brand-navy text-xs break-all mt-1">{group.pix_key_2}</p>
+                          </div>
+                        )}
+
+                        {/* Key 3 */}
+                        {group.pix_key_3 && (
+                          <div className="p-2.5 rounded-lg bg-white/60 dark:bg-white/5 border border-brand-green/10">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-1.5">
+                                {group.pix_key_type_3 && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                                    {PIX_KEY_TYPES[group.pix_key_type_3]}
+                                  </Badge>
+                                )}
+                              </div>
+                              <CopyPixButton pixKey={group.pix_key_3} />
+                            </div>
+                            <p className="font-mono font-semibold text-brand-navy text-xs break-all mt-1">{group.pix_key_3}</p>
                           </div>
                         )}
                       </div>
@@ -1001,6 +1087,12 @@ export default function PublicPage() {
                               <span className="font-semibold text-brand-green">R$ {annualGuestRevenue.toFixed(2)}</span>
                             </div>
                           )}
+                          {annualOtherRevenue > 0 && (
+                            <div className="flex justify-between py-1.5">
+                              <span className="text-muted-foreground">Outras receitas</span>
+                              <span className="font-semibold text-brand-green">R$ {annualOtherRevenue.toFixed(2)}</span>
+                            </div>
+                          )}
                           <div className="border-t pt-2 flex justify-between font-bold">
                             <span className="text-brand-navy">Total Receitas</span>
                             <span className="text-brand-green">R$ {annualTotalIncome.toFixed(2)}</span>
@@ -1122,6 +1214,7 @@ export default function PublicPage() {
                       annualSaldoFinal={annualSaldoFinal}
                       annualFeeRevenue={annualFeeRevenue}
                       annualGuestRevenue={annualGuestRevenue}
+                      annualOtherRevenue={annualOtherRevenue}
                       annualExpenseByCategory={annualExpenseByCategory}
                       memberCompliance={memberCompliance}
                     />

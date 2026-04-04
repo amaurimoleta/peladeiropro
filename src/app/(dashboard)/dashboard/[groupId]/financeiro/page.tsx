@@ -705,7 +705,11 @@ export default function FinanceiroPage() {
   function buildWhatsAppUrl(phone: string, name: string, monthLabel: string, feeAmount: number) {
     if (!group) return ''
     const cleanPhone = phone.replace(/\D/g, '')
-    const message = `Ola ${name}! 👋\n\nSua mensalidade de ${monthLabel} no valor de R$ ${feeAmount.toFixed(2)} esta pendente.\n\nChave PIX: ${group.pix_key || 'Nao configurada'}\nFavor: ${group.pix_beneficiary_name || 'Nao configurado'}\n\nObrigado! ⚽\n- ${group.name}`
+    let pixInfo = `Chave PIX: ${group.pix_key || 'Nao configurada'}`
+    if (group.pix_key_2) pixInfo += `\nChave PIX 2: ${group.pix_key_2}`
+    if (group.pix_key_3) pixInfo += `\nChave PIX 3: ${group.pix_key_3}`
+    pixInfo += `\nFavor: ${group.pix_beneficiary_name || 'Nao configurado'}`
+    const message = `Ola ${name}! 👋\n\nSua mensalidade de ${monthLabel} no valor de R$ ${feeAmount.toFixed(2)} esta pendente.\n\n${pixInfo}\n\nObrigado! ⚽\n- ${group.name}`
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
   }
 

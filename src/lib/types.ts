@@ -14,6 +14,11 @@ export interface Group {
   pix_key: string | null
   pix_key_type: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | null
   pix_beneficiary_name: string | null
+  pix_key_2: string | null
+  pix_key_type_2: string | null
+  pix_key_3: string | null
+  pix_key_type_3: string | null
+  pix_brcode: string | null
   monthly_fee_amount: number
   due_day: number
   public_slug: string | null

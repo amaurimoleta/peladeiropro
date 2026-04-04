@@ -38,6 +38,9 @@ import {
   Users,
   FileText,
   Edit,
+  QrCode,
+  Plus,
+  Minus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PIX_KEY_TYPES, MEMBER_ROLES, type Group, type GroupMember, type AuditLog } from '@/lib/types'
@@ -90,6 +93,11 @@ export default function SettingsPage() {
   const [pixKey, setPixKey] = useState('')
   const [pixKeyType, setPixKeyType] = useState('')
   const [pixBeneficiary, setPixBeneficiary] = useState('')
+  const [pixKey2, setPixKey2] = useState('')
+  const [pixKeyType2, setPixKeyType2] = useState('')
+  const [pixKey3, setPixKey3] = useState('')
+  const [pixKeyType3, setPixKeyType3] = useState('')
+  const [pixBrcode, setPixBrcode] = useState('')
   const [goalkeeperPaysFee, setGoalkeeperPaysFee] = useState(true)
   const [initialBalance, setInitialBalance] = useState('')
 
@@ -120,6 +128,11 @@ export default function SettingsPage() {
         setPixKey(data.pix_key || '')
         setPixKeyType(data.pix_key_type || '')
         setPixBeneficiary(data.pix_beneficiary_name || '')
+        setPixKey2(data.pix_key_2 || '')
+        setPixKeyType2(data.pix_key_type_2 || '')
+        setPixKey3(data.pix_key_3 || '')
+        setPixKeyType3(data.pix_key_type_3 || '')
+        setPixBrcode(data.pix_brcode || '')
         setGoalkeeperPaysFee(data.goalkeeper_pays_fee ?? true)
         setInitialBalance(String(data.initial_balance ?? 0))
       }
@@ -176,6 +189,11 @@ export default function SettingsPage() {
       if ((pixKey || null) !== group.pix_key) changes.pix_key = { from: group.pix_key, to: pixKey || null }
       if ((pixKeyType || null) !== group.pix_key_type) changes.pix_key_type = { from: group.pix_key_type, to: pixKeyType || null }
       if ((pixBeneficiary || null) !== group.pix_beneficiary_name) changes.pix_beneficiary_name = { from: group.pix_beneficiary_name, to: pixBeneficiary || null }
+      if ((pixKey2 || null) !== group.pix_key_2) changes.pix_key_2 = { from: group.pix_key_2, to: pixKey2 || null }
+      if ((pixKeyType2 || null) !== group.pix_key_type_2) changes.pix_key_type_2 = { from: group.pix_key_type_2, to: pixKeyType2 || null }
+      if ((pixKey3 || null) !== group.pix_key_3) changes.pix_key_3 = { from: group.pix_key_3, to: pixKey3 || null }
+      if ((pixKeyType3 || null) !== group.pix_key_type_3) changes.pix_key_type_3 = { from: group.pix_key_type_3, to: pixKeyType3 || null }
+      if ((pixBrcode || null) !== group.pix_brcode) changes.pix_brcode = { from: group.pix_brcode, to: pixBrcode || null }
       if (goalkeeperPaysFee !== group.goalkeeper_pays_fee) changes.goalkeeper_pays_fee = { from: group.goalkeeper_pays_fee, to: goalkeeperPaysFee }
       const newInitialBalance = parseFloat(initialBalance) || 0
       if (newInitialBalance !== (group.initial_balance ?? 0)) changes.initial_balance = { from: group.initial_balance ?? 0, to: newInitialBalance }
@@ -189,6 +207,11 @@ export default function SettingsPage() {
       pix_key: pixKey || null,
       pix_key_type: pixKeyType || null,
       pix_beneficiary_name: pixBeneficiary || null,
+      pix_key_2: pixKey2 || null,
+      pix_key_type_2: pixKeyType2 || null,
+      pix_key_3: pixKey3 || null,
+      pix_key_type_3: pixKeyType3 || null,
+      pix_brcode: pixBrcode || null,
       goalkeeper_pays_fee: goalkeeperPaysFee,
       initial_balance: parseFloat(initialBalance) || 0,
     }).eq('id', groupId)
@@ -207,6 +230,11 @@ export default function SettingsPage() {
         pix_key: pixKey || null,
         pix_key_type: (pixKeyType || null) as Group['pix_key_type'],
         pix_beneficiary_name: pixBeneficiary || null,
+        pix_key_2: pixKey2 || null,
+        pix_key_type_2: pixKeyType2 || null,
+        pix_key_3: pixKey3 || null,
+        pix_key_type_3: pixKeyType3 || null,
+        pix_brcode: pixBrcode || null,
         goalkeeper_pays_fee: goalkeeperPaysFee,
         initial_balance: parseFloat(initialBalance) || 0,
       } : null)
@@ -480,27 +508,100 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Dados PIX</CardTitle>
-            <CardDescription>Informacoes de pagamento exibidas na prestacao de contas</CardDescription>
+            <CardDescription>Cadastre ate 3 chaves PIX e/ou o codigo QR Code para facilitar o pagamento</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Tipo de chave</Label>
-              <Select value={pixKeyType} onValueChange={(v) => v && setPixKeyType(v)} disabled={isReadOnly}>
-                <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PIX_KEY_TYPES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Chave PIX</Label>
-              <Input placeholder="Sua chave PIX" value={pixKey} onChange={(e) => setPixKey(e.target.value)} disabled={isReadOnly} />
-            </div>
+          <CardContent className="space-y-6">
+            {/* Nome do beneficiario */}
             <div className="space-y-2">
               <Label>Nome do beneficiario</Label>
               <Input placeholder="Nome que aparece no PIX" value={pixBeneficiary} onChange={(e) => setPixBeneficiary(e.target.value)} disabled={isReadOnly} />
+            </div>
+
+            {/* Chave PIX 1 */}
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 1 (Principal)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={pixKeyType} onValueChange={(v) => v && setPixKeyType(v)} disabled={isReadOnly}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PIX_KEY_TYPES).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs">Chave</Label>
+                  <Input className="h-9" placeholder="Sua chave PIX principal" value={pixKey} onChange={(e) => setPixKey(e.target.value)} disabled={isReadOnly} />
+                </div>
+              </div>
+            </div>
+
+            {/* Chave PIX 2 */}
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 2 (Opcional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={pixKeyType2} onValueChange={(v) => v && setPixKeyType2(v)} disabled={isReadOnly}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {Object.entries(PIX_KEY_TYPES).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs">Chave</Label>
+                  <Input className="h-9" placeholder="Chave PIX alternativa" value={pixKey2} onChange={(e) => setPixKey2(e.target.value)} disabled={isReadOnly} />
+                </div>
+              </div>
+            </div>
+
+            {/* Chave PIX 3 */}
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 3 (Opcional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={pixKeyType3} onValueChange={(v) => v && setPixKeyType3(v)} disabled={isReadOnly}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {Object.entries(PIX_KEY_TYPES).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs">Chave</Label>
+                  <Input className="h-9" placeholder="Chave PIX alternativa" value={pixKey3} onChange={(e) => setPixKey3(e.target.value)} disabled={isReadOnly} />
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code / PIX Copia e Cola */}
+            <div className="p-3 rounded-lg border border-dashed border-[#00C853]/40 bg-[#00C853]/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-[#00C853]" />
+                <p className="text-xs font-semibold text-[#1B1F4B] uppercase tracking-wide">QR Code PIX (Copia e Cola)</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cole aqui o codigo PIX gerado pelo seu banco. Ele sera usado para gerar o QR Code automaticamente.
+              </p>
+              <Textarea
+                placeholder="00020126580014br.gov.bcb.pix0136..."
+                value={pixBrcode}
+                onChange={(e) => setPixBrcode(e.target.value)}
+                disabled={isReadOnly}
+                rows={3}
+                className="font-mono text-xs"
+              />
             </div>
           </CardContent>
         </Card>

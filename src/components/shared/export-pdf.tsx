@@ -41,6 +41,7 @@ interface ExportPdfProps {
   annualSaldoFinal?: number
   annualFeeRevenue?: number
   annualGuestRevenue?: number
+  annualOtherRevenue?: number
   annualExpenseByCategory?: Record<string, number>
   memberCompliance?: Array<{ name: string; paidMonths: number; totalMonths: number; percentage: number }>
   overdueMembers?: Array<{ name: string; months: string[]; totalAmount: number }>
@@ -405,7 +406,7 @@ function generateAnnualPdf(props: ExportPdfProps, logoBase64: string | null, fon
     groupName, year = new Date().getFullYear(), monthlyData = [],
     totalIncome = 0, totalExpenses = 0,
     annualSaldoInicial = 0, annualSaldoFinal = 0,
-    annualFeeRevenue = 0, annualGuestRevenue = 0,
+    annualFeeRevenue = 0, annualGuestRevenue = 0, annualOtherRevenue = 0,
     annualExpenseByCategory = {}, memberCompliance = [],
   } = props
 
@@ -507,6 +508,13 @@ function generateAnnualPdf(props: ExportPdfProps, logoBase64: string | null, fon
       doc.text('Jogadores avulsos:', 18, y)
       doc.setTextColor(...hexToRgb(GREEN))
       doc.text(formatCurrency(annualGuestRevenue), pageWidth - 14, y, { align: 'right' })
+      y += 6
+    }
+    if (annualOtherRevenue > 0) {
+      doc.setTextColor(60, 60, 60)
+      doc.text('Outras receitas:', 18, y)
+      doc.setTextColor(...hexToRgb(GREEN))
+      doc.text(formatCurrency(annualOtherRevenue), pageWidth - 14, y, { align: 'right' })
       y += 6
     }
     doc.setDrawColor(200, 200, 200)

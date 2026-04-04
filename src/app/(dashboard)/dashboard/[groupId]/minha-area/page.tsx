@@ -483,7 +483,7 @@ export default function MinhaAreaPage() {
       </div>
 
       {/* ── PIX Payment Section (if has pending fees) ── */}
-      {pendingFees.length > 0 && group?.pix_key && (
+      {pendingFees.length > 0 && (group?.pix_key || group?.pix_brcode) && (
         <Card className="mb-6 border-2 border-[#00C853]/30 bg-gradient-to-r from-[#00C853]/5 to-transparent">
           <CardContent className="pt-4 pb-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
@@ -492,10 +492,22 @@ export default function MinhaAreaPage() {
                 <p className="text-sm text-muted-foreground mb-2">
                   Escaneie o QR Code para pagar suas pendencias. Depois, envie o comprovante.
                 </p>
-                <div className="text-sm space-y-0.5">
-                  <p className="text-muted-foreground">
-                    Chave: <span className="font-medium text-foreground">{group.pix_key}</span>
-                  </p>
+                <div className="text-sm space-y-1">
+                  {group.pix_key && (
+                    <p className="text-muted-foreground">
+                      Chave 1: <span className="font-medium text-foreground">{group.pix_key}</span>
+                    </p>
+                  )}
+                  {group.pix_key_2 && (
+                    <p className="text-muted-foreground">
+                      Chave 2: <span className="font-medium text-foreground">{group.pix_key_2}</span>
+                    </p>
+                  )}
+                  {group.pix_key_3 && (
+                    <p className="text-muted-foreground">
+                      Chave 3: <span className="font-medium text-foreground">{group.pix_key_3}</span>
+                    </p>
+                  )}
                   {group.pix_beneficiary_name && (
                     <p className="text-muted-foreground">
                       Favorecido: <span className="font-medium text-foreground">{group.pix_beneficiary_name}</span>
@@ -506,14 +518,17 @@ export default function MinhaAreaPage() {
                   </p>
                 </div>
               </div>
-              <PixQrCode
-                pixKey={group.pix_key}
-                pixKeyType={group.pix_key_type || undefined}
-                beneficiaryName={group.pix_beneficiary_name || group.name}
-                amount={totalPending}
-                description={`Mensalidade ${group.name}`}
-                size={160}
-              />
+              {group.pix_key && (
+                <PixQrCode
+                  pixKey={group.pix_key}
+                  pixKeyType={group.pix_key_type || undefined}
+                  beneficiaryName={group.pix_beneficiary_name || group.name}
+                  amount={totalPending}
+                  description={`Mensalidade ${group.name}`}
+                  size={160}
+                  manualBrCode={group.pix_brcode}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
