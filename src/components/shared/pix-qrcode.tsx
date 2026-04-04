@@ -97,7 +97,7 @@ export function PixQrCode({
       )}
 
       <p className="text-[10px] text-muted-foreground text-center max-w-[200px]">
-        Escaneie o QR Code ou copie o codigo PIX para pagar
+        Escaneie o QR Code ou copie o código PIX para pagar
       </p>
     </div>
   )

@@ -28,7 +28,7 @@ import { GroupSelector } from '@/components/dashboard/group-selector'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/minha-area', icon: UserCircle, label: 'Minha Area' },
+  { href: '/minha-area', icon: UserCircle, label: 'Minha Área' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
   { href: '/times', icon: Shield, label: 'Times' },

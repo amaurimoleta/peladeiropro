@@ -233,7 +233,7 @@ export default function MatchesPage() {
   // RSVP toggle
   async function toggleConfirmation(matchId: string, status: 'confirmed' | 'declined') {
     if (!myMemberId) {
-      toast.error('Voce precisa estar vinculado como membro para confirmar.')
+      toast.error('Você precisa estar vinculado como membro para confirmar.')
       return
     }
     const existing = confirmationsMap[matchId]?.find(c => c.member_id === myMemberId)
@@ -268,7 +268,7 @@ export default function MatchesPage() {
     const location = match.location ? `\n📍 ${match.location}` : ''
     const confs = confirmationsMap[match.id] || []
     const confirmedCount = confs.filter(c => c.status === 'confirmed').length
-    const msg = `⚽ *Pelada ${dateStr}*${location}\n\n✅ ${confirmedCount} confirmado${confirmedCount !== 1 ? 's' : ''}\n\nConfirme sua presenca no app!\n${window.location.origin}/dashboard/${groupId}/matches`
+    const msg = `⚽ *Pelada ${dateStr}*${location}\n\n✅ ${confirmedCount} confirmado${confirmedCount !== 1 ? 's' : ''}\n\nConfirme sua presença no app!\n${window.location.origin}/dashboard/${groupId}/matches`
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -670,7 +670,7 @@ export default function MatchesPage() {
 
       <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
-      {/* Resumo do mes */}
+      {/* Resumo do mês */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card className="card-modern-elevated">
           <CardContent className="p-4 text-center">
@@ -784,7 +784,7 @@ export default function MatchesPage() {
       ) : matches.length === 0 ? (
         <Card className="card-modern-elevated">
           <CardContent className="text-center py-12 text-muted-foreground">
-            Nenhum jogo neste mes.
+            Nenhum jogo neste mês.
           </CardContent>
         </Card>
       ) : filteredMatches.length === 0 ? (
@@ -841,7 +841,7 @@ export default function MatchesPage() {
                           </div>
                         )}
 
-                        {/* Observacoes */}
+                        {/* Observações */}
                         {match.notes && (
                           <p className="text-xs text-muted-foreground ml-6">{match.notes}</p>
                         )}
@@ -858,7 +858,7 @@ export default function MatchesPage() {
                         )}
                       </div>
 
-                      {/* Botoes de acao */}
+                      {/* Botões de ação */}
                       <div className="flex items-center gap-1 ml-2 shrink-0">
                         {isAdmin && (
                           <>
@@ -983,7 +983,7 @@ export default function MatchesPage() {
                     )}
                   </div>
 
-                  {/* Confirmacao de Presenca (RSVP) */}
+                  {/* Confirmação de Presença (RSVP) */}
                   {(() => {
                     const confs = confirmationsMap[match.id] || []
                     const confirmedList = confs.filter(c => c.status === 'confirmed')
@@ -1101,11 +1101,11 @@ export default function MatchesPage() {
                   {isExpanded && (
                     <div className="border-t bg-muted/30 px-4 py-3 space-y-4">
 
-                      {/* Presenca */}
+                      {/* Presença */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Lista de Presenca
+                            Lista de Presença
                           </p>
                           <Badge variant="secondary" className="bg-brand-navy/10 text-brand-navy">
                             {presentCount}/{mensalistas.length} presentes
@@ -1336,7 +1336,7 @@ export default function MatchesPage() {
               ) : null
             })()}
             <div className="space-y-2">
-              <Label>Observacoes</Label>
+              <Label>Observações</Label>
               <Textarea placeholder="Notas sobre o jogo" value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
@@ -1400,24 +1400,24 @@ export default function MatchesPage() {
               ) : null
             })()}
             <div className="space-y-2">
-              <Label>Observacoes</Label>
+              <Label>Observações</Label>
               <Textarea placeholder="Notas sobre o jogo" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Alteracoes'}
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Confirmar Exclusao */}
+      {/* Dialog: Confirmar Exclusão */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Exclusao</DialogTitle>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Tem certeza que deseja excluir este jogo? Os jogadores avulsos vinculados tambem serao removidos.
+            Tem certeza que deseja excluir este jogo? Os jogadores avulsos vinculados também serão removidos.
           </p>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteDialogOpen(false)}>

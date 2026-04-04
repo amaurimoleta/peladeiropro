@@ -31,8 +31,8 @@ const features = [
   },
   {
     icon: Share2,
-    title: 'Prestacao de Contas',
-    description: 'Link publico para compartilhar no WhatsApp com total transparencia.',
+    title: 'Prestação de Contas',
+    description: 'Link público para compartilhar no WhatsApp com total transparencia.',
     gradient: 'from-green-500 to-teal-600',
   },
   {
@@ -56,7 +56,7 @@ const features = [
   {
     icon: Globe,
     title: 'Relatorio PDF',
-    description: 'Exporte a prestacao de contas em PDF profissional para enviar ao grupo.',
+    description: 'Exporte a prestação de contas em PDF profissional para enviar ao grupo.',
     gradient: 'from-indigo-500 to-purple-600',
   },
 ]
@@ -84,7 +84,7 @@ const testimonials = [
   {
     name: 'Anderson Lima',
     group: 'Bola Preta FC',
-    text: 'O tesoureiro anterior pediu pra sair do grupo. Eu assumi com o PeladeiroPro e agora todo mundo paga em dia. Ate o goleiro.',
+    text: 'O tesoureiro anterior pediu pra sair do grupo. Eu assumi com o PeladeiroPro e agora todo mundo paga em dia. Até o goleiro.',
     stars: 5,
   },
 ]
@@ -96,7 +96,7 @@ const faqs = [
   },
   {
     q: 'Preciso instalar alguma coisa?',
-    a: 'Nao! Funciona direto no navegador. Mas voce pode instalar como app no celular para acesso rapido (PWA).',
+    a: 'Nao! Funciona direto no navegador. Mas você pode instalar como app no celular para acesso rapido (PWA).',
   },
   {
     q: 'Meus dados estao seguros?',
@@ -108,11 +108,11 @@ const faqs = [
   },
   {
     q: 'Posso ter mais de um tesoureiro?',
-    a: 'Sim! Voce pode promover membros para Tesoureiro ou Presidente nas configuracoes do grupo.',
+    a: 'Sim! Você pode promover membros para Tesoureiro ou Presidente nas configurações do grupo.',
   },
   {
-    q: 'Como funciona a prestacao de contas?',
-    a: 'Geramos um link publico que voce compartilha no WhatsApp. Qualquer pessoa acessa e ve receitas, despesas e saldo — sem precisar de conta.',
+    q: 'Como funciona a prestação de contas?',
+    a: 'Geramos um link público que você compartilha no WhatsApp. Qualquer pessoa acessa e ve receitas, despesas e saldo — sem precisar de conta.',
   },
 ]
 
@@ -149,7 +149,7 @@ export default function LandingPage() {
             <div className="md:hidden"><Logo size="xl" variant="white" /></div>
           </div>
           <p className="text-lg md:text-2xl text-white/70 max-w-2xl mx-auto mb-4 leading-relaxed font-light animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-            Agora o seu grupo tambem pode ser uma SAF
+            Agora o seu grupo também pode ser uma SAF
           </p>
           <p className="text-sm md:text-base text-white/50 max-w-xl mx-auto mb-10 leading-relaxed animate-fade-in-up" style={{ animationDelay: '300ms' }}>
             Chega de anotar no caderninho, cobrar no WhatsApp e ouvir &ldquo;vou pagar semana que vem&rdquo;. O PeladeiroPro resolve.
@@ -199,7 +199,7 @@ export default function LandingPage() {
               Funcionalidades
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy mb-4 tracking-tight">
-              Tudo que voce precisa para organizar a pelada
+              Tudo que você precisa para organizar a pelada
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               Chega de planilha, caderninho e &ldquo;depois eu pago&rdquo;. Seu grupo merece gestao profissional.
@@ -299,12 +299,12 @@ export default function LandingPage() {
                 {[
                   'Geracao automatica de mensalidades',
                   'Ranking gamificado de pagadores',
-                  'Prestacao de contas transparente',
+                  'Prestação de contas transparente',
                   'Compartilhamento via WhatsApp',
-                  'Lista de presenca por jogo',
+                  'Lista de presença por jogo',
                   'Rateio automatico de custos',
                   'Comprovante de pagamento (foto)',
-                  'Exportacao de relatorio em PDF',
+                  'Exportação de relatorio em PDF',
                   'Dashboard financeiro completo',
                   'Instale como app no celular',
                 ].map((benefit) => (
@@ -343,7 +343,7 @@ export default function LandingPage() {
                   <span className="text-muted-foreground">/para sempre</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Grupos ilimitados', 'Membros ilimitados', 'Mensalidades e despesas', 'Prestacao de contas publica', 'Ranking de pagadores', 'Compartilhamento WhatsApp', 'Lista de presenca', 'Exportacao PDF', 'PWA (instalar como app)'].map((f) => (
+                  {['Grupos ilimitados', 'Membros ilimitados', 'Mensalidades e despesas', 'Prestação de contas publica', 'Ranking de pagadores', 'Compartilhamento WhatsApp', 'Lista de presença', 'Exportação PDF', 'PWA (instalar como app)'].map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-brand-green flex-shrink-0" />
                       <span className="text-brand-navy">{f}</span>
@@ -368,7 +368,7 @@ export default function LandingPage() {
                   <span className="text-muted-foreground">/mes</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Tudo do plano Gratis', 'Notificacoes automaticas', 'Integracao bancaria PIX', 'Relatorios avancados', 'Sorteio de times', 'Agenda de jogos integrada', 'Suporte prioritario'].map((f) => (
+                  {['Tudo do plano Gratis', 'Notificações automaticas', 'Integracao bancaria PIX', 'Relatorios avancados', 'Sorteio de times', 'Agenda de jogos integrada', 'Suporte prioritario'].map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-muted-foreground">{f}</span>

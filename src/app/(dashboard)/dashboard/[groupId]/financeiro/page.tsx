@@ -105,7 +105,7 @@ export default function FinanceiroPage() {
   const [allTimeGuests, setAllTimeGuests] = useState(0)
   const [allTimeExpenses, setAllTimeExpenses] = useState(0)
 
-  // Saldo Inicial do mes (tudo antes do mes atual)
+  // Saldo Inicial do mês (tudo antes do mês atual)
   const [priorFees, setPriorFees] = useState(0)
   const [priorGuests, setPriorGuests] = useState(0)
   const [priorExpenses, setPriorExpenses] = useState(0)
@@ -261,7 +261,7 @@ export default function FinanceiroPage() {
 
     const mensalistas = members.filter(m => {
       if (m.member_type !== 'mensalista' || m.status !== 'active') return false
-      // Se goleiro nao paga, exclui jogadores com posicao goleiro
+      // Se goleiro não paga, exclui jogadores com posição goleiro
       if (!group.goalkeeper_pays_fee && m.position === 'goleiro') return false
       return true
     })
@@ -278,7 +278,7 @@ export default function FinanceiroPage() {
       }))
 
     if (newFees.length === 0) {
-      toast.info('Todas as mensalidades ja foram geradas para este mes.')
+      toast.info('Todas as mensalidades ja foram geradas para este mês.')
       setGenerating(false)
       return
     }
@@ -316,7 +316,7 @@ export default function FinanceiroPage() {
     if (receiptFile) {
       receiptUrl = await uploadReceipt(supabase, receiptFile, groupId)
       if (!receiptUrl) {
-        toast.error('Erro ao enviar comprovante. Pagamento sera marcado sem comprovante.')
+        toast.error('Erro ao enviar comprovante. Pagamento será marcado sem comprovante.')
       }
     }
 
@@ -705,10 +705,10 @@ export default function FinanceiroPage() {
   function buildWhatsAppUrl(phone: string, name: string, monthLabel: string, feeAmount: number) {
     if (!group) return ''
     const cleanPhone = phone.replace(/\D/g, '')
-    let pixInfo = `Chave PIX: ${group.pix_key || 'Nao configurada'}`
+    let pixInfo = `Chave PIX: ${group.pix_key || 'Não configurada'}`
     if (group.pix_key_2) pixInfo += `\nChave PIX 2: ${group.pix_key_2}`
     if (group.pix_key_3) pixInfo += `\nChave PIX 3: ${group.pix_key_3}`
-    pixInfo += `\nFavor: ${group.pix_beneficiary_name || 'Nao configurado'}`
+    pixInfo += `\nFavor: ${group.pix_beneficiary_name || 'Não configurado'}`
     const message = `Ola ${name}! 👋\n\nSua mensalidade de ${monthLabel} no valor de R$ ${feeAmount.toFixed(2)} esta pendente.\n\n${pixInfo}\n\nObrigado! ⚽\n- ${group.name}`
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
   }
@@ -1003,7 +1003,7 @@ export default function FinanceiroPage() {
   const allTimeIncome = allTimeFees + allTimeGuests + allTimeRevenues
   const accumulatedBalance = groupInitialBalance + allTimeIncome - allTimeExpenses
 
-  // Saldo Inicial (tudo antes do mes selecionado) e Saldo Final
+  // Saldo Inicial (tudo antes do mês selecionado) e Saldo Final
   const saldoInicial = groupInitialBalance + (priorFees + priorGuests + priorRevenues) - priorExpenses
   const receitasDoMes = dreTotalIncome
   const despesasDoMes = dreTotalExpenses
@@ -1074,7 +1074,7 @@ export default function FinanceiroPage() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Descricao *</Label>
+        <Label>Descrição *</Label>
         <Input placeholder="Ex: Aluguel quadra Society ABC" value={description} onChange={(e) => setDescription(e.target.value)} required />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -1100,7 +1100,7 @@ export default function FinanceiroPage() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Observacoes</Label>
+        <Label>Observações</Label>
         <Textarea placeholder="Notas adicionais" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
@@ -1125,7 +1125,7 @@ export default function FinanceiroPage() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Descricao *</Label>
+        <Label>Descrição *</Label>
         <Input placeholder="Ex: Patrocinio Loja X" value={revenueDescription} onChange={(e) => setRevenueDescription(e.target.value)} required />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -1139,7 +1139,7 @@ export default function FinanceiroPage() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Observacoes</Label>
+        <Label>Observações</Label>
         <Textarea placeholder="Notas adicionais" value={revenueNotes} onChange={(e) => setRevenueNotes(e.target.value)} />
       </div>
       <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={savingRevenue}>
@@ -1574,7 +1574,7 @@ export default function FinanceiroPage() {
                       <TableHead>Vencimento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Pgto</TableHead>
-                      <TableHead className="text-right">Acoes</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1705,7 +1705,7 @@ export default function FinanceiroPage() {
                         <Input type="number" step="0.01" min="0" placeholder="25.00" value={guestAmount} onChange={(e) => setGuestAmount(e.target.value)} required />
                       </div>
                       <div className="space-y-2">
-                        <Label>Observacoes</Label>
+                        <Label>Observações</Label>
                         <Input placeholder="Ex: amigo do Joao" value={guestNotes} onChange={(e) => setGuestNotes(e.target.value)} />
                       </div>
                       <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={savingGuest}>
@@ -1737,7 +1737,7 @@ export default function FinanceiroPage() {
                     <Input type="number" step="0.01" min="0" placeholder="25.00" value={guestAmount} onChange={(e) => setGuestAmount(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Observacoes</Label>
+                    <Label>Observações</Label>
                     <Input placeholder="Ex: amigo do Joao" value={guestNotes} onChange={(e) => setGuestNotes(e.target.value)} />
                   </div>
                   <div className="space-y-2">
@@ -1760,7 +1760,7 @@ export default function FinanceiroPage() {
             {/* ── Mobile card list ── */}
             <div className="sm:hidden space-y-2">
               {allGuests.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum jogador avulso neste mes.</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum jogador avulso neste mês.</p>
               ) : (
                 allGuests.map((guest) => (
                   <div key={guest.id} className={`p-3 rounded-xl border-l-[3px] border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 ${guest.paid ? 'border-l-[#00C853]' : 'border-l-amber-400'}`}>
@@ -1819,14 +1819,14 @@ export default function FinanceiroPage() {
                       <TableHead>Data</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Acoes</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {allGuests.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          Nenhum jogador avulso neste mes.
+                          Nenhum jogador avulso neste mês.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -1931,7 +1931,7 @@ export default function FinanceiroPage() {
               {loading ? (
                 <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
               ) : expenses.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma despesa neste mes.</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma despesa neste mês.</p>
               ) : (
                 expenses.map((exp: any) => (
                   <div key={exp.id} className="p-3 rounded-xl border-l-[3px] border-l-red-400 border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
@@ -1971,12 +1971,12 @@ export default function FinanceiroPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Descricao</TableHead>
+                      <TableHead>Descrição</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Pago por</TableHead>
-                      <TableHead className="text-right">Acoes</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1986,7 +1986,7 @@ export default function FinanceiroPage() {
                       </TableRow>
                     ) : expenses.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma despesa neste mes.</TableCell>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma despesa neste mês.</TableCell>
                       </TableRow>
                     ) : (
                       expenses.map((exp: any) => (
@@ -2070,7 +2070,7 @@ export default function FinanceiroPage() {
               {loading ? (
                 <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
               ) : revenues.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma receita neste mes.</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma receita neste mês.</p>
               ) : (
                 revenues.map((rev: any) => (
                   <div key={rev.id} className="p-3 rounded-xl border-l-[3px] border-l-[#00C853] border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
@@ -2110,12 +2110,12 @@ export default function FinanceiroPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Descricao</TableHead>
+                      <TableHead>Descrição</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Obs</TableHead>
-                      <TableHead className="text-right">Acoes</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2126,7 +2126,7 @@ export default function FinanceiroPage() {
                     ) : revenues.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          Nenhuma receita neste mes. Clique em &quot;Nova Receita&quot; para adicionar.
+                          Nenhuma receita neste mês. Clique em &quot;Nova Receita&quot; para adicionar.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -2313,7 +2313,7 @@ export default function FinanceiroPage() {
                               )
                             })}
                             {dreTotalExpenses === 0 && (
-                              <p className="text-sm text-muted-foreground italic">Nenhuma despesa registrada neste mes.</p>
+                              <p className="text-sm text-muted-foreground italic">Nenhuma despesa registrada neste mês.</p>
                             )}
                           </div>
                           <div className="mt-4 pt-3 border-t border-dashed dark:border-gray-700 flex items-center justify-between">
@@ -2345,7 +2345,7 @@ export default function FinanceiroPage() {
                               <span className="text-red-500 font-medium">- {formatCurrency(dreTotalExpenses)}</span>
                             </div>
                             <div className="border-t pt-2 mt-2 flex items-center justify-between gap-2">
-                              <span className="text-sm sm:text-base font-bold text-[#1B1F4B] dark:text-gray-100">Resultado Liquido</span>
+                              <span className="text-sm sm:text-base font-bold text-[#1B1F4B] dark:text-gray-100">Resultado Líquido</span>
                               <span className={`text-base sm:text-lg font-bold ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
                                 {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
                               </span>

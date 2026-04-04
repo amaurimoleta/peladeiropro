@@ -52,7 +52,7 @@ import CustomCategories from '@/components/dashboard/custom-categories'
 import { ImageUpload } from '@/components/shared/image-upload'
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
-  update_group_settings: 'Atualizou configuracoes do grupo',
+  update_group_settings: 'Atualizou configurações do grupo',
   promote_member: 'Promoveu membro',
   delete_group: 'Excluiu grupo',
   add_member: 'Adicionou membro',
@@ -219,7 +219,7 @@ export default function SettingsPage() {
     if (error) {
       toast.error('Erro ao salvar', { description: error.message })
     } else {
-      toast.success('Configuracoes salvas!')
+      toast.success('Configurações salvas!')
       // Update local group state
       setGroup((prev) => prev ? {
         ...prev,
@@ -291,7 +291,7 @@ export default function SettingsPage() {
 
   async function handleDeleteGroup() {
     if (deleteConfirmName !== group?.name) {
-      toast.error('Nome do grupo nao confere')
+      toast.error('Nome do grupo não confere')
       return
     }
     setDeleting(true)
@@ -330,7 +330,7 @@ export default function SettingsPage() {
   function shareWhatsApp() {
     const link = getPublicLink()
     if (link) {
-      const text = `Prestacao de contas - ${name}\n\n${link}`
+      const text = `Prestação de contas - ${name}\n\n${link}`
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
     }
   }
@@ -366,7 +366,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-6 gap-2">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Configuracoes</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Configurações</h1>
         {isReadOnly && (
           <Badge variant="secondary">
             <Shield className="h-3 w-3 mr-1" />
@@ -383,7 +383,7 @@ export default function SettingsPage() {
               <Globe className="h-4 w-4 text-white" />
             </div>
             <div>
-              <CardTitle className="text-base">Link Publico de Prestacao de Contas</CardTitle>
+              <CardTitle className="text-base">Link Público de Prestação de Contas</CardTitle>
               <CardDescription>Compartilhe com os membros para transparencia total</CardDescription>
             </div>
           </div>
@@ -400,7 +400,7 @@ export default function SettingsPage() {
             </Button>
             {group?.public_slug && (
               <a href={`/p/${group.public_slug}`} target="_blank" rel="noopener noreferrer">
-                <Button type="button" variant="outline" size="icon" className="shrink-0" title="Abrir pagina">
+                <Button type="button" variant="outline" size="icon" className="shrink-0" title="Abrir página">
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </a>
@@ -411,8 +411,8 @@ export default function SettingsPage() {
             Compartilhar via WhatsApp
           </Button>
           <p className="text-xs text-muted-foreground">
-            Este link mostra um resumo financeiro do grupo com mensalidades, despesas, saldo e informacoes de PIX.
-            Qualquer pessoa com o link pode visualizar - nao precisa de login.
+            Este link mostra um resumo financeiro do grupo com mensalidades, despesas, saldo e informações de PIX.
+            Qualquer pessoa com o link pode visualizar - não precisa de login.
           </p>
         </CardContent>
       </Card>
@@ -432,7 +432,7 @@ export default function SettingsPage() {
       <form onSubmit={handleSave} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Informacoes do Grupo</CardTitle>
+            <CardTitle className="text-base">Informações do Grupo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-center">
@@ -459,8 +459,8 @@ export default function SettingsPage() {
               <Input value={name} onChange={(e) => setName(e.target.value)} required disabled={isReadOnly} />
             </div>
             <div className="space-y-2">
-              <Label>Descricao</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descricao do grupo" disabled={isReadOnly} />
+              <Label>Descrição</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição do grupo" disabled={isReadOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
@@ -490,7 +490,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Goleiro paga mensalidade?</p>
                 <p className="text-xs text-muted-foreground">
-                  Se desativado, jogadores com posicao &quot;Goleiro&quot; nao terao mensalidades geradas
+                  Se desativado, jogadores com posição &quot;Goleiro&quot; não terão mensalidades geradas
                 </p>
               </div>
               <button
@@ -508,12 +508,12 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Dados PIX</CardTitle>
-            <CardDescription>Cadastre ate 3 chaves PIX e/ou o codigo QR Code para facilitar o pagamento</CardDescription>
+            <CardDescription>Cadastre até 3 chaves PIX e/ou o código QR Code para facilitar o pagamento</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Nome do beneficiario */}
+            {/* Nome do beneficiário */}
             <div className="space-y-2">
-              <Label>Nome do beneficiario</Label>
+              <Label>Nome do beneficiário</Label>
               <Input placeholder="Nome que aparece no PIX" value={pixBeneficiary} onChange={(e) => setPixBeneficiary(e.target.value)} disabled={isReadOnly} />
             </div>
 
@@ -592,7 +592,7 @@ export default function SettingsPage() {
                 <p className="text-[10px] sm:text-xs font-semibold text-[#1B1F4B] dark:text-gray-100 uppercase">QR Code PIX (Copia e Cola)</p>
               </div>
               <p className="text-xs text-muted-foreground">
-                Cole aqui o codigo PIX gerado pelo seu banco. Ele sera usado para gerar o QR Code automaticamente.
+                Cole aqui o código PIX gerado pelo seu banco. Ele será usado para gerar o QR Code automaticamente.
               </p>
               <Textarea
                 placeholder="00020126580014br.gov.bcb.pix0136..."
@@ -608,7 +608,7 @@ export default function SettingsPage() {
 
         {isAdmin && (
           <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-            {saving ? 'Salvando...' : 'Salvar Configuracoes'}
+            {saving ? 'Salvando...' : 'Salvar Configurações'}
           </Button>
         )}
       </form>
@@ -706,8 +706,8 @@ export default function SettingsPage() {
                 <Clock className="h-4 w-4 text-white" />
               </div>
               <div>
-                <CardTitle className="text-base">Historico de Atividades</CardTitle>
-                <CardDescription>Ultimas 20 acoes registradas no grupo</CardDescription>
+                <CardTitle className="text-base">Histórico de Atividades</CardTitle>
+                <CardDescription>Ultimas 20 ações registradas no grupo</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -794,7 +794,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base text-destructive">Zona de Perigo</CardTitle>
-                  <CardDescription>Acoes irreversiveis para o grupo</CardDescription>
+                  <CardDescription>Ações irreversiveis para o grupo</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -803,7 +803,7 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm font-medium">Excluir grupo</p>
                   <p className="text-xs text-muted-foreground">
-                    Todos os dados serao permanentemente excluidos. Esta acao nao pode ser desfeita.
+                    Todos os dados serão permanentemente excluídos. Esta ação não pode ser desfeita.
                   </p>
                 </div>
                 <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -817,7 +817,7 @@ export default function SettingsPage() {
                     <DialogHeader>
                       <DialogTitle>Excluir grupo permanentemente</DialogTitle>
                       <DialogDescription>
-                        Esta acao e irreversivel. Todos os membros, mensalidades, despesas e dados do grupo serao excluidos permanentemente.
+                        Esta ação e irreversível. Todos os membros, mensalidades, despesas e dados do grupo serão excluídos permanentemente.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">

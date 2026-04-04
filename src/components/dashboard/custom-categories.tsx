@@ -104,7 +104,7 @@ export default function CustomCategories({ groupId }: { groupId: string }) {
 
   async function handleDelete(cat: CustomExpenseCategory) {
     const confirmed = window.confirm(
-      `Excluir a categoria "${cat.name}"? Despesas existentes com esta categoria nao serao excluidas, mas perderao a referencia.`
+      `Excluir a categoria "${cat.name}"? Despesas existentes com esta categoria não serão excluídas, mas perderão a referência.`
     )
     if (!confirmed) return
 

@@ -453,20 +453,20 @@ export default function TimesPage() {
               </div>
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Alteracoes'}
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Confirmar Exclusao */}
+      {/* Dialog: Confirmar Exclusão */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Exclusao</DialogTitle>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Tem certeza que deseja excluir este time? Os membros nao serao removidos do grupo, apenas desvinculados do time.
+            Tem certeza que deseja excluir este time? Os membros não serão removidos do grupo, apenas desvinculados do time.
           </p>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteDialogOpen(false)}>

@@ -22,14 +22,14 @@ export async function generateMetadata({
 
   if (!group) {
     return {
-      title: 'Grupo nao encontrado | PeladeiroPro',
+      title: 'Grupo não encontrado | PeladeiroPro',
     }
   }
 
   const title = `${group.name} | PeladeiroPro`
   const description =
     group.description ||
-    `Acompanhe a prestacao de contas do grupo ${group.name} no PeladeiroPro`
+    `Acompanhe a prestação de contas do grupo ${group.name} no PeladeiroPro`
 
   return {
     title,

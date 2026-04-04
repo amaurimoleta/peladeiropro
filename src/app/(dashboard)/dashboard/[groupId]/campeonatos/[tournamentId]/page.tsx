@@ -446,7 +446,7 @@ export default function TournamentDetailPage() {
   if (!tournament) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground mb-4">Campeonato nao encontrado.</p>
+        <p className="text-muted-foreground mb-4">Campeonato não encontrado.</p>
         <Link href={`/dashboard/${groupId}/campeonatos`}>
           <Button variant="outline"><ArrowLeft className="h-4 w-4 mr-2" />Voltar</Button>
         </Link>
@@ -798,7 +798,7 @@ export default function TournamentDetailPage() {
             {allGroupTeams.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 Nenhum time cadastrado no grupo.<br />
-                <Link href={`/dashboard/${groupId}/times`} className="text-brand-navy underline text-xs">Ir para pagina de Times</Link>
+                <Link href={`/dashboard/${groupId}/times`} className="text-brand-navy underline text-xs">Ir para página de Times</Link>
               </p>
             ) : (
               allGroupTeams.map(team => {
@@ -889,7 +889,7 @@ export default function TournamentDetailPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Observacoes</Label>
+              <Label>Observações</Label>
               <Textarea placeholder="Notas sobre o jogo" value={matchNotes} onChange={e => setMatchNotes(e.target.value)} />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={savingMatch}>

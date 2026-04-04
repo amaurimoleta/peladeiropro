@@ -57,7 +57,7 @@ export function InviteManager({ groupId }: InviteManagerProps) {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      toast.error('Voce precisa estar logado.')
+      toast.error('Você precisa estar logado.')
       setCreating(false)
       return
     }

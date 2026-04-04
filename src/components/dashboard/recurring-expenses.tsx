@@ -122,19 +122,19 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
 
   async function handleSave() {
     if (!description.trim()) {
-      toast.error('Informe a descricao da despesa.')
+      toast.error('Informe a descrição da despesa.')
       return
     }
 
     const parsedAmount = parseFloat(amount)
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast.error('Informe um valor valido.')
+      toast.error('Informe um valor válido.')
       return
     }
 
     const parsedDay = parseInt(dayOfMonth, 10)
     if (isNaN(parsedDay) || parsedDay < 1 || parsedDay > 31) {
-      toast.error('Informe um dia do mes valido (1-31).')
+      toast.error('Informe um dia do mês válido (1-31).')
       return
     }
 
@@ -254,12 +254,12 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
     )
 
     if (toGenerate.length === 0) {
-      toast.info('Todas as despesas recorrentes ativas ja foram geradas para este mes.')
+      toast.info('Todas as despesas recorrentes ativas ja foram geradas para este mês.')
       return
     }
 
     const confirmed = window.confirm(
-      `Gerar ${toGenerate.length} despesa(s) para o mes ${currentMonth}?`
+      `Gerar ${toGenerate.length} despesa(s) para o mês ${currentMonth}?`
     )
     if (!confirmed) return
 
@@ -308,7 +308,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
       fetchData()
     } catch (err) {
       console.error('Error generating monthly expenses:', err)
-      toast.error('Erro ao gerar despesas do mes.')
+      toast.error('Erro ao gerar despesas do mês.')
     } finally {
       setGenerating(false)
     }
@@ -372,7 +372,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                 <div className="space-y-4 py-2">
                   <div>
                     <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
-                      Descricao
+                      Descrição
                     </Label>
                     <Input
                       placeholder="Ex: Aluguel da quadra"
@@ -434,7 +434,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
-                      Dia do mes
+                      Dia do mês
                     </Label>
                     <Input
                       type="number"

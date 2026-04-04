@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'edge'
 
-export const alt = 'PeladeiroPro - Prestacao de contas do seu grupo'
+export const alt = 'PeladeiroPro - Prestação de contas do seu grupo'
 
 export const size = {
   width: 1200,
@@ -116,7 +116,7 @@ export default async function Image({
             display: 'flex',
           }}
         >
-          Prestacao de contas
+          Prestação de contas
         </div>
 
         {/* Green accent bar at bottom */}

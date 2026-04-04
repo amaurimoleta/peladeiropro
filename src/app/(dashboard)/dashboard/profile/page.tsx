@@ -152,7 +152,7 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label>E-mail</Label>
               <Input value={email} disabled className="bg-gray-50 dark:bg-gray-900" />
-              <p className="text-xs text-muted-foreground">O e-mail nao pode ser alterado.</p>
+              <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado.</p>
             </div>
             <div className="space-y-2">
               <Label>Nome completo</Label>
@@ -177,7 +177,7 @@ export default function ProfilePage() {
               disabled={saving}
             >
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Salvando...' : 'Salvar Alteracoes'}
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </form>
         </div>
@@ -186,7 +186,7 @@ export default function ProfilePage() {
         <div className="card-modern-elevated p-6">
           <h2 className="text-lg font-bold text-brand-navy mb-4">Meus Grupos</h2>
           {groups.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Voce nao participa de nenhum grupo ainda.</p>
+            <p className="text-muted-foreground text-sm">Você não participa de nenhum grupo ainda.</p>
           ) : (
             <div className="space-y-3">
               {groups.map((group) => (

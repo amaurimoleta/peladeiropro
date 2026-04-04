@@ -437,12 +437,12 @@ export default function CampeonatosPage() {
             <FormatSelector value={newFormat} onChange={setNewFormat} />
             {newFormat === 'best_of_4' && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-                <strong>Melhor de 4 Vitorias:</strong> A serie continua ate um time alcancar 4 vitorias. Empates adicionam jogos extras.
+                <strong>Melhor de 4 Vitórias:</strong> A série continua até um time alcançar 4 vitórias. Empates adicionam jogos extras.
               </div>
             )}
             <div className="space-y-2">
-              <Label>Descricao</Label>
-              <Textarea placeholder="Descricao do campeonato" value={newDescription} onChange={e => setNewDescription(e.target.value)} />
+              <Label>Descrição</Label>
+              <Textarea placeholder="Descrição do campeonato" value={newDescription} onChange={e => setNewDescription(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Data Inicio</Label><Input type="date" value={newStartDate} onChange={e => setNewStartDate(e.target.value)} /></div>
@@ -474,10 +474,10 @@ export default function CampeonatosPage() {
             <FormatSelector value={editFormat} onChange={setEditFormat} />
             {editFormat === 'best_of_4' && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-                <strong>Melhor de 4 Vitorias:</strong> A serie continua ate um time alcancar 4 vitorias. Empates adicionam jogos extras.
+                <strong>Melhor de 4 Vitórias:</strong> A série continua até um time alcançar 4 vitórias. Empates adicionam jogos extras.
               </div>
             )}
-            <div className="space-y-2"><Label>Descricao</Label><Textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Descrição</Label><Textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Data Inicio</Label><Input type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)} /></div>
               <div className="space-y-2"><Label>Data Fim</Label><Input type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} /></div>
@@ -501,7 +501,7 @@ export default function CampeonatosPage() {
               </Select>
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Alteracoes'}
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </form>
         </DialogContent>
@@ -515,7 +515,7 @@ export default function CampeonatosPage() {
             {allGroupTeams.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 Nenhum time cadastrado no grupo.<br />
-                <Link href={`/dashboard/${groupId}/times`} className="text-brand-navy underline text-xs">Ir para pagina de Times</Link>
+                <Link href={`/dashboard/${groupId}/times`} className="text-brand-navy underline text-xs">Ir para página de Times</Link>
               </p>
             ) : teamsDialogTournamentId && (
               allGroupTeams.map(team => {
@@ -545,11 +545,11 @@ export default function CampeonatosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Confirmar Exclusao */}
+      {/* Dialog: Confirmar Exclusão */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar Exclusao</DialogTitle></DialogHeader>
-          <p className="text-muted-foreground">Tem certeza que deseja excluir este campeonato? Os jogos vinculados nao serao removidos, apenas desvinculados.</p>
+          <DialogHeader><DialogTitle>Confirmar Exclusão</DialogTitle></DialogHeader>
+          <p className="text-muted-foreground">Tem certeza que deseja excluir este campeonato? Os jogos vinculados não serão removidos, apenas desvinculados.</p>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
             <Button className="flex-1 bg-red-500 hover:bg-red-600 text-white" onClick={handleDeleteTournament}>Excluir</Button>

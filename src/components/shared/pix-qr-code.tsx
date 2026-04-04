@@ -129,12 +129,12 @@ export function PixQrCode({
         {copied ? (
           <>
             <Check className="h-4 w-4" />
-            Codigo copiado!
+            Código copiado!
           </>
         ) : (
           <>
             <Copy className="h-4 w-4" />
-            Copiar codigo PIX
+            Copiar código PIX
           </>
         )}
       </Button>

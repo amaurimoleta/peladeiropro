@@ -38,7 +38,7 @@ export default function InvitePage({
         .single()
 
       if (inviteError || !invite) {
-        setState({ status: 'error', message: 'Link de convite invalido ou nao encontrado.' })
+        setState({ status: 'error', message: 'Link de convite invalido ou não encontrado.' })
         return
       }
 
@@ -62,7 +62,7 @@ export default function InvitePage({
         .single()
 
       if (groupError || !group) {
-        setState({ status: 'error', message: 'Grupo nao encontrado.' })
+        setState({ status: 'error', message: 'Grupo não encontrado.' })
         return
       }
 
@@ -101,7 +101,7 @@ export default function InvitePage({
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      toast.error('Voce precisa estar logado para entrar no grupo.')
+      toast.error('Você precisa estar logado para entrar no grupo.')
       setState({ status: 'error', message: 'Sessao expirada. Faca login novamente.' })
       return
     }
@@ -116,7 +116,7 @@ export default function InvitePage({
       .single()
 
     if (existingMember) {
-      toast.info('Voce ja faz parte deste grupo!')
+      toast.info('Você ja faz parte deste grupo!')
       router.push(`/dashboard/${state.invite.group_id}`)
       return
     }
@@ -153,7 +153,7 @@ export default function InvitePage({
       .update({ uses: state.invite.uses + 1 })
       .eq('id', state.invite.id)
 
-    toast.success('Voce entrou no grupo!', {
+    toast.success('Você entrou no grupo!', {
       description: `Bem-vindo ao ${state.group.name}`,
       icon: <CheckCircle2 className="h-4 w-4" />,
     })
@@ -209,9 +209,9 @@ export default function InvitePage({
                 <CheckCircle2 className="h-7 w-7 text-green-600" />
               </div>
               <div>
-                <h1 className="text-xl font-extrabold text-brand-navy tracking-tight">Voce ja esta no grupo!</h1>
+                <h1 className="text-xl font-extrabold text-brand-navy tracking-tight">Você ja esta no grupo!</h1>
                 <p className="text-muted-foreground text-sm mt-2">
-                  Voce ja faz parte do grupo <strong>{state.group.name}</strong>.
+                  Você ja faz parte do grupo <strong>{state.group.name}</strong>.
                 </p>
               </div>
               <Link
@@ -234,7 +234,7 @@ export default function InvitePage({
                   Convite para grupo
                 </h1>
                 <p className="text-muted-foreground text-sm mt-2">
-                  Voce foi convidado para participar do grupo
+                  Você foi convidado para participar do grupo
                 </p>
                 <p className="text-lg font-bold text-brand-navy mt-1">{state.group.name}</p>
                 {state.group.description && (
@@ -288,7 +288,7 @@ export default function InvitePage({
                 <CheckCircle2 className="h-7 w-7 text-green-600" />
               </div>
               <div>
-                <h1 className="text-xl font-extrabold text-brand-navy tracking-tight">Voce entrou no grupo!</h1>
+                <h1 className="text-xl font-extrabold text-brand-navy tracking-tight">Você entrou no grupo!</h1>
                 <p className="text-muted-foreground text-sm mt-2">Redirecionando para o dashboard...</p>
               </div>
             </div>

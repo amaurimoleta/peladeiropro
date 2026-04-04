@@ -225,7 +225,7 @@ export default function MembersPage() {
   }
 
   async function handleDelete(member: GroupMember) {
-    if (!confirm(`Tem certeza que deseja excluir ${member.name}? Esta acao nao pode ser desfeita.`)) return
+    if (!confirm(`Tem certeza que deseja excluir ${member.name}? Esta ação não pode ser desfeita.`)) return
     const { error } = await supabase.from('group_members').delete().eq('id', member.id)
     if (error) {
       toast.error('Erro ao excluir membro', { description: error.message })
@@ -389,10 +389,10 @@ export default function MembersPage() {
     return (
       <Select value={value} onValueChange={(v) => onChange(v || '')}>
         <SelectTrigger>
-          <SelectValue placeholder="Selecione a posicao" />
+          <SelectValue placeholder="Selecione a posição" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none_clear">Sem posicao</SelectItem>
+          <SelectItem value="none_clear">Sem posição</SelectItem>
           {Object.entries(PLAYER_POSITIONS).map(([key, label]) => (
             <SelectItem key={key} value={key}>{label}</SelectItem>
           ))}
@@ -441,9 +441,9 @@ export default function MembersPage() {
               <Link2 className="h-5 w-5 text-[#1B1F4B] dark:text-gray-100" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100">Link publico do grupo</p>
+              <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100">Link público do grupo</p>
               <p className="text-xs text-muted-foreground">
-                Compartilhe o link publico do grupo para que membros possam ver a prestacao de contas
+                Compartilhe o link público do grupo para que membros possam ver a prestação de contas
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={copyPublicLink} className="flex-shrink-0">
@@ -513,7 +513,7 @@ export default function MembersPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Posicao</Label>
+                      <Label>Posição</Label>
                       <PositionSelect value={position} onChange={setPosition} />
                     </div>
                     <div className="space-y-2">
@@ -582,7 +582,7 @@ export default function MembersPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Posicao</Label>
+                <Label>Posição</Label>
                 <PositionSelect value={editPosition} onChange={setEditPosition} />
               </div>
               <div className="space-y-2">
@@ -627,7 +627,7 @@ export default function MembersPage() {
             <DialogTitle>
               <span className="flex items-center gap-2">
                 <History className="h-4 w-4" />
-                Historico - {historyMember?.name}
+                Histórico - {historyMember?.name}
               </span>
             </DialogTitle>
           </DialogHeader>
@@ -637,14 +637,14 @@ export default function MembersPage() {
             <div className="space-y-4">
               {attendanceStats && (
                 <div className="rounded-lg border p-3 bg-muted/30">
-                  <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-2">Presenca em Peladas</p>
+                  <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-2">Presença em Peladas</p>
                   {attendanceStats.totalMatches === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum registro de presenca.</p>
+                    <p className="text-xs text-muted-foreground">Nenhum registro de presença.</p>
                   ) : (
                     <div className="flex items-center gap-4">
                       <div className="text-center">
                         <p className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">{attendanceStats.attended}</p>
-                        <p className="text-xs text-muted-foreground">Presencas</p>
+                        <p className="text-xs text-muted-foreground">Presenças</p>
                       </div>
                       <div className="text-center">
                         <p className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">{attendanceStats.totalMatches}</p>
@@ -706,7 +706,7 @@ export default function MembersPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, telefone, posicao, time..."
+              placeholder="Buscar por nome, telefone, posição, time..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9"
@@ -746,7 +746,7 @@ export default function MembersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Nome</SelectItem>
-                  <SelectItem value="position">Posicao</SelectItem>
+                  <SelectItem value="position">Posição</SelectItem>
                   <SelectItem value="team">Time</SelectItem>
                   <SelectItem value="type">Tipo</SelectItem>
                   <SelectItem value="joined">Data entrada</SelectItem>
@@ -788,14 +788,14 @@ export default function MembersPage() {
                 </Select>
               </div>
               <div className="space-y-1 min-w-[140px] flex-1">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Posicao</label>
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Posição</label>
                 <Select value={filterPosition} onValueChange={(v) => setFilterPosition(v === 'all_clear' ? '' : (v || ''))}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all_clear">Todas</SelectItem>
-                    <SelectItem value="_none">Sem posicao</SelectItem>
+                    <SelectItem value="_none">Sem posição</SelectItem>
                     {Object.entries(PLAYER_POSITIONS).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
                     ))}
@@ -970,7 +970,7 @@ export default function MembersPage() {
                   {/* Action buttons (admin only) */}
                   {isAdmin && (
                     <div className="flex items-center justify-end gap-1 mt-3 pt-2.5 border-t">
-                      <Button variant="ghost" size="icon-sm" onClick={() => openHistoryDialog(member)} title="Historico">
+                      <Button variant="ghost" size="icon-sm" onClick={() => openHistoryDialog(member)} title="Histórico">
                         <History className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                       <Button variant="ghost" size="icon-sm" onClick={() => openEditDialog(member)} title="Editar">

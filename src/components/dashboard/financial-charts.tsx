@@ -162,7 +162,7 @@ export default function FinancialCharts({ monthlyData, expenseBreakdown, viewMod
       ) : (
         <div className="card-modern-elevated p-5">
           <h2 className="font-bold text-brand-navy mb-4">
-            Despesas por Categoria ({viewMode === 'year' ? 'Anual' : 'Mes Atual'})
+            Despesas por Categoria ({viewMode === 'year' ? 'Anual' : 'Mês Atual'})
           </h2>
           {expenseBreakdown.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Sem despesas neste periodo.</p>

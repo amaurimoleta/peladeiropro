@@ -226,7 +226,7 @@ function generateMonthlyPdf(props: ExportPdfProps, logoBase64: string | null, fo
   const pageWidth = doc.internal.pageSize.getWidth()
   const f = tableFont(fontLoaded)
 
-  addHeader(doc, logoBase64, fontLoaded, `Prestacao de Contas - ${formatMonthLabel(month)}`, groupName)
+  addHeader(doc, logoBase64, fontLoaded, `Prestação de Contas - ${formatMonthLabel(month)}`, groupName)
   let y = 46
 
   // Balance Summary
@@ -313,7 +313,7 @@ function generateMonthlyPdf(props: ExportPdfProps, logoBase64: string | null, fo
 
     autoTable(doc, {
       startY: y,
-      head: [['Descricao', 'Categoria', 'Valor', 'Data']],
+      head: [['Descrição', 'Categoria', 'Valor', 'Data']],
       body: expenses.map(e => [e.description, CATEGORY_LABELS[e.category] || e.category, formatCurrency(e.amount), formatDate(e.date)]),
       headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, font: f },
       bodyStyles: { fontSize: 9, textColor: [40, 40, 40], font: f },
@@ -395,7 +395,7 @@ function generateMonthlyPdf(props: ExportPdfProps, logoBase64: string | null, fo
   }
 
   addFooter(doc, fontLoaded)
-  doc.save(`prestacao-contas-${groupName.toLowerCase().replace(/\s+/g, '-')}-${month}.pdf`)
+  doc.save(`prestação-contas-${groupName.toLowerCase().replace(/\s+/g, '-')}-${month}.pdf`)
 }
 
 // ══════════════════════════════════════════════
@@ -416,7 +416,7 @@ function generateAnnualPdf(props: ExportPdfProps, logoBase64: string | null, fon
   const pageWidth = doc.internal.pageSize.getWidth()
   const f = tableFont(fontLoaded)
 
-  addHeader(doc, logoBase64, fontLoaded, `Prestacao de Contas Anual ${year}`, groupName)
+  addHeader(doc, logoBase64, fontLoaded, `Prestação de Contas Anual ${year}`, groupName)
   let y = 46
 
   // Summary
@@ -589,7 +589,7 @@ function generateAnnualPdf(props: ExportPdfProps, logoBase64: string | null, fon
   }
 
   addFooter(doc, fontLoaded)
-  doc.save(`prestacao-contas-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
+  doc.save(`prestação-contas-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
 }
 
 // ══════════════════════════════════════════════
@@ -628,7 +628,7 @@ function generateInadimpletesPdf(props: ExportPdfProps, logoBase64: string | nul
 
   doc.setFont(f, 'normal')
   doc.setTextColor(60, 60, 60)
-  doc.text('Avulsos nao pagos:', 14, y)
+  doc.text('Avulsos não pagos:', 14, y)
   doc.setTextColor(...hexToRgb(AMBER))
   doc.setFont(f, 'bold')
   doc.text(`${unpaidGuests.length} jogadores - ${formatCurrency(totalUnpaidGuestsAmount)}`, pageWidth - 14, y, { align: 'right' })
@@ -680,13 +680,13 @@ function generateInadimpletesPdf(props: ExportPdfProps, logoBase64: string | nul
     y += 12
   }
 
-  // Avulsos nao pagos table
+  // Avulsos não pagos table
   if (unpaidGuests.length > 0) {
     y = checkPageBreak(doc, y, fontLoaded, 30)
     doc.setTextColor(...hexToRgb(NAVY))
     doc.setFontSize(13)
     doc.setFont(f, 'bold')
-    doc.text('Avulsos Nao Pagos', 14, y)
+    doc.text('Avulsos Não Pagos', 14, y)
     y += 2
 
     autoTable(doc, {

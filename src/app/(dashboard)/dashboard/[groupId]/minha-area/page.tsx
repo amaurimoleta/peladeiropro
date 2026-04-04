@@ -285,7 +285,7 @@ export default function MinhaAreaPage() {
     if (error) {
       toast.error('Erro ao salvar comprovante')
     } else {
-      toast.success('Comprovante enviado! Aguarde a confirmacao do tesoureiro.')
+      toast.success('Comprovante enviado! Aguarde a confirmação do tesoureiro.')
       await logAudit(supabase, {
         groupId,
         action: 'member_upload_receipt',
@@ -405,7 +405,7 @@ export default function MinhaAreaPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <p className="text-muted-foreground">Voce nao possui um perfil de membro neste grupo.</p>
+          <p className="text-muted-foreground">Você não possui um perfil de membro neste grupo.</p>
         </div>
       </div>
     )
@@ -414,8 +414,8 @@ export default function MinhaAreaPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Minha Area</h1>
-        <p className="text-sm text-muted-foreground">Acompanhe seus pagamentos, ranking e presenca</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Minha Área</h1>
+        <p className="text-sm text-muted-foreground">Acompanhe seus pagamentos, ranking e presença</p>
       </div>
 
       {/* ── Summary Cards ── */}
@@ -474,7 +474,7 @@ export default function MinhaAreaPage() {
               <div className="rounded-full bg-blue-500/10 p-1 sm:p-1.5">
                 <CalendarCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-500" />
               </div>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">Presenca</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">Presença</span>
             </div>
             <p className="text-lg sm:text-xl font-bold text-blue-500">{attendancePct}%</p>
             <p className="text-[10px] sm:text-xs text-muted-foreground">{attendanceStats.present}/{attendanceStats.total} jogos</p>
@@ -534,13 +534,13 @@ export default function MinhaAreaPage() {
         </Card>
       )}
 
-      {/* ── Proximos Jogos (RSVP) ── */}
+      {/* ── Próximos Jogos (RSVP) ── */}
       {upcomingMatches.length > 0 && (
         <Card className="mb-6">
           <CardContent className="p-0">
             <div className="p-4 border-b flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#1B1F4B] dark:text-gray-100" />
-              <h3 className="font-bold text-[#1B1F4B] dark:text-gray-100">Proximos Jogos</h3>
+              <h3 className="font-bold text-[#1B1F4B] dark:text-gray-100">Próximos Jogos</h3>
             </div>
             <div className="divide-y">
               {upcomingMatches.map(match => {
@@ -636,7 +636,7 @@ export default function MinhaAreaPage() {
                   <TableHead className="hidden sm:table-cell">Vencimento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden sm:table-cell">Data Pgto</TableHead>
-                  <TableHead className="text-right">Acao</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

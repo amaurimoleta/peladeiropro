@@ -336,7 +336,7 @@ export default function PublicPage() {
       <div className="min-h-screen flex items-center justify-center gradient-surface">
         <div className="text-center">
           <Logo size="lg" />
-          <p className="text-muted-foreground mt-4">Grupo nao encontrado.</p>
+          <p className="text-muted-foreground mt-4">Grupo não encontrado.</p>
         </div>
       </div>
     )
@@ -529,7 +529,7 @@ export default function PublicPage() {
 
   function handleWhatsAppShare() {
     const url = `${window.location.origin}/p/${slug}`
-    const text = `Confira a prestacao de contas da ${group.name}`
+    const text = `Confira a prestação de contas da ${group.name}`
     const waUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`
     window.open(waUrl, '_blank')
   }
@@ -544,7 +544,7 @@ export default function PublicPage() {
             <Logo size="md" variant="white" />
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">{group.name}</h1>
-          <p className="text-white/50 text-xs sm:text-sm capitalize mt-1.5 sm:mt-2 tracking-wide">Prestacao de contas</p>
+          <p className="text-white/50 text-xs sm:text-sm capitalize mt-1.5 sm:mt-2 tracking-wide">Prestação de contas</p>
         </div>
       </header>
 
@@ -702,7 +702,7 @@ export default function PublicPage() {
                           </div>
                         )}
                         {totalIncome === 0 && (
-                          <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mes.</p>
+                          <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mês.</p>
                         )}
                       </div>
                     )}
@@ -873,7 +873,7 @@ export default function PublicPage() {
 
                       {group.pix_beneficiary_name && (
                         <div className="flex justify-between text-sm mb-3">
-                          <span className="text-muted-foreground">Beneficiario:</span>
+                          <span className="text-muted-foreground">Beneficiário:</span>
                           <span className="font-semibold">{group.pix_beneficiary_name}</span>
                         </div>
                       )}
@@ -1159,7 +1159,7 @@ export default function PublicPage() {
                             <span className="px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green font-semibold">Artilheiro = antecipado</span>
                             <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold">Titular = em dia</span>
                             <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold">Catimbeiro = atrasa pouco</span>
-                            <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 font-semibold">Pendurado = paga no mes</span>
+                            <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 font-semibold">Pendurado = paga no mês</span>
                             <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold">Rebaixado = atrasa +1 mes</span>
                           </div>
                           <div className="space-y-2">
@@ -1250,7 +1250,7 @@ export default function PublicPage() {
                       <p className="text-[10px] text-muted-foreground">R$ {totalOverdueAmount.toFixed(2)}</p>
                     </div>
                     <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '60ms' }}>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Avulsos Nao Pagos</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Avulsos Não Pagos</p>
                       <p className="text-sm sm:text-base font-bold text-amber-500">{allUnpaidGuests.length}</p>
                       <p className="text-[10px] text-muted-foreground">R$ {totalUnpaidGuestsAmount.toFixed(2)}</p>
                     </div>
@@ -1302,7 +1302,7 @@ export default function PublicPage() {
                     </div>
                   )}
 
-                  {/* Avulsos nao pagos - collapsible */}
+                  {/* Avulsos não pagos - collapsible */}
                   {allUnpaidGuests.length > 0 && (
                     <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                       <button
@@ -1312,7 +1312,7 @@ export default function PublicPage() {
                       >
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-amber-500" />
-                          <h2 className="font-bold text-brand-navy">Avulsos Nao Pagos</h2>
+                          <h2 className="font-bold text-brand-navy">Avulsos Não Pagos</h2>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">{allUnpaidGuests.length}</span>
@@ -1521,7 +1521,7 @@ export default function PublicPage() {
                                   {team.champWins > 0 && (
                                     <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 text-[10px] font-bold">
                                       <Trophy className="h-2.5 w-2.5" />
-                                      {team.champWins} {team.champWins === 1 ? 'titulo' : 'titulos'}
+                                      {team.champWins} {team.champWins === 1 ? 'título' : 'títulos'}
                                     </span>
                                   )}
                                 </div>
@@ -1548,7 +1548,7 @@ export default function PublicPage() {
                                   {team.champWins}
                                 </p>
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">
-                                  {team.champWins === 1 ? 'titulo' : 'titulos'}
+                                  {team.champWins === 1 ? 'título' : 'títulos'}
                                 </p>
                               </div>
                             </div>

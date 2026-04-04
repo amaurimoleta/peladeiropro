@@ -88,7 +88,7 @@ export default function AnnouncementsCard({ groupId }: { groupId: string }) {
 
   async function handleSave() {
     if (!title.trim() || !content.trim()) {
-      toast.error('Preencha o titulo e o conteudo do aviso.')
+      toast.error('Preencha o título e o conteudo do aviso.')
       return
     }
 
@@ -114,7 +114,7 @@ export default function AnnouncementsCard({ groupId }: { groupId: string }) {
         toast.success('Aviso atualizado com sucesso!')
       } else {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('Nao autenticado')
+        if (!user) throw new Error('Não autenticado')
 
         const { data: member } = await supabase
           .from('group_members')
@@ -238,9 +238,9 @@ export default function AnnouncementsCard({ groupId }: { groupId: string }) {
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
-                  <label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">Titulo</label>
+                  <label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">Título</label>
                   <Input
-                    placeholder="Titulo do aviso"
+                    placeholder="Título do aviso"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                   />

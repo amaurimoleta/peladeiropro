@@ -126,7 +126,7 @@ export function AttendanceRanking({ groupId }: { groupId: string }) {
         <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
           <UserCheck className="h-4 w-4 text-white" />
         </div>
-        <h2 className="font-bold text-[#1B1F4B]">Ranking de Presenca</h2>
+        <h2 className="font-bold text-[#1B1F4B]">Ranking de Presença</h2>
       </div>
 
       {loading ? (
@@ -134,7 +134,7 @@ export function AttendanceRanking({ groupId }: { groupId: string }) {
       ) : ranked.length === 0 ? (
         <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
           <AlertTriangle className="h-4 w-4" />
-          <p className="text-sm">Nenhum registro de presenca encontrado.</p>
+          <p className="text-sm">Nenhum registro de presença encontrado.</p>
         </div>
       ) : (
         <>

@@ -256,7 +256,7 @@ export default async function GroupDashboard({
       {/* Greeting + Cash Balance */}
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold text-brand-navy tracking-tight">{greeting}, {userName}!</h1>
-        <p className="text-muted-foreground text-sm mt-1">Aqui esta o resumo do seu grupo.</p>
+        <p className="text-muted-foreground text-sm mt-1">Aqui está o resumo do seu grupo.</p>
       </div>
 
       <div className="card-modern-elevated mb-8 p-6 border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-green-50/50">
