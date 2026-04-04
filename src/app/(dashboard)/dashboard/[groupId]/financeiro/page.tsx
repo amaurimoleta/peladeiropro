@@ -17,12 +17,12 @@ import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
   MessageCircle, Send, Image, Eye, Wallet, Users, ShieldAlert,
-  ChevronLeft, ChevronRight, CalendarDays,
+  ChevronLeft, ChevronRight, CalendarDays, Banknote,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
-import { EXPENSE_CATEGORIES, type Expense, type GroupMember, type Group, type MonthlyFee } from '@/lib/types'
+import { EXPENSE_CATEGORIES, REVENUE_CATEGORIES, type Expense, type Revenue, type GroupMember, type Group, type MonthlyFee } from '@/lib/types'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { uploadReceipt } from '@/lib/upload-receipt'
 import { logAudit } from '@/lib/audit'
@@ -34,6 +34,15 @@ const categoryColors: Record<string, string> = {
   goalkeeper: 'bg-purple-100 text-purple-700',
   equipment: 'bg-orange-100 text-orange-700',
   drinks: 'bg-amber-100 text-amber-700',
+  other: 'bg-gray-100 text-gray-700',
+}
+
+const revenueCategoryColors: Record<string, string> = {
+  sponsorship: 'bg-indigo-100 text-indigo-700',
+  donation: 'bg-pink-100 text-pink-700',
+  event: 'bg-cyan-100 text-cyan-700',
+  prize: 'bg-yellow-100 text-yellow-700',
+  rental: 'bg-teal-100 text-teal-700',
   other: 'bg-gray-100 text-gray-700',
 }
 
@@ -89,6 +98,7 @@ export default function FinanceiroPage() {
   const [dreAnnualFees, setDreAnnualFees] = useState<any[]>([])
   const [dreAnnualGuests, setDreAnnualGuests] = useState<any[]>([])
   const [dreAnnualExpenses, setDreAnnualExpenses] = useState<any[]>([])
+  const [dreAnnualRevenues, setDreAnnualRevenues] = useState<any[]>([])
 
   // Saldo Acumulado state
   const [allTimeFees, setAllTimeFees] = useState(0)
@@ -99,6 +109,8 @@ export default function FinanceiroPage() {
   const [priorFees, setPriorFees] = useState(0)
   const [priorGuests, setPriorGuests] = useState(0)
   const [priorExpenses, setPriorExpenses] = useState(0)
+  const [allTimeRevenues, setAllTimeRevenues] = useState(0)
+  const [priorRevenues, setPriorRevenues] = useState(0)
 
   // WhatsApp cobranca state
   const [cobrancaDialogOpen, setCobrancaDialogOpen] = useState(false)
@@ -125,6 +137,18 @@ export default function FinanceiroPage() {
   // Receipt viewer state
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
 
+  // Receitas (Revenues) state
+  const [revenues, setRevenues] = useState<any[]>([])
+  const [revenueDialogOpen, setRevenueDialogOpen] = useState(false)
+  const [editRevenueDialogOpen, setEditRevenueDialogOpen] = useState(false)
+  const [editingRevenue, setEditingRevenue] = useState<any>(null)
+  const [revenueCategory, setRevenueCategory] = useState<string>('other')
+  const [revenueDescription, setRevenueDescription] = useState('')
+  const [revenueAmount, setRevenueAmount] = useState('')
+  const [revenueDate, setRevenueDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [revenueNotes, setRevenueNotes] = useState('')
+  const [savingRevenue, setSavingRevenue] = useState(false)
+
   // Batch selection state for fees
   const [selectedFees, setSelectedFees] = useState<Set<string>>(new Set())
 
@@ -141,17 +165,20 @@ export default function FinanceiroPage() {
       { data: feesData },
       { data: expensesData },
       { data: guestsAllData },
+      { data: revenuesData },
     ] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active').order('name'),
       supabase.from('monthly_fees').select('*, member:group_members(name, member_type, phone, position)').eq('group_id', groupId).eq('reference_month', currentMonth),
       supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', endDay).order('expense_date', { ascending: false }),
       supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', endDay).order('match_date', { ascending: false }),
+      supabase.from('revenues').select('*').eq('group_id', groupId).gte('revenue_date', `${currentMonth}-01`).lte('revenue_date', endDay).order('revenue_date', { ascending: false }),
     ])
     setGroup(groupData)
     setMembers(membersData || [])
     setFees(feesData || [])
     setExpenses(expensesData || [])
+    setRevenues(revenuesData || [])
     const guestsArr = guestsAllData || []
     setAllGuests(guestsArr)
     setPaidGuests(guestsArr.filter((g: any) => g.paid))
@@ -166,27 +193,34 @@ export default function FinanceiroPage() {
       { data: allFees },
       { data: allGuests },
       { data: allExpenses },
+      { data: allRevs },
       // Prior to current month (for saldo inicial)
       { data: priorFeesData },
       { data: priorGuestsData },
       { data: priorExpensesData },
+      { data: priorRevsData },
     ] = await Promise.all([
       supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
       supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
       supabase.from('expenses').select('amount').eq('group_id', groupId),
+      supabase.from('revenues').select('amount').eq('group_id', groupId),
       // Fees paid before current month
       supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid').lt('reference_month', currentMonth),
       // Guests paid before current month
       supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true).lt('match_date', firstDay),
       // Expenses before current month
       supabase.from('expenses').select('amount').eq('group_id', groupId).lt('expense_date', firstDay),
+      // Revenues before current month
+      supabase.from('revenues').select('amount').eq('group_id', groupId).lt('revenue_date', firstDay),
     ])
     setAllTimeFees((allFees || []).reduce((sum, f) => sum + Number(f.amount), 0))
     setAllTimeGuests((allGuests || []).reduce((sum, g) => sum + Number(g.amount), 0))
     setAllTimeExpenses((allExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0))
+    setAllTimeRevenues((allRevs || []).reduce((sum, r) => sum + Number(r.amount), 0))
     setPriorFees((priorFeesData || []).reduce((sum, f) => sum + Number(f.amount), 0))
     setPriorGuests((priorGuestsData || []).reduce((sum, g) => sum + Number(g.amount), 0))
     setPriorExpenses((priorExpensesData || []).reduce((sum, e) => sum + Number(e.amount), 0))
+    setPriorRevenues((priorRevsData || []).reduce((sum, r) => sum + Number(r.amount), 0))
   }, [groupId, currentMonth])
 
   useEffect(() => {
@@ -200,17 +234,20 @@ export default function FinanceiroPage() {
     async function loadDreAnnual() {
       setDreAnnualLoading(true)
       const year = dreYear
-      const [{ data: feesData }, { data: guestsData }, { data: expensesData }] = await Promise.all([
+      const [{ data: feesData }, { data: guestsData }, { data: expensesData }, { data: revsData }] = await Promise.all([
         supabase.from('monthly_fees').select('amount, status, reference_month').eq('group_id', groupId).eq('status', 'paid')
           .gte('reference_month', `${year}-01`).lte('reference_month', `${year}-12`),
         supabase.from('guest_players').select('amount, match_date').eq('group_id', groupId).eq('paid', true)
           .gte('match_date', `${year}-01-01`).lte('match_date', `${year}-12-31`),
         supabase.from('expenses').select('amount, expense_date').eq('group_id', groupId)
           .gte('expense_date', `${year}-01-01`).lte('expense_date', `${year}-12-31`),
+        supabase.from('revenues').select('amount, revenue_date, category').eq('group_id', groupId)
+          .gte('revenue_date', `${year}-01-01`).lte('revenue_date', `${year}-12-31`),
       ])
       setDreAnnualFees(feesData || [])
       setDreAnnualGuests(guestsData || [])
       setDreAnnualExpenses(expensesData || [])
+      setDreAnnualRevenues(revsData || [])
       setDreAnnualLoading(false)
     }
     loadDreAnnual()
@@ -788,6 +825,102 @@ export default function FinanceiroPage() {
     loadAccumulatedBalance()
   }
 
+  // ── Revenue handlers ──
+
+  function resetRevenueForm() {
+    setRevenueCategory('other')
+    setRevenueDescription('')
+    setRevenueAmount('')
+    setRevenueDate(format(new Date(), 'yyyy-MM-dd'))
+    setRevenueNotes('')
+  }
+
+  async function handleAddRevenue(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingRevenue(true)
+    const { data: newRevenue, error } = await supabase.from('revenues').insert({
+      group_id: groupId,
+      category: revenueCategory,
+      description: revenueDescription,
+      amount: parseFloat(revenueAmount),
+      revenue_date: revenueDate,
+      notes: revenueNotes || null,
+    }).select().single()
+    if (error) {
+      toast.error('Erro', { description: error.message })
+    } else {
+      toast.success('Receita registrada!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'create_revenue',
+        entityType: 'revenue',
+        entityId: newRevenue?.id,
+        details: { description: revenueDescription, amount: parseFloat(revenueAmount), category: revenueCategory },
+      })
+      setRevenueDialogOpen(false)
+      resetRevenueForm()
+      loadData()
+      loadAccumulatedBalance()
+    }
+    setSavingRevenue(false)
+  }
+
+  function openEditRevenue(rev: any) {
+    setEditingRevenue(rev)
+    setRevenueCategory(rev.category)
+    setRevenueDescription(rev.description)
+    setRevenueAmount(String(Number(rev.amount)))
+    setRevenueDate(rev.revenue_date)
+    setRevenueNotes(rev.notes || '')
+    setEditRevenueDialogOpen(true)
+  }
+
+  async function handleEditRevenue(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingRevenue) return
+    setSavingRevenue(true)
+    const { error } = await supabase.from('revenues').update({
+      category: revenueCategory,
+      description: revenueDescription,
+      amount: parseFloat(revenueAmount),
+      revenue_date: revenueDate,
+      notes: revenueNotes || null,
+    }).eq('id', editingRevenue.id)
+    if (error) {
+      toast.error('Erro', { description: error.message })
+    } else {
+      toast.success('Receita atualizada!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_revenue',
+        entityType: 'revenue',
+        entityId: editingRevenue.id,
+        details: { description: revenueDescription, amount: parseFloat(revenueAmount), category: revenueCategory },
+      })
+      setEditRevenueDialogOpen(false)
+      setEditingRevenue(null)
+      resetRevenueForm()
+      loadData()
+      loadAccumulatedBalance()
+    }
+    setSavingRevenue(false)
+  }
+
+  async function deleteRevenue(id: string, desc?: string) {
+    if (!confirm('Remover esta receita?')) return
+    await supabase.from('revenues').delete().eq('id', id)
+    await logAudit(supabase, {
+      groupId,
+      action: 'delete_revenue',
+      entityType: 'revenue',
+      entityId: id,
+      details: { description: desc },
+    })
+    toast.success('Receita removida!')
+    loadData()
+    loadAccumulatedBalance()
+  }
+
   // ── Computed values ──
 
   // Filter out goalkeeper fees when setting is off
@@ -809,10 +942,18 @@ export default function FinanceiroPage() {
     return acc
   }, {} as Record<string, number>)
 
+  // Receitas (outras)
+  const totalRevenuesAmount = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
+  const byRevenueCategory = revenues.reduce((acc: Record<string, number>, r: any) => {
+    acc[r.category] = (acc[r.category] || 0) + Number(r.amount)
+    return acc
+  }, {} as Record<string, number>)
+
   // DRE
   const dreTotalFees = displayFees.filter(f => f.status === 'paid').reduce((sum, f) => sum + Number(f.amount), 0)
   const dreTotalGuests = paidGuests.reduce((sum, g) => sum + Number(g.amount), 0)
-  const dreTotalIncome = dreTotalFees + dreTotalGuests
+  const dreTotalRevenues = totalRevenuesAmount
+  const dreTotalIncome = dreTotalFees + dreTotalGuests + dreTotalRevenues
   const dreExpensesByCategory = expenses.reduce((acc, e) => {
     const cat = e.category as ExpenseCategory
     acc[cat] = (acc[cat] || 0) + Number(e.amount)
@@ -835,29 +976,31 @@ export default function FinanceiroPage() {
     const monthKey = `${dreYear}-${mm}`
     const monthFees = dreAnnualFees.filter(f => f.reference_month === monthKey).reduce((s: number, f: any) => s + Number(f.amount), 0)
     const monthGuests = dreAnnualGuests.filter(g => g.match_date?.startsWith(monthKey)).reduce((s: number, g: any) => s + Number(g.amount), 0)
+    const monthRevenues = dreAnnualRevenues.filter(r => r.revenue_date?.startsWith(monthKey)).reduce((s: number, r: any) => s + Number(r.amount), 0)
     const monthExpenses = dreAnnualExpenses.filter(e => e.expense_date?.startsWith(monthKey)).reduce((s: number, e: any) => s + Number(e.amount), 0)
-    const totalReceitas = monthFees + monthGuests
+    const totalReceitas = monthFees + monthGuests + monthRevenues
     const saldo = totalReceitas - monthExpenses
-    return { name, monthKey, mensalidades: monthFees, avulsos: monthGuests, totalReceitas, despesas: monthExpenses, saldo }
+    return { name, monthKey, mensalidades: monthFees, avulsos: monthGuests, outrasReceitas: monthRevenues, totalReceitas, despesas: monthExpenses, saldo }
   })
   const dreAnnualTotals = dreAnnualMonthsData.reduce(
     (acc, m) => ({
       mensalidades: acc.mensalidades + m.mensalidades,
       avulsos: acc.avulsos + m.avulsos,
+      outrasReceitas: acc.outrasReceitas + m.outrasReceitas,
       totalReceitas: acc.totalReceitas + m.totalReceitas,
       despesas: acc.despesas + m.despesas,
       saldo: acc.saldo + m.saldo,
     }),
-    { mensalidades: 0, avulsos: 0, totalReceitas: 0, despesas: 0, saldo: 0 }
+    { mensalidades: 0, avulsos: 0, outrasReceitas: 0, totalReceitas: 0, despesas: 0, saldo: 0 }
   )
 
   // Saldo Acumulado
   const groupInitialBalance = Number(group?.initial_balance ?? 0)
-  const allTimeIncome = allTimeFees + allTimeGuests
+  const allTimeIncome = allTimeFees + allTimeGuests + allTimeRevenues
   const accumulatedBalance = groupInitialBalance + allTimeIncome - allTimeExpenses
 
   // Saldo Inicial (tudo antes do mes selecionado) e Saldo Final
-  const saldoInicial = groupInitialBalance + (priorFees + priorGuests) - priorExpenses
+  const saldoInicial = groupInitialBalance + (priorFees + priorGuests + priorRevenues) - priorExpenses
   const receitasDoMes = dreTotalIncome
   const despesasDoMes = dreTotalExpenses
   const saldoFinal = saldoInicial + receitasDoMes - despesasDoMes
@@ -962,6 +1105,45 @@ export default function FinanceiroPage() {
     </form>
   )
 
+  // ── Revenue form ──
+
+  const revenueForm = (isEdit: boolean) => (
+    <form onSubmit={isEdit ? handleEditRevenue : handleAddRevenue} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Categoria *</Label>
+        <Select value={revenueCategory} onValueChange={(v) => v && setRevenueCategory(v)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.entries(REVENUE_CATEGORIES).map(([key, label]) => (
+              <SelectItem key={key} value={key}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Descricao *</Label>
+        <Input placeholder="Ex: Patrocinio Loja X" value={revenueDescription} onChange={(e) => setRevenueDescription(e.target.value)} required />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Valor (R$) *</Label>
+          <Input type="number" step="0.01" min="0" placeholder="500.00" value={revenueAmount} onChange={(e) => setRevenueAmount(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label>Data *</Label>
+          <Input type="date" value={revenueDate} onChange={(e) => setRevenueDate(e.target.value)} required />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Observacoes</Label>
+        <Textarea placeholder="Notas adicionais" value={revenueNotes} onChange={(e) => setRevenueNotes(e.target.value)} />
+      </div>
+      <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={savingRevenue}>
+        {savingRevenue ? 'Salvando...' : isEdit ? 'Atualizar' : 'Registrar Receita'}
+      </Button>
+    </form>
+  )
+
   return (
     <div>
       <div className="mb-6">
@@ -1043,6 +1225,10 @@ export default function FinanceiroPage() {
           <TabsTrigger value="despesas">
             <Receipt className="h-4 w-4 mr-1.5" />
             Despesas
+          </TabsTrigger>
+          <TabsTrigger value="receitas">
+            <Banknote className="h-4 w-4 mr-1.5" />
+            Receitas
           </TabsTrigger>
           <TabsTrigger value="dre">
             <BarChart3 className="h-4 w-4 mr-1.5" />
@@ -1669,6 +1855,106 @@ export default function FinanceiroPage() {
           </div>
         </TabsContent>
 
+        {/* ── Tab: Receitas ── */}
+        <TabsContent value="receitas">
+          <div className="space-y-4 mt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Total: R$ {totalRevenuesAmount.toFixed(2)}</p>
+              {isAdmin && (
+                <Dialog open={revenueDialogOpen} onOpenChange={(v) => { setRevenueDialogOpen(v); if (!v) resetRevenueForm() }}>
+                  <Button className="bg-[#00C853] hover:bg-[#00A843] text-white" onClick={() => setRevenueDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Receita
+                  </Button>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Receita</DialogTitle>
+                    </DialogHeader>
+                    {revenueForm(false)}
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+
+            {/* Edit Revenue Dialog */}
+            <Dialog open={editRevenueDialogOpen} onOpenChange={(v) => { setEditRevenueDialogOpen(v); if (!v) { setEditingRevenue(null); resetRevenueForm() } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Receita</DialogTitle>
+                </DialogHeader>
+                {revenueForm(true)}
+              </DialogContent>
+            </Dialog>
+
+            {/* Category summary */}
+            {Object.keys(byRevenueCategory).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(byRevenueCategory).map(([cat, val]) => (
+                  <Badge key={cat} className={revenueCategoryColors[cat] || 'bg-gray-100'} variant="secondary">
+                    {REVENUE_CATEGORIES[cat] || cat}: R$ {(val as number).toFixed(2)}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Descricao</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Obs</TableHead>
+                      <TableHead className="text-right">Acoes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                      </TableRow>
+                    ) : revenues.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Nenhuma receita neste mes. Clique em &quot;Nova Receita&quot; para adicionar.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      revenues.map((rev: any) => (
+                        <TableRow key={rev.id}>
+                          <TableCell className="font-medium">{rev.description}</TableCell>
+                          <TableCell>
+                            <Badge className={revenueCategoryColors[rev.category] || 'bg-gray-100'} variant="secondary">
+                              {REVENUE_CATEGORIES[rev.category] || rev.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-[#00C853] font-medium">R$ {Number(rev.amount).toFixed(2)}</TableCell>
+                          <TableCell>{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{rev.notes || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            {isAdmin && (
+                              <div className="flex gap-1 justify-end">
+                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => openEditRevenue(rev)}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteRevenue(rev.id, rev.description)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         {/* ── Tab: DRE ── */}
         <TabsContent value="dre">
           <div className="space-y-6 mt-4">
@@ -1774,6 +2060,15 @@ export default function FinanceiroPage() {
                               total={dreTotalIncome}
                               color="#66BB6A"
                             />
+                            {dreTotalRevenues > 0 && (
+                              <BarLine
+                                label={`Outras receitas (${revenues.length})`}
+                                value={dreTotalRevenues}
+                                total={dreTotalIncome}
+                                color="#6366f1"
+                                icon={<Banknote className="h-4 w-4 text-indigo-500" />}
+                              />
+                            )}
                           </div>
                           <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
                             <span className="text-sm font-bold text-[#1B1F4B]">Total de Receitas</span>
@@ -1935,6 +2230,7 @@ export default function FinanceiroPage() {
                                 <TableHead className="font-semibold text-[#1B1F4B]">Mes</TableHead>
                                 <TableHead className="text-right font-semibold text-[#00C853]">Mensalidades</TableHead>
                                 <TableHead className="text-right font-semibold text-[#66BB6A]">Avulsos</TableHead>
+                                <TableHead className="text-right font-semibold text-indigo-500">Outras</TableHead>
                                 <TableHead className="text-right font-semibold text-[#00C853]">Total Receitas</TableHead>
                                 <TableHead className="text-right font-semibold text-red-500">Despesas</TableHead>
                                 <TableHead className="text-right font-semibold text-[#1B1F4B]">Saldo</TableHead>
@@ -1942,7 +2238,7 @@ export default function FinanceiroPage() {
                             </TableHeader>
                             <TableBody>
                               {dreAnnualMonthsData.map((m, idx) => {
-                                const hasData = m.mensalidades > 0 || m.avulsos > 0 || m.despesas > 0
+                                const hasData = m.mensalidades > 0 || m.avulsos > 0 || m.outrasReceitas > 0 || m.despesas > 0
                                 return (
                                   <TableRow key={m.monthKey} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
                                     <TableCell className="font-medium text-[#1B1F4B]">{m.name}</TableCell>
@@ -1951,6 +2247,9 @@ export default function FinanceiroPage() {
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums">
                                       {hasData ? formatCurrency(m.avulsos) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums">
+                                      {hasData ? formatCurrency(m.outrasReceitas) : <span className="text-muted-foreground">-</span>}
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums font-medium text-[#00C853]">
                                       {hasData ? formatCurrency(m.totalReceitas) : <span className="text-muted-foreground">-</span>}
@@ -1977,6 +2276,7 @@ export default function FinanceiroPage() {
                                 <TableCell className="font-bold text-[#1B1F4B]">Total</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.mensalidades)}</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.avulsos)}</TableCell>
+                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.outrasReceitas)}</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</TableCell>
                                 <TableCell className={`text-right font-bold tabular-nums ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
@@ -2009,6 +2309,12 @@ export default function FinanceiroPage() {
                             <span className="text-muted-foreground">Avulsos</span>
                             <span className="text-[#66BB6A] font-medium">{formatCurrency(dreAnnualTotals.avulsos)}</span>
                           </div>
+                          {dreAnnualTotals.outrasReceitas > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Outras Receitas</span>
+                              <span className="text-indigo-500 font-medium">{formatCurrency(dreAnnualTotals.outrasReceitas)}</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between text-sm border-t pt-2">
                             <span className="font-semibold text-[#1B1F4B]">Total Receitas</span>
                             <span className="text-[#00C853] font-bold">{formatCurrency(dreAnnualTotals.totalReceitas)}</span>

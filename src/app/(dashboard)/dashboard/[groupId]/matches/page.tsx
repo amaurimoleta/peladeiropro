@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
-  MessageCircle, DollarSign, Trophy, Save, Loader2,
+  MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -100,6 +100,10 @@ export default function MatchesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null)
 
+  // Match confirmations (RSVP)
+  const [confirmationsMap, setConfirmationsMap] = useState<Record<string, any[]>>({})
+  const [myMemberId, setMyMemberId] = useState<string | null>(null)
+
   const currentMonth = format(currentDate, 'yyyy-MM')
 
   // Load group data
@@ -181,6 +185,86 @@ export default function MatchesPage() {
   }, [groupId, currentMonth])
 
   useEffect(() => { loadMatches() }, [loadMatches])
+
+  // Load current user's member ID
+  useEffect(() => {
+    async function loadMyMember() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('group_members')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('profile_id', user.id)
+        .eq('status', 'active')
+        .single()
+      if (data) setMyMemberId(data.id)
+    }
+    loadMyMember()
+  }, [groupId])
+
+  // Load confirmations for all loaded matches
+  useEffect(() => {
+    async function loadConfirmations() {
+      if (matches.length === 0) return
+      const matchIds = matches.map(m => m.id)
+      const { data } = await supabase
+        .from('match_confirmations')
+        .select('*, member:group_members(name)')
+        .in('match_id', matchIds)
+      if (data) {
+        const map: Record<string, any[]> = {}
+        for (const c of data) {
+          if (!map[c.match_id]) map[c.match_id] = []
+          map[c.match_id].push(c)
+        }
+        setConfirmationsMap(map)
+      }
+    }
+    loadConfirmations()
+  }, [matches])
+
+  // RSVP toggle
+  async function toggleConfirmation(matchId: string, status: 'confirmed' | 'declined') {
+    if (!myMemberId) {
+      toast.error('Voce precisa estar vinculado como membro para confirmar.')
+      return
+    }
+    const existing = confirmationsMap[matchId]?.find(c => c.member_id === myMemberId)
+
+    if (existing) {
+      if (existing.status === status) {
+        // Remove confirmation
+        await supabase.from('match_confirmations').delete().eq('id', existing.id)
+      } else {
+        // Update status
+        await supabase.from('match_confirmations').update({ status }).eq('id', existing.id)
+      }
+    } else {
+      // Create new
+      await supabase.from('match_confirmations').insert({
+        match_id: matchId,
+        member_id: myMemberId,
+        status,
+      })
+    }
+
+    // Reload confirmations
+    const { data } = await supabase
+      .from('match_confirmations')
+      .select('*, member:group_members(name)')
+      .eq('match_id', matchId)
+    setConfirmationsMap(prev => ({ ...prev, [matchId]: data || [] }))
+  }
+
+  function shareMatchWhatsApp(match: Match) {
+    const dateStr = format(new Date(match.match_date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })
+    const location = match.location ? `\n📍 ${match.location}` : ''
+    const confs = confirmationsMap[match.id] || []
+    const confirmedCount = confs.filter(c => c.status === 'confirmed').length
+    const msg = `⚽ *Pelada ${dateStr}*${location}\n\n✅ ${confirmedCount} confirmado${confirmedCount !== 1 ? 's' : ''}\n\nConfirme sua presenca no app!\n${window.location.origin}/dashboard/${groupId}/matches`
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }
 
   // Load attendance for a match
   const loadAttendance = useCallback(async (matchId: string) => {
@@ -760,6 +844,88 @@ export default function MatchesPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Confirmacao de Presenca (RSVP) */}
+                  {(() => {
+                    const confs = confirmationsMap[match.id] || []
+                    const confirmedList = confs.filter(c => c.status === 'confirmed')
+                    const declinedList = confs.filter(c => c.status === 'declined')
+                    const myConf = myMemberId ? confs.find(c => c.member_id === myMemberId) : null
+                    const isFutureOrToday = new Date(match.match_date + 'T23:59:59') >= new Date(new Date().toISOString().split('T')[0] + 'T00:00:00')
+
+                    return (
+                      <div className="px-4 py-2.5 border-t border-b bg-gradient-to-r from-[#00C853]/5 to-blue-500/5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <UserCheck className="h-3.5 w-3.5 text-[#00C853]" />
+                              <span className="text-sm font-semibold text-[#00C853]">{confirmedList.length}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <UserX className="h-3.5 w-3.5 text-red-400" />
+                              <span className="text-sm font-semibold text-red-400">{declinedList.length}</span>
+                            </div>
+                            {match.max_players && (
+                              <span className="text-xs text-muted-foreground">
+                                / {match.max_players} vagas
+                              </span>
+                            )}
+                          </div>
+
+                          {myMemberId && isFutureOrToday && (
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant={myConf?.status === 'confirmed' ? 'default' : 'outline'}
+                                className={`h-7 text-xs gap-1 ${
+                                  myConf?.status === 'confirmed'
+                                    ? 'bg-[#00C853] hover:bg-[#00A843] text-white'
+                                    : 'text-[#00C853] border-[#00C853]/50 hover:bg-[#00C853]/10'
+                                }`}
+                                onClick={() => toggleConfirmation(match.id, 'confirmed')}
+                              >
+                                <UserCheck className="h-3 w-3" />
+                                Vou
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={myConf?.status === 'declined' ? 'default' : 'outline'}
+                                className={`h-7 text-xs gap-1 ${
+                                  myConf?.status === 'declined'
+                                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                                    : 'text-red-400 border-red-300/50 hover:bg-red-50'
+                                }`}
+                                onClick={() => toggleConfirmation(match.id, 'declined')}
+                              >
+                                <UserX className="h-3 w-3" />
+                                Fora
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground"
+                                onClick={() => shareMatchWhatsApp(match)}
+                                title="Compartilhar no WhatsApp"
+                              >
+                                <Share2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Show confirmed names */}
+                        {confirmedList.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {confirmedList.map(c => (
+                              <span key={c.id} className="text-[10px] bg-[#00C853]/10 text-[#00C853] rounded-full px-2 py-0.5 font-medium">
+                                {c.member?.name || '?'}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Badges + botao expandir */}
                   <div className="px-4 py-2 flex items-center justify-between">

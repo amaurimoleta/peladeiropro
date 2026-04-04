@@ -102,6 +102,7 @@ export interface Match {
   score_b: number | null
   tournament_id: string | null
   tournament_phase: string | null
+  max_players: number | null
   created_at: string
   updated_at: string
   guest_players?: GuestPlayer[]
@@ -211,6 +212,26 @@ export interface TournamentTeam {
   tournament_id: string
   team_id: string
   created_at: string
+}
+
+export interface Revenue {
+  id: string
+  group_id: string
+  description: string
+  amount: number
+  revenue_date: string
+  category: string
+  notes: string | null
+  created_at: string
+}
+
+export const REVENUE_CATEGORIES: Record<string, string> = {
+  sponsorship: 'Patrocinio',
+  donation: 'Doacao',
+  event: 'Evento',
+  prize: 'Premiacao',
+  rental: 'Aluguel',
+  other: 'Outros',
 }
 
 export const EXPENSE_CATEGORIES: Record<string, string> = {

@@ -15,6 +15,7 @@ import {
   User,
   Trophy,
   Shield,
+  UserCircle,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
@@ -27,6 +28,7 @@ import { GroupSelector } from '@/components/dashboard/group-selector'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/minha-area', icon: UserCircle, label: 'Minha Area' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
   { href: '/times', icon: Shield, label: 'Times' },
