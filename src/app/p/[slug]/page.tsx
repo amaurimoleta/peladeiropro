@@ -504,6 +504,92 @@ export default function PublicPage() {
                     </div>
                   </div>
 
+                  {/* Receitas - collapsible */}
+                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAvulsos(!showAvulsos)}
+                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                    >
+                      <h2 className="font-bold text-brand-navy">Receitas</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">R$ {totalIncome.toFixed(2)}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAvulsos ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {showAvulsos && (
+                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
+                        {/* Mensalidades pagas */}
+                        {totalFeesPaid > 0 && (
+                          <div className="flex justify-between text-sm py-1">
+                            <span className="text-muted-foreground">Mensalidades pagas</span>
+                            <span className="font-semibold text-brand-green">R$ {totalFeesPaid.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {/* Jogadores Avulsos */}
+                        {guests.length > 0 && (
+                          <div>
+                            <div className="flex justify-between text-sm py-1 mb-1">
+                              <span className="text-muted-foreground">Jogadores avulsos</span>
+                              <span className="font-semibold text-brand-green">R$ {totalGuestsPaid.toFixed(2)}</span>
+                            </div>
+                            <div className="space-y-1 pl-3 border-l-2 border-gray-100">
+                              {guests.map((guest: any) => (
+                                <div key={guest.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <span className="text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium">R$ {Number(guest.amount).toFixed(2)}</span>
+                                    {guest.paid ? (
+                                      <CheckCircle2 className="h-3 w-3 text-brand-green" />
+                                    ) : (
+                                      <Clock className="h-3 w-3 text-amber-500" />
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {totalIncome === 0 && (
+                          <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mes.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Despesas - collapsible */}
+                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '280ms' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDespesas(!showDespesas)}
+                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                    >
+                      <h2 className="font-bold text-brand-navy">Despesas</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {totalExpenses_.toFixed(2)}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showDespesas ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {showDespesas && (
+                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                        {expenses.map((exp: any) => (
+                          <div key={exp.id} className="flex items-center justify-between text-sm py-1">
+                            <div>
+                              <span className="font-medium text-brand-navy">{exp.description}</span>
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                {EXPENSE_CATEGORIES[exp.category as keyof typeof EXPENSE_CATEGORIES]}
+                              </span>
+                            </div>
+                            <span className="text-red-500 font-semibold">R$ {Number(exp.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        {expenses.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa registrada.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Mensalidades - collapsible with categorization */}
                   {(() => {
                     const sortByName = (a: any, b: any) => (a.member?.name || '').localeCompare(b.member?.name || '')
@@ -534,7 +620,7 @@ export default function PublicPage() {
                     )
 
                     return (
-                      <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                      <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '360ms' }}>
                         <button
                           type="button"
                           onClick={() => setShowMensalidades(!showMensalidades)}
@@ -609,92 +695,6 @@ export default function PublicPage() {
                       </div>
                     )
                   })()}
-
-                  {/* Despesas - collapsible */}
-                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '360ms' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowDespesas(!showDespesas)}
-                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
-                    >
-                      <h2 className="font-bold text-brand-navy">Despesas do Mes</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {totalExpenses_.toFixed(2)}</span>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showDespesas ? 'rotate-180' : ''}`} />
-                      </div>
-                    </button>
-                    {showDespesas && (
-                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
-                        {expenses.map((exp: any) => (
-                          <div key={exp.id} className="flex items-center justify-between text-sm py-1">
-                            <div>
-                              <span className="font-medium text-brand-navy">{exp.description}</span>
-                              <span className="text-muted-foreground ml-2 text-xs">
-                                {EXPENSE_CATEGORIES[exp.category as keyof typeof EXPENSE_CATEGORIES]}
-                              </span>
-                            </div>
-                            <span className="text-red-500 font-semibold">R$ {Number(exp.amount).toFixed(2)}</span>
-                          </div>
-                        ))}
-                        {expenses.length === 0 && (
-                          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa registrada.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Receitas - collapsible */}
-                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '440ms' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAvulsos(!showAvulsos)}
-                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
-                    >
-                      <h2 className="font-bold text-brand-navy">Receitas</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">R$ {totalIncome.toFixed(2)}</span>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAvulsos ? 'rotate-180' : ''}`} />
-                      </div>
-                    </button>
-                    {showAvulsos && (
-                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
-                        {/* Mensalidades pagas */}
-                        {totalFeesPaid > 0 && (
-                          <div className="flex justify-between text-sm py-1">
-                            <span className="text-muted-foreground">Mensalidades pagas</span>
-                            <span className="font-semibold text-brand-green">R$ {totalFeesPaid.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {/* Jogadores Avulsos */}
-                        {guests.length > 0 && (
-                          <div>
-                            <div className="flex justify-between text-sm py-1 mb-1">
-                              <span className="text-muted-foreground">Jogadores avulsos</span>
-                              <span className="font-semibold text-brand-green">R$ {totalGuestsPaid.toFixed(2)}</span>
-                            </div>
-                            <div className="space-y-1 pl-3 border-l-2 border-gray-100">
-                              {guests.map((guest: any) => (
-                                <div key={guest.id} className="flex items-center justify-between text-xs py-0.5">
-                                  <span className="text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-medium">R$ {Number(guest.amount).toFixed(2)}</span>
-                                    {guest.paid ? (
-                                      <CheckCircle2 className="h-3 w-3 text-brand-green" />
-                                    ) : (
-                                      <Clock className="h-3 w-3 text-amber-500" />
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {totalIncome === 0 && (
-                          <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mes.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
 
                   {/* PIX info */}
                   {group.pix_key && (
