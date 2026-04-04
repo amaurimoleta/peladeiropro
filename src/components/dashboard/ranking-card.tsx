@@ -114,8 +114,10 @@ export default function RankingCard({ groupId }: { groupId: string }) {
           if (fee.status === 'paid' && fee.paid_at) {
             const paidDate = new Date(fee.paid_at)
             if (paidDate <= dueDate) {
-              // Paid on time — full score, no differentiation
-              totalFeeScore += 100
+              // Paid on time — bonus if 2+ days early
+              const daysEarly = (dueDate.getTime() - paidDate.getTime()) / (1000 * 60 * 60 * 24)
+              const bonus = daysEarly >= 2 ? Math.min(daysEarly, 10) : 0
+              totalFeeScore += 100 + bonus
             } else {
               // Paid late — penalty by days late
               const daysLate = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
