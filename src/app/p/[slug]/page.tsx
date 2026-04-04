@@ -407,37 +407,46 @@ export default function PublicPage() {
     const paidMonths = scorableFees.filter(f => f.status === 'paid').length
     const dmMonths = memberFees.filter(f => f.status === 'dm_leave' || f.status === 'waived').length
 
-    // Score per fee: 100 if on time, penalty by days late
-    let totalFeeScore = 0
+    // Sort by reference_month ascending for recency weighting
+    const sorted = [...scorableFees].sort((a, b) =>
+      (a.reference_month || '').localeCompare(b.reference_month || '')
+    )
 
-    for (const fee of scorableFees) {
+    let totalWeightedScore = 0
+    let totalWeight = 0
+
+    sorted.forEach((fee, index) => {
+      const weight = index + 1 // oldest=1, newest=n
       const dueDate = new Date(fee.due_date + 'T23:59:59')
+      let feeScore = 0
+
       if (fee.status === 'paid' && fee.paid_at) {
         const paidDate = new Date(fee.paid_at)
         if (paidDate <= dueDate) {
-          // Paid on time — bonus if 2+ days early
           const daysEarly = (dueDate.getTime() - paidDate.getTime()) / (1000 * 60 * 60 * 24)
           const bonus = daysEarly >= 2 ? Math.min(daysEarly, 10) : 0
-          totalFeeScore += 100 + bonus
+          feeScore = 100 + bonus
         } else {
-          // Paid late — penalty by days late
           const daysLate = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-          totalFeeScore += Math.max(0, 100 - daysLate * 3)
+          feeScore = Math.max(0, 100 - daysLate * 3)
         }
       } else if (fee.status === 'overdue' || (fee.status === 'pending' && dueDate < today)) {
-        // Unpaid and overdue — penalty by days overdue
         const daysLate = (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-        totalFeeScore += Math.max(0, 100 - daysLate * 3)
+        feeScore = Math.max(0, 100 - daysLate * 3)
       }
-    }
 
-    const score = totalMonths > 0 ? totalFeeScore / totalMonths : 50
+      totalWeightedScore += feeScore * weight
+      totalWeight += weight
+    })
+
+    const score = totalWeight > 0 ? totalWeightedScore / totalWeight : 100
 
     let badge: string
-    if (score >= 80) badge = 'Craque'
-    else if (score >= 55) badge = 'Em dia'
-    else if (score >= 25) badge = 'Irregular'
-    else badge = 'Devedor'
+    if (score > 100) badge = 'Artilheiro'
+    else if (score >= 95) badge = 'Titular'
+    else if (score >= 80) badge = 'Catimbeiro'
+    else if (score >= 50) badge = 'Pendurado'
+    else badge = 'Rebaixado'
 
     const percentage = totalMonths > 0 ? Math.round((paidMonths / totalMonths) * 100) : 0
     return { name: member.name, paidMonths, totalMonths, dmMonths, percentage, score: Math.round(score * 10) / 10, badge }
@@ -484,20 +493,22 @@ export default function PublicPage() {
 
   function badgeColor(badge: string) {
     switch (badge) {
-      case 'Craque': return 'text-brand-green'
-      case 'Em dia': return 'text-blue-600'
-      case 'Irregular': return 'text-amber-500'
-      case 'Devedor': return 'text-red-500'
+      case 'Artilheiro': return 'text-brand-green'
+      case 'Titular': return 'text-blue-600'
+      case 'Catimbeiro': return 'text-amber-600'
+      case 'Pendurado': return 'text-orange-600'
+      case 'Rebaixado': return 'text-red-600'
       default: return 'text-muted-foreground'
     }
   }
 
   function badgeBg(badge: string) {
     switch (badge) {
-      case 'Craque': return 'bg-brand-green/10'
-      case 'Em dia': return 'bg-blue-50'
-      case 'Irregular': return 'bg-amber-50'
-      case 'Devedor': return 'bg-red-50'
+      case 'Artilheiro': return 'bg-brand-green/10'
+      case 'Titular': return 'bg-blue-50'
+      case 'Catimbeiro': return 'bg-amber-50'
+      case 'Pendurado': return 'bg-orange-50'
+      case 'Rebaixado': return 'bg-red-50'
       default: return 'bg-muted/30'
     }
   }
@@ -1052,7 +1063,13 @@ export default function PublicPage() {
                       </button>
                       {showCompliance && (
                         <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-                          <p className="text-[11px] text-muted-foreground mb-3">Pontuacao baseada em pagamentos em dia e antecedencia. DM e dispensas nao contam.</p>
+                          <div className="flex flex-wrap gap-2 mb-3 text-[10px]">
+                            <span className="px-1.5 py-0.5 rounded bg-brand-green/10 text-brand-green font-semibold">Artilheiro = antecipado</span>
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold">Titular = em dia</span>
+                            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-semibold">Catimbeiro = atrasa pouco</span>
+                            <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 font-semibold">Pendurado = paga no mes</span>
+                            <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold">Rebaixado = atrasa +1 mes</span>
+                          </div>
                           <div className="space-y-2">
                             {memberCompliance.map((member, idx) => (
                               <div key={member.name} className="flex items-center gap-3 text-sm py-2 border-b border-gray-100 last:border-0">

@@ -10,18 +10,20 @@ interface RankedMember {
   memberId: string
   name: string
   score: number
-  badge: 'Craque' | 'Em dia' | 'Irregular' | 'Devedor'
+  badge: 'Artilheiro' | 'Titular' | 'Catimbeiro' | 'Pendurado' | 'Rebaixado'
 }
 
 function getBadgeVariant(badge: string) {
   switch (badge) {
-    case 'Craque':
+    case 'Artilheiro':
       return 'default'
-    case 'Em dia':
+    case 'Titular':
       return 'secondary'
-    case 'Irregular':
+    case 'Catimbeiro':
       return 'outline'
-    case 'Devedor':
+    case 'Pendurado':
+      return 'outline'
+    case 'Rebaixado':
       return 'destructive'
     default:
       return 'secondary'
@@ -78,7 +80,7 @@ export default function RankingCard({ groupId }: { groupId: string }) {
 
       const { data: fees } = await supabase
         .from('monthly_fees')
-        .select('member_id, status, due_date, paid_at')
+        .select('member_id, status, due_date, paid_at, reference_month')
         .eq('group_id', groupId)
         .in('member_id', memberIds)
 
@@ -87,9 +89,7 @@ export default function RankingCard({ groupId }: { groupId: string }) {
       const today = new Date()
 
       for (const fee of fees || []) {
-        // Exclude DM and waived — they don't count
         if (fee.status === 'dm_leave' || fee.status === 'waived') continue
-        // Exclude pending fees whose due_date hasn't passed yet (not yet due)
         if (fee.status === 'pending' && new Date(fee.due_date + 'T23:59:59') > today) continue
         const list = feesByMember.get(fee.member_id) || []
         list.push(fee)
@@ -101,42 +101,50 @@ export default function RankingCard({ groupId }: { groupId: string }) {
       for (const [memberId, name] of memberMap) {
         const memberFees = feesByMember.get(memberId) || []
         if (memberFees.length === 0) {
-          // No relevant fees — new member or all DM/waived, neutral score
-          results.push({ memberId, name, score: 50, badge: 'Em dia' })
+          results.push({ memberId, name, score: 100, badge: 'Titular' })
           continue
         }
 
-        // Score per fee: 100 if on time, penalty by days late
-        let totalFeeScore = 0
+        // Sort by reference_month ascending for recency weighting
+        const sorted = [...memberFees].sort((a, b) =>
+          (a.reference_month || '').localeCompare(b.reference_month || '')
+        )
 
-        for (const fee of memberFees) {
+        let totalWeightedScore = 0
+        let totalWeight = 0
+
+        sorted.forEach((fee, index) => {
+          const weight = index + 1 // oldest=1, newest=n
           const dueDate = new Date(fee.due_date + 'T23:59:59')
+          let feeScore = 0
+
           if (fee.status === 'paid' && fee.paid_at) {
             const paidDate = new Date(fee.paid_at)
             if (paidDate <= dueDate) {
-              // Paid on time — bonus if 2+ days early
               const daysEarly = (dueDate.getTime() - paidDate.getTime()) / (1000 * 60 * 60 * 24)
               const bonus = daysEarly >= 2 ? Math.min(daysEarly, 10) : 0
-              totalFeeScore += 100 + bonus
+              feeScore = 100 + bonus
             } else {
-              // Paid late — penalty by days late
               const daysLate = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-              totalFeeScore += Math.max(0, 100 - daysLate * 3)
+              feeScore = Math.max(0, 100 - daysLate * 3)
             }
           } else if (fee.status === 'overdue' || (fee.status === 'pending' && dueDate < today)) {
-            // Unpaid and overdue — penalty by days overdue
             const daysLate = (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-            totalFeeScore += Math.max(0, 100 - daysLate * 3)
+            feeScore = Math.max(0, 100 - daysLate * 3)
           }
-        }
 
-        const score = totalFeeScore / memberFees.length
+          totalWeightedScore += feeScore * weight
+          totalWeight += weight
+        })
+
+        const score = totalWeight > 0 ? totalWeightedScore / totalWeight : 100
 
         let badge: RankedMember['badge']
-        if (score >= 80) badge = 'Craque'
-        else if (score >= 55) badge = 'Em dia'
-        else if (score >= 25) badge = 'Irregular'
-        else badge = 'Devedor'
+        if (score > 100) badge = 'Artilheiro'
+        else if (score >= 95) badge = 'Titular'
+        else if (score >= 80) badge = 'Catimbeiro'
+        else if (score >= 50) badge = 'Pendurado'
+        else badge = 'Rebaixado'
 
         results.push({ memberId, name, score: Math.round(score * 10) / 10, badge })
       }
