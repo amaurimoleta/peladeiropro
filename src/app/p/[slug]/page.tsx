@@ -354,8 +354,11 @@ export default function PublicPage() {
     annualExpenseByCategory[cat] = (annualExpenseByCategory[cat] || 0) + Number(e.amount)
   }
 
-  // Member compliance for annual view
-  const memberCompliance = annualMembers.map((member: any) => {
+  // Member compliance for annual view (exclude goalkeepers when setting is off)
+  const complianceMembers = group && !group.goalkeeper_pays_fee
+    ? annualMembers.filter((m: any) => m.position !== 'goleiro')
+    : annualMembers
+  const memberCompliance = complianceMembers.map((member: any) => {
     const memberFees = annualFees.filter(f => f.member_id === member.id)
     const totalMonths = memberFees.length
     const paidMonths = memberFees.filter(f => f.status === 'paid').length
