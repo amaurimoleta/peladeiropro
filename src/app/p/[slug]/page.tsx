@@ -407,43 +407,29 @@ export default function PublicPage() {
     const paidMonths = scorableFees.filter(f => f.status === 'paid').length
     const dmMonths = memberFees.filter(f => f.status === 'dm_leave' || f.status === 'waived').length
 
-    // Score based on payment timing
-    let onTimeCount = 0
-    let lateCount = 0
-    let totalDaysEarly = 0
-    let totalDaysLate = 0
+    // Score per fee: 100 if on time, penalty by days late
+    let totalFeeScore = 0
 
     for (const fee of scorableFees) {
       const dueDate = new Date(fee.due_date + 'T23:59:59')
       if (fee.status === 'paid' && fee.paid_at) {
         const paidDate = new Date(fee.paid_at)
-        const diffMs = dueDate.getTime() - paidDate.getTime()
-        const diffDays = diffMs / (1000 * 60 * 60 * 24)
         if (paidDate <= dueDate) {
-          onTimeCount++
-          if (diffDays > 0) totalDaysEarly += Math.min(diffDays, 15)
+          // Paid on time — full score, no differentiation
+          totalFeeScore += 100
         } else {
-          lateCount++
-          totalDaysLate += Math.min(Math.abs(diffDays), 30)
+          // Paid late — penalty by days late
+          const daysLate = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
+          totalFeeScore += Math.max(0, 100 - daysLate * 3)
         }
       } else if (fee.status === 'overdue' || (fee.status === 'pending' && dueDate < today)) {
-        lateCount++
+        // Unpaid and overdue — penalty by days overdue
         const daysLate = (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-        totalDaysLate += Math.min(daysLate, 30)
+        totalFeeScore += Math.max(0, 100 - daysLate * 3)
       }
     }
 
-    const relevantCount = onTimeCount + lateCount
-    const onTimeRate = relevantCount > 0 ? onTimeCount / relevantCount : 0
-    const avgDaysEarly = onTimeCount > 0 ? totalDaysEarly / onTimeCount : 0
-    const avgDaysLate = lateCount > 0 ? totalDaysLate / lateCount : 0
-
-    const baseScore = onTimeRate * 70
-    const earlyBonus = Math.min(avgDaysEarly, 10) * 2
-    const latePenalty = Math.min(avgDaysLate, 15) * 1.5
-    const score = totalMonths > 0
-      ? Math.max(0, Math.min(100, baseScore + earlyBonus - latePenalty))
-      : 50
+    const score = totalMonths > 0 ? totalFeeScore / totalMonths : 50
 
     let badge: string
     if (score >= 80) badge = 'Craque'
