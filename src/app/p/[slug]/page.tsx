@@ -243,7 +243,8 @@ export default function PublicPage() {
     if (!group) return
     async function loadInadimplentes() {
       setInadimplentesLoading(true)
-      const todayStr = new Date().toISOString().split('T')[0]
+      const now = new Date()
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       const [{ data: overdueFees }, { data: unpaidGuestsData }] = await Promise.all([
         supabase.from('monthly_fees')
           .select('*, member:group_members(name, member_type, position)')
