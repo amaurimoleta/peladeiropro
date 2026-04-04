@@ -487,11 +487,11 @@ export default function PublicPage() {
                       />
                     </div>
                     <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '60ms' }}>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Entradas</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Receitas</p>
                       <AnimatedNumber value={totalIncome} prefix="R$ " className="text-sm sm:text-base font-bold text-brand-green" />
                     </div>
                     <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Saidas</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Despesas</p>
                       <AnimatedNumber value={totalExpenses_} prefix="R$ " className="text-sm sm:text-base font-bold text-red-500" />
                     </div>
                     <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '180ms' }}>
