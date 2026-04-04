@@ -24,7 +24,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 interface ExportPdfProps {
-  type: 'monthly' | 'annual'
+  type: 'monthly' | 'annual' | 'inadimplentes'
   groupName: string
   // Monthly data
   month?: string
@@ -45,6 +45,11 @@ interface ExportPdfProps {
   annualGuestRevenue?: number
   annualExpenseByCategory?: Record<string, number>
   memberCompliance?: Array<{ name: string; paidMonths: number; totalMonths: number; percentage: number }>
+  // Inadimplentes data
+  overdueMembers?: Array<{ name: string; months: string[]; totalAmount: number }>
+  unpaidGuests?: Array<{ name: string; matchDate: string; amount: number }>
+  totalOverdueAmount?: number
+  totalUnpaidGuestsAmount?: number
 }
 
 const NAVY = '#1B1F4B'
@@ -539,12 +544,167 @@ function generateAnnualPdf(props: ExportPdfProps) {
   doc.save(`prestacao-contas-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
 }
 
+function generateInadimpletesPdf(props: ExportPdfProps) {
+  const {
+    groupName,
+    overdueMembers = [],
+    unpaidGuests = [],
+    totalOverdueAmount = 0,
+    totalUnpaidGuestsAmount = 0,
+  } = props
+
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  let y = 15
+
+  // Header
+  doc.setFillColor(...hexToRgb(NAVY))
+  doc.rect(0, 0, pageWidth, 36, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(22)
+  doc.setFont('helvetica', 'bold')
+  doc.text('PeladeiroPro', 14, y + 5)
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`${groupName} - Relatorio de Inadimplentes`, 14, y + 16)
+  y = 46
+
+  // Summary
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Resumo', 14, y)
+  y += 8
+
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Mensalistas em atraso:', 14, y)
+  doc.setTextColor(...hexToRgb(RED))
+  doc.setFont('helvetica', 'bold')
+  doc.text(`${overdueMembers.length} membros - ${formatCurrency(totalOverdueAmount)}`, pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Avulsos nao pagos:', 14, y)
+  doc.setTextColor(...hexToRgb(AMBER))
+  doc.setFont('helvetica', 'bold')
+  doc.text(`${unpaidGuests.length} jogadores - ${formatCurrency(totalUnpaidGuestsAmount)}`, pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Total pendente:', 14, y)
+  doc.setTextColor(...hexToRgb(RED))
+  doc.setFont('helvetica', 'bold')
+  doc.text(formatCurrency(totalOverdueAmount + totalUnpaidGuestsAmount), pageWidth - 14, y, { align: 'right' })
+  y += 14
+
+  // Mensalistas em atraso table
+  if (overdueMembers.length > 0) {
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Mensalistas em Atraso', 14, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Membro', 'Meses em Atraso', 'Qtd', 'Valor Total']],
+      body: overdueMembers.map((m) => [
+        m.name,
+        m.months.map(mo => formatMonthLabel(mo)).join(', '),
+        String(m.months.length),
+        formatCurrency(m.totalAmount),
+      ]),
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        1: { cellWidth: 70 },
+        2: { halign: 'center', cellWidth: 18 },
+        3: { halign: 'right', cellWidth: 30 },
+      },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 3) {
+          data.cell.styles.textColor = hexToRgb(RED)
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+    y = (doc as any).lastAutoTable.finalY + 4
+
+    // Total row
+    doc.setDrawColor(200, 200, 200)
+    doc.line(14, y, pageWidth - 14, y)
+    y += 5
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Total em Atraso:', 14, y)
+    doc.setTextColor(...hexToRgb(RED))
+    doc.text(formatCurrency(totalOverdueAmount), pageWidth - 14, y, { align: 'right' })
+    y += 12
+  }
+
+  // Avulsos nao pagos table
+  if (unpaidGuests.length > 0) {
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Avulsos Nao Pagos', 14, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Nome', 'Data', 'Valor']],
+      body: unpaidGuests.map((g) => [
+        g.name,
+        formatDate(g.matchDate),
+        formatCurrency(g.amount),
+      ]),
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
+      margin: { left: 14, right: 14 },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 2) {
+          data.cell.styles.textColor = hexToRgb(AMBER)
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+    y = (doc as any).lastAutoTable.finalY + 4
+
+    // Total row
+    doc.setDrawColor(200, 200, 200)
+    doc.line(14, y, pageWidth - 14, y)
+    y += 5
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Total Pendente:', 14, y)
+    doc.setTextColor(...hexToRgb(AMBER))
+    doc.text(formatCurrency(totalUnpaidGuestsAmount), pageWidth - 14, y, { align: 'right' })
+  }
+
+  addFooter(doc)
+  const today = new Date().toISOString().split('T')[0]
+  doc.save(`inadimplentes-${groupName.toLowerCase().replace(/\s+/g, '-')}-${today}.pdf`)
+}
+
 export function ExportPdf(props: ExportPdfProps) {
   function handleExport() {
     if (props.type === 'monthly') {
       generateMonthlyPdf(props)
-    } else {
+    } else if (props.type === 'annual') {
       generateAnnualPdf(props)
+    } else {
+      generateInadimpletesPdf(props)
     }
   }
 

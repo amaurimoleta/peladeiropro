@@ -126,6 +126,13 @@ export default function PublicPage() {
   const [annualMembers, setAnnualMembers] = useState<any[]>([])
   const [annualLoading, setAnnualLoading] = useState(false)
 
+  // Inadimplentes state
+  const [allOverdueFees, setAllOverdueFees] = useState<any[]>([])
+  const [allUnpaidGuests, setAllUnpaidGuests] = useState<any[]>([])
+  const [inadimplentesLoading, setInadimplentesLoading] = useState(false)
+  const [showOverdueMembers, setShowOverdueMembers] = useState(true)
+  const [showUnpaidGuests, setShowUnpaidGuests] = useState(true)
+
   // Campeonatos state
   const [campYear, setCampYear] = useState(new Date().getFullYear())
   const [campTournaments, setCampTournaments] = useState<any[]>([])
@@ -230,6 +237,30 @@ export default function PublicPage() {
     }
     loadAnnualData()
   }, [group, selectedYear])
+
+  // Inadimplentes data
+  useEffect(() => {
+    if (!group) return
+    async function loadInadimplentes() {
+      setInadimplentesLoading(true)
+      const [{ data: overdueFees }, { data: unpaidGuestsData }] = await Promise.all([
+        supabase.from('monthly_fees')
+          .select('*, member:group_members(name, member_type, position)')
+          .eq('group_id', group.id)
+          .in('status', ['pending', 'overdue'])
+          .order('reference_month', { ascending: true }),
+        supabase.from('guest_players')
+          .select('*')
+          .eq('group_id', group.id)
+          .eq('paid', false)
+          .order('match_date', { ascending: false }),
+      ])
+      setAllOverdueFees(overdueFees || [])
+      setAllUnpaidGuests(unpaidGuestsData || [])
+      setInadimplentesLoading(false)
+    }
+    loadInadimplentes()
+  }, [group])
 
   // Mural de avisos
   useEffect(() => {
@@ -366,6 +397,23 @@ export default function PublicPage() {
     return { name: member.name, paidMonths, totalMonths, percentage }
   }).sort((a, b) => b.percentage - a.percentage)
 
+  // Inadimplentes computed data
+  const filteredOverdueFees = group && !group.goalkeeper_pays_fee
+    ? allOverdueFees.filter((f: any) => f.member?.position !== 'goleiro')
+    : allOverdueFees
+  const overdueByMember: Record<string, { name: string; months: string[]; totalAmount: number }> = {}
+  for (const fee of filteredOverdueFees) {
+    const mid = fee.member_id
+    if (!overdueByMember[mid]) {
+      overdueByMember[mid] = { name: fee.member?.name || 'Desconhecido', months: [], totalAmount: 0 }
+    }
+    overdueByMember[mid].months.push(fee.reference_month)
+    overdueByMember[mid].totalAmount += Number(fee.amount)
+  }
+  const overdueMembers = Object.values(overdueByMember).sort((a, b) => b.months.length - a.months.length)
+  const totalOverdueAmount = overdueMembers.reduce((s, m) => s + m.totalAmount, 0)
+  const totalUnpaidGuestsAmount = allUnpaidGuests.reduce((s: number, g: any) => s + Number(g.amount), 0)
+
   function feeStatusDisplay(fee: any) {
     if (fee.status === 'paid') {
       return <span className="flex items-center gap-1.5 text-brand-green font-medium text-xs"><CheckCircle2 className="h-3.5 w-3.5" />Pago</span>
@@ -466,6 +514,7 @@ export default function PublicPage() {
           <TabsList className="w-full transition-all duration-300">
             <TabsTrigger value="mensal" className="flex-1 transition-all duration-200">Mensal</TabsTrigger>
             <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Anual</TabsTrigger>
+            <TabsTrigger value="inadimplentes" className="flex-1 transition-all duration-200">Inadimplentes</TabsTrigger>
             <TabsTrigger value="campeonatos" className="flex-1 transition-all duration-200">Campeonatos</TabsTrigger>
           </TabsList>
 
@@ -990,6 +1039,141 @@ export default function PublicPage() {
                       annualGuestRevenue={annualGuestRevenue}
                       annualExpenseByCategory={annualExpenseByCategory}
                       memberCompliance={memberCompliance}
+                    />
+                  </div>
+
+                  {/* Share button */}
+                  <div className="flex justify-center pt-2 sm:pt-4 pb-8">
+                    <ShareButton groupName={group.name} slug={slug} />
+                  </div>
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ===================== INADIMPLENTES VIEW ===================== */}
+          <TabsContent value="inadimplentes" className="transition-all duration-300">
+            <div className="space-y-3 sm:space-y-4 pt-4">
+              {inadimplentesLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+              ) : overdueMembers.length === 0 && allUnpaidGuests.length === 0 ? (
+                <div className="card-modern-elevated p-8 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-brand-green mx-auto mb-3" />
+                  <p className="text-lg font-semibold text-brand-navy">Tudo em dia!</p>
+                  <p className="text-sm text-muted-foreground mt-1">Nenhuma pendencia encontrada.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Mensalistas em Atraso</p>
+                      <p className="text-sm sm:text-base font-bold text-red-500">{overdueMembers.length}</p>
+                      <p className="text-[10px] text-muted-foreground">R$ {totalOverdueAmount.toFixed(2)}</p>
+                    </div>
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '60ms' }}>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Avulsos Nao Pagos</p>
+                      <p className="text-sm sm:text-base font-bold text-amber-500">{allUnpaidGuests.length}</p>
+                      <p className="text-[10px] text-muted-foreground">R$ {totalUnpaidGuestsAmount.toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  {/* Mensalistas em atraso - collapsible */}
+                  {overdueMembers.length > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowOverdueMembers(!showOverdueMembers)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                          <h2 className="font-bold text-brand-navy">Mensalistas em Atraso</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">{overdueMembers.length}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showOverdueMembers ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showOverdueMembers && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
+                          {overdueMembers.map((member) => (
+                            <div key={member.name} className="border border-red-100 rounded-xl p-3 bg-red-50/30">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-sm text-brand-navy">{member.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-red-500 font-bold">{member.months.length} {member.months.length === 1 ? 'mes' : 'meses'}</span>
+                                  <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">R$ {member.totalAmount.toFixed(2)}</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {member.months.map((m) => (
+                                  <span key={m} className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium capitalize">
+                                    {formatMonthName(m)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="border-t pt-3 flex justify-between items-center">
+                            <span className="font-bold text-sm text-brand-navy">Total em Atraso</span>
+                            <span className="font-bold text-sm text-red-600">R$ {totalOverdueAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Avulsos nao pagos - collapsible */}
+                  {allUnpaidGuests.length > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowUnpaidGuests(!showUnpaidGuests)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-amber-500" />
+                          <h2 className="font-bold text-brand-navy">Avulsos Nao Pagos</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">{allUnpaidGuests.length}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showUnpaidGuests ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showUnpaidGuests && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5">
+                          <div className="space-y-2">
+                            {allUnpaidGuests.map((g: any) => (
+                              <div key={g.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                                <div>
+                                  <span className="font-medium text-brand-navy">{g.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {new Date(g.match_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                  </span>
+                                </div>
+                                <span className="font-semibold text-amber-600">R$ {Number(g.amount).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t pt-3 mt-3 flex justify-between items-center">
+                            <span className="font-bold text-sm text-brand-navy">Total Pendente</span>
+                            <span className="font-bold text-sm text-amber-600">R$ {totalUnpaidGuestsAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Export PDF - Inadimplentes */}
+                  <div className="flex justify-center animate-fade-in-up" style={{ animationDelay: '280ms' }}>
+                    <ExportPdf
+                      type="inadimplentes"
+                      groupName={group.name}
+                      overdueMembers={overdueMembers}
+                      unpaidGuests={allUnpaidGuests.map(g => ({ name: g.name, matchDate: g.match_date, amount: Number(g.amount) }))}
+                      totalOverdueAmount={totalOverdueAmount}
+                      totalUnpaidGuestsAmount={totalUnpaidGuestsAmount}
                     />
                   </div>
 
