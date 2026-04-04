@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Plus, Phone, UserMinus, UserCheck, Pencil, Trash2, History,
   Check, Clock, AlertCircle, Link2, Eye, Shield, MapPin, Users,
-  Filter, ArrowUpDown, X, SlidersHorizontal,
+  Filter, ArrowUpDown, X, SlidersHorizontal, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ImageUpload } from '@/components/shared/image-upload'
@@ -48,7 +48,8 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [showInactive, setShowInactive] = useState(false)
 
-  // Filter & sort state
+  // Search, filter & sort state
+  const [searchTerm, setSearchTerm] = useState('')
   const [filterTeam, setFilterTeam] = useState('')
   const [filterPosition, setFilterPosition] = useState('')
   const [filterType, setFilterType] = useState('')
@@ -313,18 +314,32 @@ export default function MembersPage() {
   const activeMembers = members.filter(m => m.status === 'active')
   const inactiveMembers = members.filter(m => m.status === 'inactive')
 
-  const hasActiveFilters = filterTeam !== '' || filterPosition !== '' || filterType !== ''
+  const hasActiveFilters = searchTerm.trim() !== '' || filterTeam !== '' || filterPosition !== '' || filterType !== ''
   const activeFilterCount = [filterTeam, filterPosition, filterType].filter(Boolean).length
 
   function clearAllFilters() {
+    setSearchTerm('')
     setFilterTeam('')
     setFilterPosition('')
     setFilterType('')
   }
 
-  // Apply filters then sort
+  // Apply search, filters then sort
   const displayMembers = (() => {
     let list = showInactive ? members : activeMembers
+
+    // Text search
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      list = list.filter(m => {
+        const name = m.name.toLowerCase()
+        const phone = (m.phone || '').toLowerCase()
+        const position = (m.position ? PLAYER_POSITIONS[m.position] || m.position : '').toLowerCase()
+        const teamName = (getTeamById(m.team_id)?.name || '').toLowerCase()
+        const role = (MEMBER_ROLES[m.role] || m.role).toLowerCase()
+        return name.includes(term) || phone.includes(term) || position.includes(term) || teamName.includes(term) || role.includes(term)
+      })
+    }
 
     // Filters
     if (filterTeam) {
@@ -684,10 +699,30 @@ export default function MembersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Filters & Sort Bar */}
+      {/* Search, Filters & Sort Bar */}
       {!loading && members.length > 0 && (
         <div className="mb-4 space-y-3">
-          {/* Toggle bar */}
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, telefone, posicao, time..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter toggle + Sort */}
           <div className="flex items-center justify-between">
             <Button
               variant="outline"
