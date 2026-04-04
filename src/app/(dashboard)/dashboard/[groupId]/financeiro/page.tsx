@@ -1043,7 +1043,7 @@ export default function FinanceiroPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground">{pct}%</span>
-            <span className="text-sm font-semibold tabular-nums min-w-[100px] text-right">
+            <span className="text-xs sm:text-sm font-semibold tabular-nums min-w-[70px] sm:min-w-[100px] text-right">
               {formatCurrency(value)}
             </span>
           </div>
@@ -1077,7 +1077,7 @@ export default function FinanceiroPage() {
         <Label>Descricao *</Label>
         <Input placeholder="Ex: Aluguel quadra Society ABC" value={description} onChange={(e) => setDescription(e.target.value)} required />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-2">
           <Label>Valor (R$) *</Label>
           <Input type="number" step="0.01" min="0" placeholder="200.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
@@ -1128,7 +1128,7 @@ export default function FinanceiroPage() {
         <Label>Descricao *</Label>
         <Input placeholder="Ex: Patrocinio Loja X" value={revenueDescription} onChange={(e) => setRevenueDescription(e.target.value)} required />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-2">
           <Label>Valor (R$) *</Label>
           <Input type="number" step="0.01" min="0" placeholder="500.00" value={revenueAmount} onChange={(e) => setRevenueAmount(e.target.value)} required />
@@ -1153,8 +1153,8 @@ export default function FinanceiroPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
-            <p className="text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado financeiro</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado</p>
           </div>
           {isReadOnly && (
             <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
@@ -1176,29 +1176,29 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Saldo Inicial → Movimentacao → Saldo Final */}
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-center">
-            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-slate-50">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Saldo Inicial</span>
-              <span className={`text-lg font-bold ${saldoInicial >= 0 ? 'text-[#1B1F4B]' : 'text-red-500'}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 items-center">
+            <div className="flex flex-col items-center sm:items-start p-2 sm:p-3 rounded-lg bg-slate-50">
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase">Saldo Inicial</span>
+              <span className={`text-sm sm:text-lg font-bold ${saldoInicial >= 0 ? 'text-[#1B1F4B]' : 'text-red-500'}`}>
                 {formatCurrency(saldoInicial)}
               </span>
             </div>
 
-            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-green-50">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">+ Receitas</span>
-              <span className="text-lg font-bold text-[#00C853]">{formatCurrency(receitasDoMes)}</span>
+            <div className="flex flex-col items-center sm:items-start p-2 sm:p-3 rounded-lg bg-green-50">
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase">+ Receitas</span>
+              <span className="text-sm sm:text-lg font-bold text-[#00C853]">{formatCurrency(receitasDoMes)}</span>
             </div>
 
-            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-red-50">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">- Despesas</span>
-              <span className="text-lg font-bold text-red-500">{formatCurrency(despesasDoMes)}</span>
+            <div className="flex flex-col items-center sm:items-start p-2 sm:p-3 rounded-lg bg-red-50">
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase">- Despesas</span>
+              <span className="text-sm sm:text-lg font-bold text-red-500">{formatCurrency(despesasDoMes)}</span>
             </div>
 
             <div className="hidden sm:flex items-center justify-center text-2xl text-muted-foreground">=</div>
 
-            <div className="flex flex-col items-center sm:items-start p-3 rounded-lg bg-[#1B1F4B]/5 border-2 border-[#1B1F4B]/20">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Saldo Final</span>
-              <span className={`text-xl font-extrabold ${saldoFinal >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+            <div className="col-span-2 sm:col-span-1 flex flex-col items-center sm:items-start p-2 sm:p-3 rounded-lg bg-[#1B1F4B]/5 border-2 border-[#1B1F4B]/20">
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase">Saldo Final</span>
+              <span className={`text-base sm:text-xl font-extrabold ${saldoFinal >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
                 {saldoFinal >= 0 ? '+' : ''}{formatCurrency(saldoFinal)}
               </span>
             </div>
@@ -1217,28 +1217,33 @@ export default function FinanceiroPage() {
       <MonthNavigator currentDate={currentDate} onChange={setCurrentDate} />
 
       <Tabs defaultValue="mensalidades">
-        <TabsList className="w-full">
-          <TabsTrigger value="mensalidades">
-            <CreditCard className="h-4 w-4 mr-1.5" />
-            Mensalidades
-          </TabsTrigger>
-          <TabsTrigger value="avulsos">
-            <Users className="h-4 w-4 mr-1.5" />
-            Avulsos
-          </TabsTrigger>
-          <TabsTrigger value="despesas">
-            <Receipt className="h-4 w-4 mr-1.5" />
-            Despesas
-          </TabsTrigger>
-          <TabsTrigger value="receitas">
-            <Banknote className="h-4 w-4 mr-1.5" />
-            Receitas
-          </TabsTrigger>
-          <TabsTrigger value="dre">
-            <BarChart3 className="h-4 w-4 mr-1.5" />
-            DRE
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="w-full min-w-fit">
+            <TabsTrigger value="mensalidades" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3">
+              <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Mensalidades</span>
+              <span className="sm:hidden">Mensal.</span>
+            </TabsTrigger>
+            <TabsTrigger value="avulsos" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              Avulsos
+            </TabsTrigger>
+            <TabsTrigger value="despesas" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3">
+              <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Despesas</span>
+              <span className="sm:hidden">Desp.</span>
+            </TabsTrigger>
+            <TabsTrigger value="receitas" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3">
+              <Banknote className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Receitas</span>
+              <span className="sm:hidden">Rec.</span>
+            </TabsTrigger>
+            <TabsTrigger value="dre" className="text-xs sm:text-sm gap-1 sm:gap-1.5 px-2 sm:px-3">
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              DRE
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── Tab: Mensalidades ── */}
         <TabsContent value="mensalidades">
@@ -1254,7 +1259,7 @@ export default function FinanceiroPage() {
                       <MessageCircle className="h-4 w-4 mr-2" />
                       Cobrar Pendentes
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg">
+                    <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Cobrar Pendentes via WhatsApp</DialogTitle>
                       </DialogHeader>
@@ -1371,7 +1376,7 @@ export default function FinanceiroPage() {
 
             {/* Receipt viewer dialog */}
             <Dialog open={!!viewingReceipt} onOpenChange={(v) => { if (!v) setViewingReceipt(null) }}>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Comprovante</DialogTitle>
                 </DialogHeader>
@@ -1471,6 +1476,7 @@ export default function FinanceiroPage() {
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1571,6 +1577,7 @@ export default function FinanceiroPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1676,6 +1683,7 @@ export default function FinanceiroPage() {
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1754,6 +1762,7 @@ export default function FinanceiroPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1803,14 +1812,15 @@ export default function FinanceiroPage() {
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Descricao</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Pago por</TableHead>
+                      <TableHead className="hidden sm:table-cell">Data</TableHead>
+                      <TableHead className="hidden sm:table-cell">Pago por</TableHead>
                       <TableHead className="text-right">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1835,8 +1845,8 @@ export default function FinanceiroPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-red-500 font-medium">R$ {Number(exp.amount).toFixed(2)}</TableCell>
-                          <TableCell>{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell>{exp.paid_by_member?.name || '-'}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{exp.paid_by_member?.name || '-'}</TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
                               <div className="flex gap-1 justify-end">
@@ -1854,6 +1864,7 @@ export default function FinanceiroPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1903,14 +1914,15 @@ export default function FinanceiroPage() {
 
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Descricao</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Obs</TableHead>
+                      <TableHead className="hidden sm:table-cell">Data</TableHead>
+                      <TableHead className="hidden sm:table-cell">Obs</TableHead>
                       <TableHead className="text-right">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1934,9 +1946,9 @@ export default function FinanceiroPage() {
                               {REVENUE_CATEGORIES[rev.category] || rev.category}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-[#00C853] font-medium">R$ {Number(rev.amount).toFixed(2)}</TableCell>
-                          <TableCell>{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{rev.notes || '-'}</TableCell>
+                          <TableCell className="text-[#00C853] font-medium whitespace-nowrap">R$ {Number(rev.amount).toFixed(2)}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground text-sm max-w-[150px] truncate">{rev.notes || '-'}</TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
                               <div className="flex gap-1 justify-end">
@@ -1954,6 +1966,7 @@ export default function FinanceiroPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>

@@ -364,9 +364,9 @@ export default function SettingsPage() {
   if (loading || roleLoading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#1B1F4B]">Configuracoes</h1>
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-6 gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Configuracoes</h1>
         {isReadOnly && (
           <Badge variant="secondary">
             <Shield className="h-3 w-3 mr-1" />
@@ -393,14 +393,14 @@ export default function SettingsPage() {
             <Input
               readOnly
               value={getPublicLink() || 'Gerando...'}
-              className="bg-white font-mono text-sm"
+              className="bg-white font-mono text-xs sm:text-sm min-w-0"
             />
-            <Button type="button" variant="outline" size="icon" onClick={copyPublicLink} title="Copiar link">
+            <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={copyPublicLink} title="Copiar link">
               <Copy className="h-4 w-4" />
             </Button>
             {group?.public_slug && (
               <a href={`/p/${group.public_slug}`} target="_blank" rel="noopener noreferrer">
-                <Button type="button" variant="outline" size="icon" title="Abrir pagina">
+                <Button type="button" variant="outline" size="icon" className="shrink-0" title="Abrir pagina">
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </a>
@@ -462,7 +462,7 @@ export default function SettingsPage() {
               <Label>Descricao</Label>
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descricao do grupo" disabled={isReadOnly} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label>Mensalidade (R$)</Label>
                 <Input type="number" step="0.01" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} disabled={isReadOnly} />
@@ -636,17 +636,17 @@ export default function SettingsPage() {
               ) : (
                 <div className="space-y-2">
                   {adminMembers.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-sm font-medium text-[#1B1F4B]">
+                    <div key={member.id} className="flex items-center justify-between gap-2 p-2 sm:p-3 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-xs sm:text-sm font-medium text-[#1B1F4B] shrink-0">
                           {member.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{member.name}</p>
-                          {member.phone && <p className="text-xs text-muted-foreground">{member.phone}</p>}
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-medium truncate">{member.name}</p>
+                          {member.phone && <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{member.phone}</p>}
                         </div>
                       </div>
-                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'} className="shrink-0 text-[10px] sm:text-xs">
                         {MEMBER_ROLES[member.role]}
                       </Badge>
                     </div>
@@ -725,24 +725,24 @@ export default function SettingsPage() {
                   {auditLogs.map((log) => {
                     const IconComponent = getAuditIcon(log.action)
                     return (
-                      <div key={log.id} className="relative flex gap-4 pl-0">
+                      <div key={log.id} className="relative flex gap-2 sm:gap-4 pl-0">
                         {/* Icon circle */}
-                        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background shadow-sm">
-                          <IconComponent className="h-3.5 w-3.5 text-muted-foreground" />
+                        <div className="relative z-10 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full border bg-background shadow-sm">
+                          <IconComponent className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 min-w-0 pb-1">
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-0.5 sm:gap-2">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium leading-tight">
+                              <p className="text-xs sm:text-sm font-medium leading-tight">
                                 {getAuditActionLabel(log.action)}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                                 por {log.user_name || 'Sistema'}
                               </p>
                             </div>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
                               {formatTimestamp(log.created_at)}
                             </span>
                           </div>
@@ -799,7 +799,7 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border border-destructive/20 bg-destructive/5">
                 <div>
                   <p className="text-sm font-medium">Excluir grupo</p>
                   <p className="text-xs text-muted-foreground">
@@ -808,7 +808,7 @@ export default function SettingsPage() {
                 </div>
                 <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                   <DialogTrigger render={
-                    <Button variant="destructive" size="sm">
+                    <Button variant="destructive" size="sm" className="w-full sm:w-auto shrink-0">
                       <Trash2 className="h-4 w-4 mr-2" />
                       Excluir
                     </Button>

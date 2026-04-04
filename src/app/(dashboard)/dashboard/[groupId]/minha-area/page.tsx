@@ -414,22 +414,22 @@ export default function MinhaAreaPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1B1F4B]">Minha Area</h1>
-        <p className="text-muted-foreground">Acompanhe seus pagamentos, ranking e presenca</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Minha Area</h1>
+        <p className="text-sm text-muted-foreground">Acompanhe seus pagamentos, ranking e presenca</p>
       </div>
 
       {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
         {/* Ranking Card */}
         <Card className="border-2 border-yellow-200 dark:border-yellow-800">
-          <CardContent className="pt-4 pb-4 text-center">
+          <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4 text-center">
             {ranking ? (
               <>
                 <PositionIcon position={ranking.position} />
-                <p className={`text-lg font-bold mt-1 ${badgeColor(ranking.badge)}`}>
+                <p className={`text-sm sm:text-lg font-bold mt-1 ${badgeColor(ranking.badge)}`}>
                   {ranking.badge}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
                   {ranking.position}º de {ranking.totalMembers} &bull; Score {ranking.score}
                 </p>
               </>
@@ -441,43 +441,43 @@ export default function MinhaAreaPage() {
 
         {/* Fees Paid */}
         <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="rounded-full bg-[#00C853]/10 p-1.5">
-                <Check className="h-3.5 w-3.5 text-[#00C853]" />
+          <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+              <div className="rounded-full bg-[#00C853]/10 p-1 sm:p-1.5">
+                <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#00C853]" />
               </div>
-              <span className="text-xs text-muted-foreground">Pagas</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">Pagas</span>
             </div>
-            <p className="text-xl font-bold text-[#00C853]">{paidFees.length}</p>
-            <p className="text-xs text-muted-foreground">R$ {totalPaid.toFixed(2)}</p>
+            <p className="text-lg sm:text-xl font-bold text-[#00C853]">{paidFees.length}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">R$ {totalPaid.toFixed(2)}</p>
           </CardContent>
         </Card>
 
         {/* Fees Pending */}
         <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="rounded-full bg-red-500/10 p-1.5">
-                <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+          <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+              <div className="rounded-full bg-red-500/10 p-1 sm:p-1.5">
+                <AlertCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-500" />
               </div>
-              <span className="text-xs text-muted-foreground">Pendentes</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">Pendentes</span>
             </div>
-            <p className="text-xl font-bold text-red-500">{pendingFees.length}</p>
-            <p className="text-xs text-muted-foreground">R$ {totalPending.toFixed(2)}</p>
+            <p className="text-lg sm:text-xl font-bold text-red-500">{pendingFees.length}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">R$ {totalPending.toFixed(2)}</p>
           </CardContent>
         </Card>
 
         {/* Attendance */}
         <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="rounded-full bg-blue-500/10 p-1.5">
-                <CalendarCheck className="h-3.5 w-3.5 text-blue-500" />
+          <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+              <div className="rounded-full bg-blue-500/10 p-1 sm:p-1.5">
+                <CalendarCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-500" />
               </div>
-              <span className="text-xs text-muted-foreground">Presenca</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">Presenca</span>
             </div>
-            <p className="text-xl font-bold text-blue-500">{attendancePct}%</p>
-            <p className="text-xs text-muted-foreground">{attendanceStats.present}/{attendanceStats.total} jogos</p>
+            <p className="text-lg sm:text-xl font-bold text-blue-500">{attendancePct}%</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{attendanceStats.present}/{attendanceStats.total} jogos</p>
           </CardContent>
         </Card>
       </div>
@@ -485,26 +485,26 @@ export default function MinhaAreaPage() {
       {/* ── PIX Payment Section (if has pending fees) ── */}
       {pendingFees.length > 0 && (group?.pix_key || group?.pix_brcode) && (
         <Card className="mb-6 border-2 border-[#00C853]/30 bg-gradient-to-r from-[#00C853]/5 to-transparent">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex flex-col md:flex-row items-center gap-4">
-              <div className="flex-1">
+          <CardContent className="pt-4 pb-4 px-3 sm:px-6">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full">
                 <h3 className="font-bold text-[#1B1F4B] mb-1">Pague via PIX</h3>
                 <p className="text-sm text-muted-foreground mb-2">
                   Escaneie o QR Code para pagar suas pendencias. Depois, envie o comprovante.
                 </p>
-                <div className="text-sm space-y-1">
+                <div className="text-xs sm:text-sm space-y-1">
                   {group.pix_key && (
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground break-all">
                       Chave 1: <span className="font-medium text-foreground">{group.pix_key}</span>
                     </p>
                   )}
                   {group.pix_key_2 && (
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground break-all">
                       Chave 2: <span className="font-medium text-foreground">{group.pix_key_2}</span>
                     </p>
                   )}
                   {group.pix_key_3 && (
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground break-all">
                       Chave 3: <span className="font-medium text-foreground">{group.pix_key_3}</span>
                     </p>
                   )}
@@ -623,71 +623,73 @@ export default function MinhaAreaPage() {
       {/* ── Fees Table ── */}
       <Card>
         <CardContent className="p-0">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="font-bold text-[#1B1F4B]">Minhas Mensalidades</h3>
-            <span className="text-sm text-muted-foreground">{fees.length} registros</span>
+          <div className="p-3 sm:p-4 border-b flex items-center justify-between">
+            <h3 className="font-bold text-[#1B1F4B] text-sm sm:text-base">Minhas Mensalidades</h3>
+            <span className="text-xs sm:text-sm text-muted-foreground">{fees.length} registros</span>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mes</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Data Pgto</TableHead>
-                <TableHead className="text-right">Acao</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {fees.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Nenhuma mensalidade registrada.
-                  </TableCell>
+                  <TableHead>Mes</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead className="hidden sm:table-cell">Vencimento</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden sm:table-cell">Data Pgto</TableHead>
+                  <TableHead className="text-right">Acao</TableHead>
                 </TableRow>
-              ) : (
-                displayedFees.map((fee) => (
-                  <TableRow key={fee.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(fee.reference_month + '-15T12:00:00'), 'MMM/yyyy', { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>R$ {Number(fee.amount).toFixed(2)}</TableCell>
-                    <TableCell>{format(new Date(fee.due_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{statusBadge(fee.status)}</TableCell>
-                    <TableCell>
-                      {fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
-                        {fee.receipt_url && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-blue-500"
-                            onClick={() => setViewingReceipt(fee.receipt_url!)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Ver
-                          </Button>
-                        )}
-                        {(fee.status === 'pending' || fee.status === 'overdue') && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[#00C853] border-[#00C853]"
-                            onClick={() => openUploadDialog(fee.id, fee.reference_month, Number(fee.amount))}
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Comprovante
-                          </Button>
-                        )}
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {fees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Nenhuma mensalidade registrada.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  displayedFees.map((fee) => (
+                    <TableRow key={fee.id}>
+                      <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
+                        {format(new Date(fee.reference_month + '-15T12:00:00'), 'MMM/yy', { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-xs sm:text-sm whitespace-nowrap">R$ {Number(fee.amount).toFixed(2)}</TableCell>
+                      <TableCell className="hidden sm:table-cell text-xs sm:text-sm">{format(new Date(fee.due_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>{statusBadge(fee.status)}</TableCell>
+                      <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
+                        {fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end flex-wrap">
+                          {fee.receipt_url && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-blue-500 h-7 px-2 text-xs"
+                              onClick={() => setViewingReceipt(fee.receipt_url!)}
+                            >
+                              <Eye className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">Ver</span>
+                            </Button>
+                          )}
+                          {(fee.status === 'pending' || fee.status === 'overdue') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[#00C853] border-[#00C853] h-7 px-2 text-xs"
+                              onClick={() => openUploadDialog(fee.id, fee.reference_month, Number(fee.amount))}
+                            >
+                              <Upload className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">Comprovante</span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
           {fees.length > 6 && (
             <div className="p-3 border-t text-center">
@@ -710,7 +712,7 @@ export default function MinhaAreaPage() {
 
       {/* ── Upload Receipt Dialog ── */}
       <Dialog open={uploadDialogOpen} onOpenChange={(v) => { setUploadDialogOpen(v); if (!v) { setReceiptFile(null); setUploadingFeeId(null) } }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Enviar Comprovante</DialogTitle>
           </DialogHeader>
@@ -771,7 +773,7 @@ export default function MinhaAreaPage() {
 
       {/* ── Receipt Viewer Dialog ── */}
       <Dialog open={!!viewingReceipt} onOpenChange={(v) => { if (!v) setViewingReceipt(null) }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Comprovante</DialogTitle>
           </DialogHeader>
