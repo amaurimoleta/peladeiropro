@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
-  MessageCircle, Send, Image, Eye, Wallet, Users, Calculator, ShieldAlert,
+  MessageCircle, Send, Image, Eye, Wallet, Users, ShieldAlert,
   ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,16 +37,6 @@ const categoryColors: Record<string, string> = {
   other: 'bg-gray-100 text-gray-700',
 }
 
-interface RateioMatch {
-  id: string
-  match_date: string
-  location: string | null
-  total_expenses: number
-  attendance_count: number
-  guest_count: number
-  total_players: number
-  cost_per_player: number
-}
 
 export default function FinanceiroPage() {
   const params = useParams()
@@ -135,9 +125,6 @@ export default function FinanceiroPage() {
   // Receipt viewer state
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
 
-  // Rateio state
-  const [rateioMatches, setRateioMatches] = useState<RateioMatch[]>([])
-  const [loadingRateio, setLoadingRateio] = useState(false)
 
   const currentMonth = format(currentDate, 'yyyy-MM')
 
@@ -198,85 +185,10 @@ export default function FinanceiroPage() {
     setPriorExpenses((priorExpensesData || []).reduce((sum, e) => sum + Number(e.amount), 0))
   }, [groupId, currentMonth])
 
-  // Load rateio data
-  const loadRateio = useCallback(async () => {
-    setLoadingRateio(true)
-    const startDate = `${currentMonth}-01`
-    const endDate = format(endOfMonth(currentDate), 'yyyy-MM-dd')
-
-    // Get matches for the month
-    const { data: matchesData } = await supabase
-      .from('matches')
-      .select('id, match_date, location')
-      .eq('group_id', groupId)
-      .gte('match_date', startDate)
-      .lte('match_date', endDate)
-      .order('match_date')
-
-    if (!matchesData || matchesData.length === 0) {
-      setRateioMatches([])
-      setLoadingRateio(false)
-      return
-    }
-
-    const matchIds = matchesData.map(m => m.id)
-
-    // Get attendance and guests for these matches
-    const [{ data: attendanceData }, { data: guestData }, { data: expensesForDates }] = await Promise.all([
-      supabase
-        .from('match_attendance')
-        .select('match_id, present')
-        .in('match_id', matchIds)
-        .eq('present', true),
-      supabase
-        .from('guest_players')
-        .select('match_id, match_date')
-        .eq('group_id', groupId)
-        .gte('match_date', startDate)
-        .lte('match_date', endDate),
-      supabase
-        .from('expenses')
-        .select('amount, expense_date')
-        .eq('group_id', groupId)
-        .gte('expense_date', startDate)
-        .lte('expense_date', endDate),
-    ])
-
-    // Build rateio per match
-    const rateio: RateioMatch[] = matchesData.map(match => {
-      const attendanceCount = (attendanceData || []).filter(a => a.match_id === match.id).length
-      const guestCount = (guestData || []).filter(g => g.match_id === match.id || g.match_date === match.match_date).length
-      const totalPlayers = attendanceCount + guestCount
-
-      // Expenses for that specific date
-      const dateExpenses = (expensesForDates || [])
-        .filter(e => e.expense_date === match.match_date)
-        .reduce((sum, e) => sum + Number(e.amount), 0)
-
-      return {
-        id: match.id,
-        match_date: match.match_date,
-        location: match.location,
-        total_expenses: dateExpenses,
-        attendance_count: attendanceCount,
-        guest_count: guestCount,
-        total_players: totalPlayers,
-        cost_per_player: totalPlayers > 0 ? dateExpenses / totalPlayers : 0,
-      }
-    })
-
-    setRateioMatches(rateio)
-    setLoadingRateio(false)
-  }, [groupId, currentMonth])
-
   useEffect(() => {
     loadData()
     loadAccumulatedBalance()
   }, [loadData, loadAccumulatedBalance])
-
-  useEffect(() => {
-    loadRateio()
-  }, [loadRateio])
 
   // Load DRE annual data
   useEffect(() => {
@@ -1090,10 +1002,6 @@ export default function FinanceiroPage() {
           <TabsTrigger value="dre">
             <BarChart3 className="h-4 w-4 mr-1.5" />
             DRE
-          </TabsTrigger>
-          <TabsTrigger value="rateio">
-            <Calculator className="h-4 w-4 mr-1.5" />
-            Rateio
           </TabsTrigger>
         </TabsList>
 
@@ -2058,99 +1966,6 @@ export default function FinanceiroPage() {
           </div>
         </TabsContent>
 
-        {/* ── Tab: Rateio ── */}
-        <TabsContent value="rateio">
-          <div className="space-y-4 mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Calculator className="h-5 w-5 text-[#1B1F4B]" />
-              <h2 className="text-lg font-bold text-[#1B1F4B]">Rateio por Jogo</h2>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Custo dividido por jogador presente em cada partida do mes.
-            </p>
-
-            {loadingRateio ? (
-              <div className="flex items-center justify-center py-16 text-muted-foreground">
-                Carregando...
-              </div>
-            ) : rateioMatches.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Users className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                  <p className="text-muted-foreground">
-                    Registre a presenca nos jogos para calcular o rateio
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Local</TableHead>
-                        <TableHead>Despesas do Dia</TableHead>
-                        <TableHead>Presentes</TableHead>
-                        <TableHead>Convidados</TableHead>
-                        <TableHead>Total Jogadores</TableHead>
-                        <TableHead className="text-right">Custo/Jogador</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rateioMatches.map((match) => (
-                        <TableRow key={match.id}>
-                          <TableCell className="font-medium">
-                            {format(new Date(match.match_date + 'T12:00:00'), 'dd/MM/yyyy')}
-                          </TableCell>
-                          <TableCell>{match.location || '-'}</TableCell>
-                          <TableCell className="text-red-500 font-medium">
-                            {formatCurrency(match.total_expenses)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{match.attendance_count}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{match.guest_count}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className="bg-[#1B1F4B]/10 text-[#1B1F4B]">{match.total_players}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {match.total_players > 0 ? (
-                              <span className="font-bold text-[#1B1F4B]">
-                                {formatCurrency(match.cost_per_player)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {/* Totals row */}
-                      <TableRow className="bg-muted/30 font-semibold">
-                        <TableCell colSpan={2}>Total do Mes</TableCell>
-                        <TableCell className="text-red-500">
-                          {formatCurrency(rateioMatches.reduce((s, m) => s + m.total_expenses, 0))}
-                        </TableCell>
-                        <TableCell>{rateioMatches.reduce((s, m) => s + m.attendance_count, 0)}</TableCell>
-                        <TableCell>{rateioMatches.reduce((s, m) => s + m.guest_count, 0)}</TableCell>
-                        <TableCell>{rateioMatches.reduce((s, m) => s + m.total_players, 0)}</TableCell>
-                        <TableCell className="text-right text-[#1B1F4B]">
-                          {(() => {
-                            const totalExp = rateioMatches.reduce((s, m) => s + m.total_expenses, 0)
-                            const totalPlayers = rateioMatches.reduce((s, m) => s + m.total_players, 0)
-                            return totalPlayers > 0 ? formatCurrency(totalExp / totalPlayers) : '-'
-                          })()}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
       </Tabs>
     </div>
   )
