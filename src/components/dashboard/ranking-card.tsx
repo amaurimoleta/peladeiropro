@@ -48,12 +48,26 @@ export default function RankingCard({ groupId }: { groupId: string }) {
     async function fetchRanking() {
       const supabase = createClient()
 
-      const { data: members } = await supabase
+      // Check if goalkeeper pays fee
+      const { data: group } = await supabase
+        .from('groups')
+        .select('goalkeeper_pays_fee')
+        .eq('id', groupId)
+        .single()
+
+      const goalkeeperPaysFee = group?.goalkeeper_pays_fee ?? true
+
+      const { data: allMembers } = await supabase
         .from('group_members')
-        .select('id, name')
+        .select('id, name, position')
         .eq('group_id', groupId)
         .eq('status', 'active')
         .eq('member_type', 'mensalista')
+
+      // Exclude goalkeepers if they don't pay fees
+      const members = !goalkeeperPaysFee
+        ? (allMembers || []).filter((m: any) => m.position !== 'goleiro')
+        : allMembers
 
       if (!members || members.length === 0) {
         setLoading(false)
