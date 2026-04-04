@@ -95,7 +95,47 @@ function addFooter(doc: jsPDF) {
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
   doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 14, pageHeight - 8)
-  doc.text('PeladeiroPro - Gestao de tesouraria', pageWidth - 14, pageHeight - 8, { align: 'right' })
+  doc.text('PeladeiroPro\u00AE', pageWidth - 14, pageHeight - 8, { align: 'right' })
+}
+
+const LOGO_WIDTH = 50
+const LOGO_HEIGHT = 50 / (600 / 110) // ~9.2mm maintaining aspect ratio
+
+async function loadLogoBase64(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth || 600
+      canvas.height = img.naturalHeight || 110
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(null); return }
+      ctx.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(null)
+    img.src = '/logo-white.svg'
+  })
+}
+
+function addHeaderLogo(doc: jsPDF, logoBase64: string | null, x: number, y: number) {
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', x, y, LOGO_WIDTH, LOGO_HEIGHT)
+    } catch {
+      // Fallback to text if image fails
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(22)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PeladeiroPro', x, y + 7)
+    }
+  } else {
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text('PeladeiroPro', x, y + 7)
+  }
 }
 
 function checkPageBreak(doc: jsPDF, y: number, needed: number = 40): number {
@@ -108,7 +148,7 @@ function checkPageBreak(doc: jsPDF, y: number, needed: number = 40): number {
   return y
 }
 
-function generateMonthlyPdf(props: ExportPdfProps) {
+function generateMonthlyPdf(props: ExportPdfProps, logoBase64: string | null) {
   const {
     groupName,
     month = '',
@@ -128,10 +168,8 @@ function generateMonthlyPdf(props: ExportPdfProps) {
   // Header
   doc.setFillColor(...hexToRgb(NAVY))
   doc.rect(0, 0, pageWidth, 40, 'F')
+  addHeaderLogo(doc, logoBase64, 14, 4)
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  doc.text('PeladeiroPro', 14, y + 5)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
   doc.text(groupName, 14, y + 14)
@@ -331,7 +369,7 @@ function generateMonthlyPdf(props: ExportPdfProps) {
   doc.save(`prestacao-contas-${groupName.toLowerCase().replace(/\s+/g, '-')}-${month}.pdf`)
 }
 
-function generateAnnualPdf(props: ExportPdfProps) {
+function generateAnnualPdf(props: ExportPdfProps, logoBase64: string | null) {
   const {
     groupName,
     year = new Date().getFullYear(),
@@ -353,10 +391,8 @@ function generateAnnualPdf(props: ExportPdfProps) {
   // Header
   doc.setFillColor(...hexToRgb(NAVY))
   doc.rect(0, 0, pageWidth, 36, 'F')
+  addHeaderLogo(doc, logoBase64, 14, 3)
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  doc.text('PeladeiroPro', 14, y + 5)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
   doc.text(`${groupName} - Prestacao de Contas Anual ${year}`, 14, y + 16)
@@ -544,7 +580,7 @@ function generateAnnualPdf(props: ExportPdfProps) {
   doc.save(`prestacao-contas-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
 }
 
-function generateInadimpletesPdf(props: ExportPdfProps) {
+function generateInadimpletesPdf(props: ExportPdfProps, logoBase64: string | null) {
   const {
     groupName,
     overdueMembers = [],
@@ -560,10 +596,8 @@ function generateInadimpletesPdf(props: ExportPdfProps) {
   // Header
   doc.setFillColor(...hexToRgb(NAVY))
   doc.rect(0, 0, pageWidth, 36, 'F')
+  addHeaderLogo(doc, logoBase64, 14, 3)
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  doc.text('PeladeiroPro', 14, y + 5)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
   doc.text(`${groupName} - Relatorio de Inadimplentes`, 14, y + 16)
@@ -698,13 +732,14 @@ function generateInadimpletesPdf(props: ExportPdfProps) {
 }
 
 export function ExportPdf(props: ExportPdfProps) {
-  function handleExport() {
+  async function handleExport() {
+    const logoBase64 = await loadLogoBase64()
     if (props.type === 'monthly') {
-      generateMonthlyPdf(props)
+      generateMonthlyPdf(props, logoBase64)
     } else if (props.type === 'annual') {
-      generateAnnualPdf(props)
+      generateAnnualPdf(props, logoBase64)
     } else {
-      generateInadimpletesPdf(props)
+      generateInadimpletesPdf(props, logoBase64)
     }
   }
 

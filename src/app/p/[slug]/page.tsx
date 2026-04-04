@@ -238,21 +238,24 @@ export default function PublicPage() {
     loadAnnualData()
   }, [group, selectedYear])
 
-  // Inadimplentes data
+  // Inadimplentes data - only fees whose due_date has passed and unpaid guests up to today
   useEffect(() => {
     if (!group) return
     async function loadInadimplentes() {
       setInadimplentesLoading(true)
+      const todayStr = new Date().toISOString().split('T')[0]
       const [{ data: overdueFees }, { data: unpaidGuestsData }] = await Promise.all([
         supabase.from('monthly_fees')
           .select('*, member:group_members(name, member_type, position)')
           .eq('group_id', group.id)
           .in('status', ['pending', 'overdue'])
+          .lte('due_date', todayStr)
           .order('reference_month', { ascending: true }),
         supabase.from('guest_players')
           .select('*')
           .eq('group_id', group.id)
           .eq('paid', false)
+          .lte('match_date', todayStr)
           .order('match_date', { ascending: false }),
       ])
       setAllOverdueFees(overdueFees || [])
