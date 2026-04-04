@@ -105,6 +105,7 @@ export default function FinanceiroPage() {
   const [payingFeeName, setPayingFeeName] = useState<string>('')
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const [paymentDate, setPaymentDate] = useState('')
   const receiptInputRef = useRef<HTMLInputElement>(null)
 
   // Receipt viewer state
@@ -323,6 +324,7 @@ export default function FinanceiroPage() {
     setPayingFeeId(feeId)
     setPayingFeeName(memberName)
     setReceiptFile(null)
+    setPaymentDate(format(new Date(), 'yyyy-MM-dd'))
     setPaymentDialogOpen(true)
   }
 
@@ -338,9 +340,13 @@ export default function FinanceiroPage() {
       }
     }
 
+    const paidAtDate = paymentDate
+      ? new Date(paymentDate + 'T12:00:00').toISOString()
+      : new Date().toISOString()
+
     const updateData: Record<string, any> = {
       status: 'paid',
-      paid_at: new Date().toISOString(),
+      paid_at: paidAtDate,
       payment_method: 'pix',
     }
     if (receiptUrl) {
@@ -885,7 +891,7 @@ export default function FinanceiroPage() {
             </div>
 
             {/* Payment confirmation dialog with receipt upload */}
-            <Dialog open={paymentDialogOpen} onOpenChange={(v) => { setPaymentDialogOpen(v); if (!v) { setPayingFeeId(null); setReceiptFile(null) } }}>
+            <Dialog open={paymentDialogOpen} onOpenChange={(v) => { setPaymentDialogOpen(v); if (!v) { setPayingFeeId(null); setReceiptFile(null); setPaymentDate('') } }}>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Confirmar Pagamento</DialogTitle>
@@ -894,6 +900,15 @@ export default function FinanceiroPage() {
                   <p className="text-sm text-muted-foreground">
                     Confirmar pagamento de <span className="font-semibold text-foreground">{payingFeeName}</span>?
                   </p>
+                  <div className="space-y-2">
+                    <Label>Data do pagamento</Label>
+                    <Input
+                      type="date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Comprovante (opcional)</Label>
                     <div className="flex items-center gap-2">

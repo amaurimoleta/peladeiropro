@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Plus, Phone, UserMinus, UserCheck, Pencil, Trash2, History,
   Check, Clock, AlertCircle, Link2, Eye, Shield, MapPin, Users,
+  Filter, ArrowUpDown, X, SlidersHorizontal,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ImageUpload } from '@/components/shared/image-upload'
@@ -46,6 +47,14 @@ export default function MembersPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [showInactive, setShowInactive] = useState(false)
+
+  // Filter & sort state
+  const [filterTeam, setFilterTeam] = useState('')
+  const [filterPosition, setFilterPosition] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [sortBy, setSortBy] = useState<'name' | 'position' | 'team' | 'type' | 'joined'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [showFilters, setShowFilters] = useState(false)
 
   // Group info for public link
   const [publicSlug, setPublicSlug] = useState<string | null>(null)
@@ -303,7 +312,62 @@ export default function MembersPage() {
 
   const activeMembers = members.filter(m => m.status === 'active')
   const inactiveMembers = members.filter(m => m.status === 'inactive')
-  const displayMembers = showInactive ? members : activeMembers
+
+  const hasActiveFilters = filterTeam !== '' || filterPosition !== '' || filterType !== ''
+  const activeFilterCount = [filterTeam, filterPosition, filterType].filter(Boolean).length
+
+  function clearAllFilters() {
+    setFilterTeam('')
+    setFilterPosition('')
+    setFilterType('')
+  }
+
+  // Apply filters then sort
+  const displayMembers = (() => {
+    let list = showInactive ? members : activeMembers
+
+    // Filters
+    if (filterTeam) {
+      list = filterTeam === '_none'
+        ? list.filter(m => !m.team_id)
+        : list.filter(m => m.team_id === filterTeam)
+    }
+    if (filterPosition) {
+      list = filterPosition === '_none'
+        ? list.filter(m => !m.position)
+        : list.filter(m => m.position === filterPosition)
+    }
+    if (filterType) {
+      list = list.filter(m => m.member_type === filterType)
+    }
+
+    // Sort
+    const dir = sortDir === 'asc' ? 1 : -1
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name) * dir
+        case 'position': {
+          const pa = a.position || 'zzz'
+          const pb = b.position || 'zzz'
+          return pa.localeCompare(pb) * dir
+        }
+        case 'team': {
+          const ta = getTeamById(a.team_id)?.name || 'zzz'
+          const tb = getTeamById(b.team_id)?.name || 'zzz'
+          return ta.localeCompare(tb) * dir
+        }
+        case 'type':
+          return a.member_type.localeCompare(b.member_type) * dir
+        case 'joined':
+          return (new Date(a.joined_at || a.created_at).getTime() - new Date(b.joined_at || b.created_at).getTime()) * dir
+        default:
+          return 0
+      }
+    })
+
+    return list
+  })()
 
   // Position field component reused in add/edit dialogs
   function PositionSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -620,6 +684,125 @@ export default function MembersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Filters & Sort Bar */}
+      {!loading && members.length > 0 && (
+        <div className="mb-4 space-y-3">
+          {/* Toggle bar */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`text-xs gap-1.5 ${hasActiveFilters ? 'border-[#1B1F4B] text-[#1B1F4B]' : ''}`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+              {activeFilterCount > 0 && (
+                <span className="h-4 min-w-4 rounded-full bg-[#1B1F4B] text-white text-[10px] flex items-center justify-center px-1">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            <div className="flex items-center gap-1.5">
+              <Select value={sortBy} onValueChange={(v) => v && setSortBy(v as typeof sortBy)}>
+                <SelectTrigger className="h-8 text-xs w-[130px]">
+                  <ArrowUpDown className="h-3 w-3 mr-1 shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nome</SelectItem>
+                  <SelectItem value="position">Posicao</SelectItem>
+                  <SelectItem value="team">Time</SelectItem>
+                  <SelectItem value="type">Tipo</SelectItem>
+                  <SelectItem value="joined">Data entrada</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                title={sortDir === 'asc' ? 'Crescente' : 'Decrescente'}
+              >
+                <ArrowUpDown className={`h-3.5 w-3.5 transition-transform ${sortDir === 'desc' ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
+          </div>
+
+          {/* Filter selectors */}
+          {showFilters && (
+            <div className="flex flex-wrap items-end gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className="space-y-1 min-w-[140px] flex-1">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Time</label>
+                <Select value={filterTeam} onValueChange={(v) => setFilterTeam(v === 'all_clear' ? '' : (v || ''))}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_clear">Todos</SelectItem>
+                    <SelectItem value="_none">Sem time</SelectItem>
+                    {teams.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full inline-block" style={{ backgroundColor: t.color }} />
+                          {t.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[140px] flex-1">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Posicao</label>
+                <Select value={filterPosition} onValueChange={(v) => setFilterPosition(v === 'all_clear' ? '' : (v || ''))}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_clear">Todas</SelectItem>
+                    <SelectItem value="_none">Sem posicao</SelectItem>
+                    {Object.entries(PLAYER_POSITIONS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[140px] flex-1">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tipo</label>
+                <Select value={filterType} onValueChange={(v) => setFilterType(v === 'all_clear' ? '' : (v || ''))}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_clear">Todos</SelectItem>
+                    <SelectItem value="mensalista">Mensalista</SelectItem>
+                    <SelectItem value="avulso">Avulso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Limpar
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Active filters summary + result count */}
+          {(hasActiveFilters || displayMembers.length !== (showInactive ? members : activeMembers).length) && (
+            <p className="text-xs text-muted-foreground">
+              Exibindo {displayMembers.length} de {showInactive ? members.length : activeMembers.length} membros
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Members Grid */}
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Carregando...</div>
@@ -627,8 +810,21 @@ export default function MembersPage() {
         <Card>
           <CardContent className="text-center py-12 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Nenhum membro ainda</p>
-            <p className="text-sm">Adicione o primeiro membro ao grupo!</p>
+            {hasActiveFilters ? (
+              <>
+                <p className="font-medium">Nenhum membro encontrado</p>
+                <p className="text-sm mt-1">Tente alterar os filtros</p>
+                <Button variant="outline" size="sm" onClick={clearAllFilters} className="mt-3">
+                  <X className="h-3 w-3 mr-1" />
+                  Limpar filtros
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">Nenhum membro ainda</p>
+                <p className="text-sm">Adicione o primeiro membro ao grupo!</p>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
