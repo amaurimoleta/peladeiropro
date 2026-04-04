@@ -88,6 +88,15 @@ export default async function GroupDashboard({
     supabase.from('expenses').select('amount, expense_date, category').eq('group_id', groupId).gte('expense_date', chartStartDate),
   ])
 
+  // ---- Filter out goalkeeper fees if setting is off ----
+  const goalkeeperPaysFee = group?.goalkeeper_pays_fee ?? true
+  const goalkeeperMemberIds = new Set(
+    !goalkeeperPaysFee ? (members || []).filter((m: any) => m.position === 'goleiro').map((m: any) => m.id) : []
+  )
+  const filteredFees = !goalkeeperPaysFee
+    ? (fees || []).filter((f: any) => !goalkeeperMemberIds.has(f.member_id))
+    : fees
+
   // ---- Accumulated balance (all-time) ----
   const totalAllFeesPaid = allFees?.reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalAllGuestsPaid = allGuests?.reduce((acc, g) => acc + Number(g.amount), 0) || 0
@@ -95,20 +104,20 @@ export default async function GroupDashboard({
   const accumulatedBalance = totalAllFeesPaid + totalAllGuestsPaid - totalAllExpenses
 
   // ---- Current month calculations ----
-  const totalFeesPaid = fees?.filter(f => f.status === 'paid').reduce((acc, f) => acc + Number(f.amount), 0) || 0
-  const totalFeesPending = fees?.filter(f => f.status !== 'paid' && f.status !== 'waived' && f.status !== 'dm_leave').reduce((acc, f) => acc + Number(f.amount), 0) || 0
+  const totalFeesPaid = filteredFees?.filter(f => f.status === 'paid').reduce((acc, f) => acc + Number(f.amount), 0) || 0
+  const totalFeesPending = filteredFees?.filter(f => f.status !== 'paid' && f.status !== 'waived' && f.status !== 'dm_leave').reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalGuests = guests?.filter(g => g.paid).reduce((acc, g) => acc + Number(g.amount), 0) || 0
   const totalGuestsPending = guests?.filter(g => !g.paid).reduce((acc, g) => acc + Number(g.amount), 0) || 0
   const totalExpenses = expenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0
   const totalIncome = totalFeesPaid + totalGuests
   const balance = totalIncome - totalExpenses
 
-  const paidCount = fees?.filter(f => f.status === 'paid').length || 0
-  const dmCount = fees?.filter(f => f.status === 'dm_leave').length || 0
-  const totalFeesCount = fees?.length || 0
-  const overdueFees = fees?.filter(f => f.status === 'overdue' || (f.status === 'pending' && new Date(f.due_date) < new Date())) || []
+  const paidCount = filteredFees?.filter(f => f.status === 'paid').length || 0
+  const dmCount = filteredFees?.filter(f => f.status === 'dm_leave').length || 0
+  const totalFeesCount = filteredFees?.length || 0
+  const overdueFees = filteredFees?.filter(f => f.status === 'overdue' || (f.status === 'pending' && new Date(f.due_date) < new Date())) || []
 
-  const mensalistas = members?.filter(m => m.member_type === 'mensalista').length || 0
+  const mensalistas = members?.filter((m: any) => m.member_type === 'mensalista' && (goalkeeperPaysFee || m.position !== 'goleiro')).length || 0
   const avulsos = members?.filter(m => m.member_type === 'avulso').length || 0
 
   // ---- Chart data: last N months ----

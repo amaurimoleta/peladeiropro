@@ -16,7 +16,7 @@ import {
 import {
   DollarSign, TrendingUp, TrendingDown, CheckCircle2, Clock,
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
-  ChevronRight, Users, Camera, Share2, Trophy, Award,
+  ChevronRight, Users, Camera, Share2, Trophy, Award, Megaphone, Pin,
 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -122,6 +122,10 @@ export default function PublicPage() {
   const [campMatches, setCampMatches] = useState<any[]>([])
   const [campLoading, setCampLoading] = useState(false)
 
+  // Mural de avisos state
+  const [announcements, setAnnouncements] = useState<any[]>([])
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false)
+
   const currentMonth = format(currentDate, 'yyyy-MM')
 
   useEffect(() => {
@@ -197,6 +201,24 @@ export default function PublicPage() {
     loadAnnualData()
   }, [group, selectedYear])
 
+  // Mural de avisos
+  useEffect(() => {
+    if (!group) return
+    async function loadAnnouncements() {
+      setAnnouncementsLoading(true)
+      const { data } = await supabase
+        .from('announcements')
+        .select('*, author:group_members(name)')
+        .eq('group_id', group.id)
+        .order('pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setAnnouncements(data || [])
+      setAnnouncementsLoading(false)
+    }
+    loadAnnouncements()
+  }, [group])
+
   // Campeonatos data
   useEffect(() => {
     if (!group) return
@@ -211,7 +233,10 @@ export default function PublicPage() {
       const all = tournamentsData || []
       const yearFiltered = all.filter((t: any) => {
         const d = t.start_date || t.created_at
-        return d && new Date(d).getFullYear() === campYear
+        if (!d) return false
+        // Extract year from string to avoid timezone issues
+        const y = t.start_date ? parseInt(t.start_date.substring(0, 4), 10) : new Date(d).getFullYear()
+        return y === campYear
       })
       setCampTournaments(yearFiltered)
 
@@ -346,8 +371,14 @@ export default function PublicPage() {
         <Tabs defaultValue="mensal" onValueChange={setActiveTab}>
           <TabsList className="w-full transition-all duration-300">
             <TabsTrigger value="mensal" className="flex-1 transition-all duration-200">Mensal</TabsTrigger>
-            <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Resumo Anual</TabsTrigger>
+            <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Anual</TabsTrigger>
             <TabsTrigger value="campeonatos" className="flex-1 transition-all duration-200">Campeonatos</TabsTrigger>
+            <TabsTrigger value="avisos" className="flex-1 transition-all duration-200">
+              Avisos
+              {announcements.filter(a => a.pinned).length > 0 && (
+                <span className="ml-1 h-2 w-2 rounded-full bg-red-500 inline-block" />
+              )}
+            </TabsTrigger>
           </TabsList>
 
           {/* ===================== MONTHLY VIEW ===================== */}
@@ -998,6 +1029,82 @@ export default function PublicPage() {
                   </>
                 )
               })()}
+            </div>
+          </TabsContent>
+
+          {/* ===================== AVISOS VIEW ===================== */}
+          <TabsContent value="avisos" className="transition-all duration-300">
+            <div className="space-y-3 pt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-[#1B1F4B] flex items-center justify-center">
+                  <Megaphone className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#1B1F4B]">Mural de Avisos</h2>
+                  <p className="text-xs text-muted-foreground">Comunicados e informacoes do grupo</p>
+                </div>
+              </div>
+
+              {announcementsLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Carregando avisos...</div>
+              ) : announcements.length === 0 ? (
+                <div className="text-center py-12">
+                  <Megaphone className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground font-medium">Nenhum aviso publicado</p>
+                  <p className="text-xs text-muted-foreground mt-1">Avisos do grupo aparecerão aqui</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {announcements.map((a: any) => {
+                    const createdAt = new Date(a.created_at)
+                    const isRecent = (Date.now() - createdAt.getTime()) < 3 * 24 * 60 * 60 * 1000 // 3 dias
+
+                    return (
+                      <div
+                        key={a.id}
+                        className={`rounded-xl border p-4 transition-all ${
+                          a.pinned
+                            ? 'border-[#1B1F4B]/30 bg-[#1B1F4B]/5 shadow-sm'
+                            : 'bg-white'
+                        }`}
+                      >
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {a.pinned && (
+                              <Pin className="h-3.5 w-3.5 text-[#1B1F4B] shrink-0 rotate-45" />
+                            )}
+                            <h3 className={`text-sm font-semibold truncate ${a.pinned ? 'text-[#1B1F4B]' : 'text-gray-900'}`}>
+                              {a.title}
+                            </h3>
+                            {isRecent && !a.pinned && (
+                              <Badge variant="secondary" className="bg-[#00C853]/10 text-[#00C853] text-[10px] px-1.5 py-0 shrink-0">
+                                Novo
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                          {a.content}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100">
+                          <span className="text-[11px] text-muted-foreground">
+                            {a.author?.name || 'Admin'}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">•</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {format(createdAt, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -18,6 +18,7 @@ export interface Group {
   due_day: number
   public_slug: string | null
   cover_url: string | null
+  goalkeeper_pays_fee: boolean
   created_by: string
   created_at: string
   updated_at: string
@@ -32,8 +33,10 @@ export interface GroupMember {
   role: 'admin' | 'treasurer' | 'member'
   status: 'active' | 'inactive'
   member_type: 'mensalista' | 'avulso'
+  position: string | null
   avatar_url: string | null
   team: string | null
+  team_id: string | null
   joined_at: string
   created_at: string
 }
@@ -255,6 +258,17 @@ export const PLAYOFF_PHASES: Record<string, string> = {
   quarter: 'Quartas de Final',
   round16: 'Oitavas de Final',
   group: 'Fase de Grupos',
+}
+
+export const PLAYER_POSITIONS: Record<string, string> = {
+  goleiro: 'Goleiro',
+  zagueiro: 'Zagueiro',
+  lateral: 'Lateral',
+  meia: 'Meia',
+  atacante: 'Atacante',
+  pivo: 'Pivo',
+  fixo: 'Fixo',
+  ala: 'Ala',
 }
 
 export const FEE_STATUSES: Record<string, string> = {

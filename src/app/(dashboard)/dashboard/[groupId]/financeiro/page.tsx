@@ -278,7 +278,12 @@ export default function FinanceiroPage() {
     if (!group || members.length === 0) return
     setGenerating(true)
 
-    const mensalistas = members.filter(m => m.member_type === 'mensalista' && m.status === 'active')
+    const mensalistas = members.filter(m => {
+      if (m.member_type !== 'mensalista' || m.status !== 'active') return false
+      // Se goleiro nao paga, exclui jogadores com posicao goleiro
+      if (!group.goalkeeper_pays_fee && m.position === 'goleiro') return false
+      return true
+    })
     const existingMemberIds = new Set(fees.map(f => f.member_id))
     const newFees = mensalistas
       .filter(m => !existingMemberIds.has(m.id))

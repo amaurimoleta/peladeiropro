@@ -90,6 +90,7 @@ export default function SettingsPage() {
   const [pixKey, setPixKey] = useState('')
   const [pixKeyType, setPixKeyType] = useState('')
   const [pixBeneficiary, setPixBeneficiary] = useState('')
+  const [goalkeeperPaysFee, setGoalkeeperPaysFee] = useState(true)
 
   // Members state (for admin management)
   const [members, setMembers] = useState<GroupMember[]>([])
@@ -118,6 +119,7 @@ export default function SettingsPage() {
         setPixKey(data.pix_key || '')
         setPixKeyType(data.pix_key_type || '')
         setPixBeneficiary(data.pix_beneficiary_name || '')
+        setGoalkeeperPaysFee(data.goalkeeper_pays_fee ?? true)
       }
       setLoading(false)
     }
@@ -172,6 +174,7 @@ export default function SettingsPage() {
       if ((pixKey || null) !== group.pix_key) changes.pix_key = { from: group.pix_key, to: pixKey || null }
       if ((pixKeyType || null) !== group.pix_key_type) changes.pix_key_type = { from: group.pix_key_type, to: pixKeyType || null }
       if ((pixBeneficiary || null) !== group.pix_beneficiary_name) changes.pix_beneficiary_name = { from: group.pix_beneficiary_name, to: pixBeneficiary || null }
+      if (goalkeeperPaysFee !== group.goalkeeper_pays_fee) changes.goalkeeper_pays_fee = { from: group.goalkeeper_pays_fee, to: goalkeeperPaysFee }
     }
 
     const { error } = await supabase.from('groups').update({
@@ -182,6 +185,7 @@ export default function SettingsPage() {
       pix_key: pixKey || null,
       pix_key_type: pixKeyType || null,
       pix_beneficiary_name: pixBeneficiary || null,
+      goalkeeper_pays_fee: goalkeeperPaysFee,
     }).eq('id', groupId)
 
     if (error) {
@@ -198,6 +202,7 @@ export default function SettingsPage() {
         pix_key: pixKey || null,
         pix_key_type: (pixKeyType || null) as Group['pix_key_type'],
         pix_beneficiary_name: pixBeneficiary || null,
+        goalkeeper_pays_fee: goalkeeperPaysFee,
       } : null)
 
       // Log audit with details of what changed
@@ -432,6 +437,22 @@ export default function SettingsPage() {
                 <Label>Dia de vencimento</Label>
                 <Input type="number" min="1" max="28" value={dueDay} onChange={(e) => setDueDay(e.target.value)} disabled={isReadOnly} />
               </div>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Goleiro paga mensalidade?</p>
+                <p className="text-xs text-muted-foreground">
+                  Se desativado, jogadores com posicao &quot;Goleiro&quot; nao terao mensalidades geradas
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => setGoalkeeperPaysFee(!goalkeeperPaysFee)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${goalkeeperPaysFee ? 'bg-[#00C853]' : 'bg-gray-300'}`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${goalkeeperPaysFee ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
             </div>
           </CardContent>
         </Card>
