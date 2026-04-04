@@ -26,7 +26,6 @@ import { CopyPixButton } from '@/components/shared/copy-pix-button'
 import { Logo } from '@/components/shared/logo'
 import { MonthNavigator } from '@/components/shared/month-navigator'
 import { ExportPdf } from '@/components/shared/export-pdf'
-import { PixQrCode } from '@/components/shared/pix-qr-code'
 
 // ── Animated Number Component ──
 function AnimatedNumber({ value, prefix = '', suffix = '', className = '' }: {
@@ -596,11 +595,6 @@ export default function PublicPage() {
                           </div>
                         )}
                       </div>
-                      <PixQrCode
-                        pixKey={group.pix_key}
-                        pixKeyType={group.pix_key_type}
-                        beneficiaryName={group.pix_beneficiary_name || group.name}
-                      />
                     </div>
                   )}
 
@@ -798,11 +792,6 @@ export default function PublicPage() {
                           </div>
                         )}
                       </div>
-                      <PixQrCode
-                        pixKey={group.pix_key}
-                        pixKeyType={group.pix_key_type}
-                        beneficiaryName={group.pix_beneficiary_name || group.name}
-                      />
                     </div>
                   )}
 
