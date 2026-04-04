@@ -70,9 +70,13 @@ export default function RankingCard({ groupId }: { groupId: string }) {
 
       const memberMap = new Map(members.map((m) => [m.id, m.name]))
       const feesByMember = new Map<string, typeof fees>()
+      const today = new Date()
 
       for (const fee of fees || []) {
+        // Exclude DM and waived — they don't count
         if (fee.status === 'dm_leave' || fee.status === 'waived') continue
+        // Exclude pending fees whose due_date hasn't passed yet (not yet due)
+        if (fee.status === 'pending' && new Date(fee.due_date + 'T23:59:59') > today) continue
         const list = feesByMember.get(fee.member_id) || []
         list.push(fee)
         feesByMember.set(fee.member_id, list)
@@ -83,36 +87,54 @@ export default function RankingCard({ groupId }: { groupId: string }) {
       for (const [memberId, name] of memberMap) {
         const memberFees = feesByMember.get(memberId) || []
         if (memberFees.length === 0) {
-          results.push({ memberId, name, score: 0, badge: 'Devedor' })
+          // No relevant fees — new member or all DM/waived, neutral score
+          results.push({ memberId, name, score: 50, badge: 'Em dia' })
           continue
         }
 
         let onTimeCount = 0
+        let lateCount = 0
         let totalDaysEarly = 0
+        let totalDaysLate = 0
 
         for (const fee of memberFees) {
           const dueDate = new Date(fee.due_date + 'T23:59:59')
           if (fee.status === 'paid' && fee.paid_at) {
             const paidDate = new Date(fee.paid_at)
-            if (paidDate <= dueDate) {
-              onTimeCount++
-            }
             const diffMs = dueDate.getTime() - paidDate.getTime()
             const diffDays = diffMs / (1000 * 60 * 60 * 24)
-            if (diffDays > 0) {
-              totalDaysEarly += diffDays
+            if (paidDate <= dueDate) {
+              onTimeCount++
+              if (diffDays > 0) {
+                totalDaysEarly += Math.min(diffDays, 15)
+              }
+            } else {
+              lateCount++
+              totalDaysLate += Math.min(Math.abs(diffDays), 30)
             }
+          } else if (fee.status === 'overdue' || (fee.status === 'pending' && dueDate < today)) {
+            // Unpaid and overdue
+            lateCount++
+            const daysLate = (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
+            totalDaysLate += Math.min(daysLate, 30)
           }
         }
 
-        const onTimeRate = onTimeCount / memberFees.length
-        const avgDaysEarly = memberFees.length > 0 ? totalDaysEarly / memberFees.length : 0
-        const score = onTimeRate * 70 + Math.min(avgDaysEarly, 10) * 3
+        // Score: base on-time rate (70 pts) + early bonus (20 pts) - late penalty (20 pts)
+        const relevantCount = onTimeCount + lateCount
+        const onTimeRate = relevantCount > 0 ? onTimeCount / relevantCount : 0
+        const avgDaysEarly = onTimeCount > 0 ? totalDaysEarly / onTimeCount : 0
+        const avgDaysLate = lateCount > 0 ? totalDaysLate / lateCount : 0
+
+        const baseScore = onTimeRate * 70
+        const earlyBonus = Math.min(avgDaysEarly, 10) * 2
+        const latePenalty = Math.min(avgDaysLate, 15) * 1.5
+        const score = Math.max(0, Math.min(100, baseScore + earlyBonus - latePenalty))
 
         let badge: RankedMember['badge']
-        if (score >= 85) badge = 'Craque'
-        else if (score >= 60) badge = 'Em dia'
-        else if (score >= 30) badge = 'Irregular'
+        if (score >= 80) badge = 'Craque'
+        else if (score >= 55) badge = 'Em dia'
+        else if (score >= 25) badge = 'Irregular'
         else badge = 'Devedor'
 
         results.push({ memberId, name, score: Math.round(score * 10) / 10, badge })
