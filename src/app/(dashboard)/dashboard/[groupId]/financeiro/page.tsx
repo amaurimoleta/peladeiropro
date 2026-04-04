@@ -1149,9 +1149,9 @@ export default function FinanceiroPage() {
   )
 
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado</p>
@@ -1248,16 +1248,17 @@ export default function FinanceiroPage() {
         {/* ── Tab: Mensalidades ── */}
         <TabsContent value="mensalidades">
           <div className="space-y-4 mt-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-sm text-muted-foreground">
-                {paidCount}/{displayFees.length} pagas | R$ {totalFeesAmount.toFixed(2)} recebido{dmCount > 0 ? ` | ${dmCount} afastados DM` : ''}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {paidCount}/{displayFees.length} pagas | R$ {totalFeesAmount.toFixed(2)}{dmCount > 0 ? ` | ${dmCount} DM` : ''}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {isAdmin && pendingFees.length > 0 && (
                   <Dialog open={cobrancaDialogOpen} onOpenChange={setCobrancaDialogOpen}>
-                    <DialogTrigger render={<Button variant="outline" className="text-green-600 border-green-400 hover:bg-green-50" />}>
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Cobrar Pendentes
+                    <DialogTrigger render={<Button variant="outline" size="sm" className="text-green-600 border-green-400 hover:bg-green-50 text-xs sm:text-sm" />}>
+                      <MessageCircle className="h-3.5 w-3.5 sm:mr-1.5" />
+                      <span className="hidden sm:inline">Cobrar Pendentes</span>
+                      <span className="sm:hidden">Cobrar</span>
                     </DialogTrigger>
                     <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
                       <DialogHeader>
@@ -1309,12 +1310,14 @@ export default function FinanceiroPage() {
                 )}
                 {isAdmin && (
                   <Button
-                    className="bg-[#00C853] hover:bg-[#00A843] text-white"
+                    size="sm"
+                    className="bg-[#00C853] hover:bg-[#00A843] text-white text-xs sm:text-sm"
                     onClick={generateFees}
                     disabled={generating}
                   >
-                    <Zap className="h-4 w-4 mr-2" />
-                    {generating ? 'Gerando...' : 'Gerar Mensalidades'}
+                    <Zap className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{generating ? 'Gerando...' : 'Gerar Mensalidades'}</span>
+                    <span className="sm:hidden">{generating ? 'Gerando...' : 'Gerar'}</span>
                   </Button>
                 )}
               </div>
@@ -1544,29 +1547,29 @@ export default function FinanceiroPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             {(fee.status === 'pending' || fee.status === 'overdue') && isAdmin ? (
-                              <div className="flex gap-1 justify-end">
-                                <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => openPaymentDialog(fee.id, fee.member?.name || '')}>
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Pago
+                              <div className="flex gap-1 justify-end flex-wrap">
+                                <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10 h-7 px-2 text-xs" onClick={() => openPaymentDialog(fee.id, fee.member?.name || '')}>
+                                  <Check className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">Pago</span>
                                 </Button>
-                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
-                                  <Stethoscope className="h-3 w-3 mr-1" />
-                                  DM
+                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50 h-7 px-2 text-xs" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
+                                  <Stethoscope className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">DM</span>
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground h-7 px-2 text-xs hidden sm:inline-flex" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
                                   Dispensar
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
                             ) : (fee.status === 'paid' || fee.status === 'dm_leave' || fee.status === 'waived') && isAdmin ? (
-                              <div className="flex gap-1 justify-end">
-                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy" onClick={() => openEditPaymentDialog(fee)}>
-                                  <Pencil className="h-3 w-3 mr-1" />
-                                  Editar
+                              <div className="flex gap-1 justify-end flex-wrap">
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy h-7 px-2 text-xs" onClick={() => openEditPaymentDialog(fee)}>
+                                  <Pencil className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">Editar</span>
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -1736,22 +1739,21 @@ export default function FinanceiroPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
-                              <div className="flex gap-1 justify-end">
+                              <div className="flex gap-1 justify-end flex-wrap">
                                 {!guest.paid ? (
-                                  <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => markGuestPaid(guest.id, guest.name)}>
-                                    <Check className="h-3 w-3 mr-1" />
-                                    Pago
+                                  <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10 h-7 px-2 text-xs" onClick={() => markGuestPaid(guest.id, guest.name)}>
+                                    <Check className="h-3 w-3 sm:mr-1" />
+                                    <span className="hidden sm:inline">Pago</span>
                                   </Button>
                                 ) : (
-                                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markGuestUnpaid(guest.id, guest.name)}>
-                                    <Minus className="h-3 w-3 mr-1" />
-                                    Reverter
+                                  <Button size="sm" variant="ghost" className="text-muted-foreground h-7 px-2 text-xs" onClick={() => markGuestUnpaid(guest.id, guest.name)}>
+                                    <Minus className="h-3 w-3" />
                                   </Button>
                                 )}
-                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => openEditGuestDialog(guest)}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground h-7 w-7 p-0" onClick={() => openEditGuestDialog(guest)}>
                                   <Pencil className="h-3 w-3" />
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteGuest(guest.id, guest.name)}>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0" onClick={() => deleteGuest(guest.id, guest.name)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>

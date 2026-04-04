@@ -59,8 +59,8 @@ export function MonthNavigator({ currentDate, onChange }: MonthNavigatorProps) {
   const selectedYear = currentDate.getFullYear()
 
   return (
-    <div className="flex items-center justify-center gap-4 mb-6 relative">
-      <Button variant="outline" size="icon" onClick={() => onChange(subMonths(currentDate, 1))}>
+    <div className="flex items-center justify-center gap-2 sm:gap-4 mb-6 relative">
+      <Button variant="outline" size="icon" className="shrink-0" onClick={() => onChange(subMonths(currentDate, 1))}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
@@ -68,20 +68,20 @@ export function MonthNavigator({ currentDate, onChange }: MonthNavigatorProps) {
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-lg font-semibold capitalize min-w-[200px] text-center cursor-pointer
-                   rounded-md px-3 py-1 transition-colors hover:bg-muted/60"
+        className="text-sm sm:text-lg font-semibold capitalize min-w-0 text-center cursor-pointer
+                   rounded-md px-2 sm:px-3 py-1 transition-colors hover:bg-muted/60"
       >
         {monthLabel}
       </button>
 
-      <Button variant="outline" size="icon" onClick={() => onChange(addMonths(currentDate, 1))}>
+      <Button variant="outline" size="icon" className="shrink-0" onClick={() => onChange(addMonths(currentDate, 1))}>
         <ChevronRight className="h-4 w-4" />
       </Button>
 
       {/* Month picker popover */}
       <div
         ref={popoverRef}
-        className={`absolute top-full mt-2 z-50 w-[260px] left-1/2 -translate-x-1/2
+        className={`absolute top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-[260px] max-w-[260px] left-1/2 -translate-x-1/2
                     rounded-xl border border-border/50 shadow-lg
                     backdrop-blur-xl bg-background/80
                     transition-all duration-200 origin-top

@@ -364,7 +364,7 @@ export default function SettingsPage() {
   if (loading || roleLoading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-6 gap-2">
         <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Configuracoes</h1>
         {isReadOnly && (
@@ -519,7 +519,7 @@ export default function SettingsPage() {
 
             {/* Chave PIX 1 */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 1 (Principal)</p>
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase">Chave PIX 1 (Principal)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Tipo</Label>
@@ -541,7 +541,7 @@ export default function SettingsPage() {
 
             {/* Chave PIX 2 */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 2 (Opcional)</p>
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase">Chave PIX 2 (Opcional)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Tipo</Label>
@@ -564,7 +564,7 @@ export default function SettingsPage() {
 
             {/* Chave PIX 3 */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chave PIX 3 (Opcional)</p>
+              <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase">Chave PIX 3 (Opcional)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Tipo</Label>
@@ -589,7 +589,7 @@ export default function SettingsPage() {
             <div className="p-3 rounded-lg border border-dashed border-[#00C853]/40 bg-[#00C853]/5 space-y-2">
               <div className="flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-[#00C853]" />
-                <p className="text-xs font-semibold text-[#1B1F4B] uppercase tracking-wide">QR Code PIX (Copia e Cola)</p>
+                <p className="text-[10px] sm:text-xs font-semibold text-[#1B1F4B] uppercase">QR Code PIX (Copia e Cola)</p>
               </div>
               <p className="text-xs text-muted-foreground">
                 Cole aqui o codigo PIX gerado pelo seu banco. Ele sera usado para gerar o QR Code automaticamente.
