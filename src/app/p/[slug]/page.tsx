@@ -105,6 +105,17 @@ export default function PublicPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeTab, setActiveTab] = useState('mensal')
+  const [priorBalance, setPriorBalance] = useState(0)
+
+  // Collapsible states for monthly view
+  const [showMensalidades, setShowMensalidades] = useState(true)
+  const [showDespesas, setShowDespesas] = useState(true)
+  const [showAvulsos, setShowAvulsos] = useState(true)
+
+  // Collapsible states for annual view
+  const [showCompliance, setShowCompliance] = useState(false)
+  const [showAnnualReceitas, setShowAnnualReceitas] = useState(false)
+  const [showAnnualDespesas, setShowAnnualDespesas] = useState(false)
 
   // Annual view state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -144,11 +155,21 @@ export default function PublicPage() {
     if (!group) return
     async function loadData() {
       setLoading(true)
-      const [{ data: feesData }, { data: guestsData }, { data: expensesData }, { data: matchesData }] = await Promise.all([
+      const firstDayOfMonth = `${currentMonth}-01`
+      const lastDayOfMonth = format(endOfMonth(currentDate), 'yyyy-MM-dd')
+
+      const [
+        { data: feesData }, { data: guestsData }, { data: expensesData }, { data: matchesData },
+        { data: priorFees }, { data: priorGuests }, { data: priorExpenses },
+      ] = await Promise.all([
         supabase.from('monthly_fees').select('*, member:group_members(name, member_type)').eq('group_id', group.id).eq('reference_month', currentMonth),
-        supabase.from('guest_players').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')),
-        supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', `${currentMonth}-01`).lte('expense_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('expense_date', { ascending: false }),
-        supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('match_date', { ascending: false }),
+        supabase.from('guest_players').select('*').eq('group_id', group.id).gte('match_date', firstDayOfMonth).lte('match_date', lastDayOfMonth),
+        supabase.from('expenses').select('*').eq('group_id', group.id).gte('expense_date', firstDayOfMonth).lte('expense_date', lastDayOfMonth).order('expense_date', { ascending: false }),
+        supabase.from('matches').select('*').eq('group_id', group.id).gte('match_date', firstDayOfMonth).lte('match_date', lastDayOfMonth).order('match_date', { ascending: false }),
+        // Prior data for saldo inicial
+        supabase.from('monthly_fees').select('amount').eq('group_id', group.id).eq('status', 'paid').lt('reference_month', currentMonth),
+        supabase.from('guest_players').select('amount').eq('group_id', group.id).eq('paid', true).lt('match_date', firstDayOfMonth),
+        supabase.from('expenses').select('amount').eq('group_id', group.id).lt('expense_date', firstDayOfMonth),
       ])
 
       // Load attendance counts for each match
@@ -165,6 +186,13 @@ export default function PublicPage() {
           })
         }
       }
+
+      // Compute prior balance (saldo inicial)
+      const initBal = Number(group.initial_balance ?? 0)
+      const priorFeesTotal = (priorFees || []).reduce((s: number, f: any) => s + Number(f.amount), 0)
+      const priorGuestsTotal = (priorGuests || []).reduce((s: number, g: any) => s + Number(g.amount), 0)
+      const priorExpensesTotal = (priorExpenses || []).reduce((s: number, e: any) => s + Number(e.amount), 0)
+      setPriorBalance(initBal + priorFeesTotal + priorGuestsTotal - priorExpensesTotal)
 
       setFees(feesData || [])
       setGuests(guestsData || [])
@@ -283,26 +311,48 @@ export default function PublicPage() {
   const totalIncome = totalFeesPaid + totalGuestsPaid
   const totalExpenses_ = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
   const balance = totalIncome - totalExpenses_
+  const saldoFinal = priorBalance + balance
   const paidCount = fees.filter(f => f.status === 'paid').length
   const totalFeesCount = fees.length
 
   // Annual calculations
-  const monthsData = Array.from({ length: 12 }, (_, i) => {
+  const groupInitialBalance = group ? Number(group.initial_balance || 0) : 0
+  const allMonthsRaw = Array.from({ length: 12 }, (_, i) => {
     const month = `${selectedYear}-${String(i + 1).padStart(2, '0')}`
     const monthFees = annualFees?.filter(f => f.reference_month === month && f.status === 'paid') || []
     const monthGuests = annualGuests?.filter(g => g.match_date.startsWith(month) && g.paid) || []
     const monthExpenses = annualExpenses?.filter(e => e.expense_date.startsWith(month)) || []
-    const income = monthFees.reduce((s: number, f: any) => s + Number(f.amount), 0) + monthGuests.reduce((s: number, g: any) => s + Number(g.amount), 0)
+    const feeIncome = monthFees.reduce((s: number, f: any) => s + Number(f.amount), 0)
+    const guestIncome = monthGuests.reduce((s: number, g: any) => s + Number(g.amount), 0)
+    const income = feeIncome + guestIncome
     const expense = monthExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
-    return { month, monthIndex: i, income, expense, balance: income - expense }
-  }).filter(m => m.income > 0 || m.expense > 0)
+    return { month, monthIndex: i, income, expense, balance: income - expense, saldoInicial: 0, saldoFinal: 0 }
+  })
+  // Compute running saldo
+  let runningSaldo = groupInitialBalance
+  for (const m of allMonthsRaw) {
+    m.saldoInicial = runningSaldo
+    m.saldoFinal = runningSaldo + m.income - m.expense
+    runningSaldo = m.saldoFinal
+  }
+  const monthsData = allMonthsRaw.filter(m => m.income > 0 || m.expense > 0)
 
   const annualTotalIncome = monthsData.reduce((s, m) => s + m.income, 0)
   const annualTotalExpense = monthsData.reduce((s, m) => s + m.expense, 0)
   const annualBalance = annualTotalIncome - annualTotalExpense
+  const annualSaldoInicial = monthsData.length > 0 ? monthsData[0].saldoInicial : groupInitialBalance
+  const annualSaldoFinal = monthsData.length > 0 ? monthsData[monthsData.length - 1].saldoFinal : groupInitialBalance
 
-  const annualTotalMatches = annualMatches.length
+  // Detailed revenue breakdown for annual view
+  const annualFeeRevenue = annualFees.filter(f => f.status === 'paid').reduce((s: number, f: any) => s + Number(f.amount), 0)
   const annualGuestRevenue = annualGuests.filter(g => g.paid).reduce((s: number, g: any) => s + Number(g.amount), 0)
+
+  // Detailed expense breakdown by category for annual view
+  const annualExpenseByCategory: Record<string, number> = {}
+  for (const e of (annualExpenses || [])) {
+    const cat = e.category || 'other'
+    annualExpenseByCategory[cat] = (annualExpenseByCategory[cat] || 0) + Number(e.amount)
+  }
 
   // Member compliance for annual view
   const memberCompliance = annualMembers.map((member: any) => {
@@ -427,30 +477,29 @@ export default function PublicPage() {
               ) : (
                 <>
                   {/* Balance Cards */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
-                        <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Entradas</p>
-                      <AnimatedNumber value={totalIncome} prefix="R$ " className="text-base sm:text-lg font-bold text-brand-green" />
-                    </div>
-                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
-                        <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saidas</p>
-                      <AnimatedNumber value={totalExpenses_} prefix="R$ " className="text-base sm:text-lg font-bold text-red-500" />
-                    </div>
-                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
-                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Saldo Inicial</p>
                       <AnimatedNumber
-                        value={balance}
+                        value={priorBalance}
                         prefix="R$ "
-                        className={`text-base sm:text-lg font-bold ${balance >= 0 ? 'text-brand-green' : 'text-red-500'}`}
+                        className={`text-sm sm:text-base font-bold ${priorBalance >= 0 ? 'text-brand-navy' : 'text-red-500'}`}
+                      />
+                    </div>
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '60ms' }}>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Entradas</p>
+                      <AnimatedNumber value={totalIncome} prefix="R$ " className="text-sm sm:text-base font-bold text-brand-green" />
+                    </div>
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Saidas</p>
+                      <AnimatedNumber value={totalExpenses_} prefix="R$ " className="text-sm sm:text-base font-bold text-red-500" />
+                    </div>
+                    <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '180ms' }}>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium mb-0.5">Saldo Final</p>
+                      <AnimatedNumber
+                        value={saldoFinal}
+                        prefix="R$ "
+                        className={`text-sm sm:text-base font-bold ${saldoFinal >= 0 ? 'text-brand-green' : 'text-red-500'}`}
                       />
                     </div>
                   </div>
@@ -490,78 +539,108 @@ export default function PublicPage() {
                     </div>
                   )}
 
-                  {/* Mensalidades */}
-                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '280ms' }}>
-                    <div className="flex items-center justify-between mb-4">
+                  {/* Mensalidades - collapsible */}
+                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '280ms' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowMensalidades(!showMensalidades)}
+                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                    >
                       <h2 className="font-bold text-brand-navy">Mensalidades</h2>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{paidCount}/{totalFeesCount}</span>
-                    </div>
-                    <div className="space-y-2.5">
-                      {fees.map((fee: any) => (
-                        <div key={fee.id} className="flex items-center justify-between text-sm py-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-brand-navy">{fee.member?.name}</span>
-                            {fee.member?.member_type === 'avulso' && (
-                              <Badge variant="outline" className="text-[10px] py-0 px-1">Avulso</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {fee.receipt_url && (
-                              <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
-                            )}
-                            {feeStatusDisplay(fee)}
-                          </div>
-                        </div>
-                      ))}
-                      {fees.length === 0 && (
-                        <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma mensalidade gerada.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Despesas */}
-                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '360ms' }}>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="font-bold text-brand-navy">Despesas do Mes</h2>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {totalExpenses_.toFixed(2)}</span>
-                    </div>
-                    <div className="space-y-2.5">
-                      {expenses.map((exp: any) => (
-                        <div key={exp.id} className="flex items-center justify-between text-sm py-1">
-                          <div>
-                            <span className="font-medium text-brand-navy">{exp.description}</span>
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              {EXPENSE_CATEGORIES[exp.category as keyof typeof EXPENSE_CATEGORIES]}
-                            </span>
-                          </div>
-                          <span className="text-red-500 font-semibold">R$ {Number(exp.amount).toFixed(2)}</span>
-                        </div>
-                      ))}
-                      {expenses.length === 0 && (
-                        <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa registrada.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Avulsos */}
-                  {guests.length > 0 && (
-                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '440ms' }}>
-                      <h2 className="font-bold text-brand-navy mb-4">Jogadores Avulsos</h2>
-                      <div className="space-y-2.5">
-                        {guests.map((guest: any) => (
-                          <div key={guest.id} className="flex items-center justify-between text-sm py-1">
-                            <span className="font-medium text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{paidCount}/{totalFeesCount}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showMensalidades ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {showMensalidades && (
+                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                        {fees.map((fee: any) => (
+                          <div key={fee.id} className="flex items-center justify-between text-sm py-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold">R$ {Number(guest.amount).toFixed(2)}</span>
-                              {guest.paid ? (
-                                <CheckCircle2 className="h-4 w-4 text-brand-green" />
-                              ) : (
-                                <Clock className="h-4 w-4 text-amber-500" />
+                              <span className="font-medium text-brand-navy">{fee.member?.name}</span>
+                              {fee.member?.member_type === 'avulso' && (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1">Avulso</Badge>
                               )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {fee.receipt_url && (
+                                <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
+                              )}
+                              {feeStatusDisplay(fee)}
                             </div>
                           </div>
                         ))}
+                        {fees.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma mensalidade gerada.</p>
+                        )}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Despesas - collapsible */}
+                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '360ms' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDespesas(!showDespesas)}
+                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                    >
+                      <h2 className="font-bold text-brand-navy">Despesas do Mes</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {totalExpenses_.toFixed(2)}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showDespesas ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {showDespesas && (
+                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                        {expenses.map((exp: any) => (
+                          <div key={exp.id} className="flex items-center justify-between text-sm py-1">
+                            <div>
+                              <span className="font-medium text-brand-navy">{exp.description}</span>
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                {EXPENSE_CATEGORIES[exp.category as keyof typeof EXPENSE_CATEGORIES]}
+                              </span>
+                            </div>
+                            <span className="text-red-500 font-semibold">R$ {Number(exp.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        {expenses.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma despesa registrada.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Avulsos - collapsible */}
+                  {guests.length > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '440ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAvulsos(!showAvulsos)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <h2 className="font-bold text-brand-navy">Jogadores Avulsos</h2>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-500">{guests.length}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAvulsos ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showAvulsos && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                          {guests.map((guest: any) => (
+                            <div key={guest.id} className="flex items-center justify-between text-sm py-1">
+                              <span className="font-medium text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">R$ {Number(guest.amount).toFixed(2)}</span>
+                                {guest.paid ? (
+                                  <CheckCircle2 className="h-4 w-4 text-brand-green" />
+                                ) : (
+                                  <Clock className="h-4 w-4 text-amber-500" />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -641,67 +720,77 @@ export default function PublicPage() {
               ) : (
                 <>
                   {/* Annual Summary Cards */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                     <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo Inicial</p>
+                      <AnimatedNumber value={annualSaldoInicial} prefix="R$ " className="text-base sm:text-lg font-bold text-brand-navy" />
+                    </div>
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '80ms' }}>
                       <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
                         <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Receitas</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Receitas</p>
                       <AnimatedNumber value={annualTotalIncome} prefix="R$ " className="text-base sm:text-lg font-bold text-brand-green" />
                     </div>
-                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '160ms' }}>
                       <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
                         <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Despesas</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Despesas</p>
                       <AnimatedNumber value={annualTotalExpense} prefix="R$ " className="text-base sm:text-lg font-bold text-red-500" />
                     </div>
-                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+                    <div className="card-modern-elevated p-3 sm:p-4 text-center animate-fade-in-up" style={{ animationDelay: '240ms' }}>
                       <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-1.5 sm:mb-2 shadow-sm">
                         <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                       </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo Anual</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Saldo Final</p>
                       <AnimatedNumber
-                        value={annualBalance}
+                        value={annualSaldoFinal}
                         prefix="R$ "
-                        className={`text-base sm:text-lg font-bold ${annualBalance >= 0 ? 'text-brand-green' : 'text-red-500'}`}
+                        className={`text-base sm:text-lg font-bold ${annualSaldoFinal >= 0 ? 'text-brand-green' : 'text-red-500'}`}
                       />
                     </div>
                   </div>
 
                   {/* Month-by-month breakdown table */}
-                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                  <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
                     <h2 className="font-bold text-brand-navy mb-4">Resumo por Mes</h2>
                     {monthsData.length > 0 ? (
                       <div className="overflow-x-auto -mx-2">
-                        <table className="w-full text-sm">
+                        <table className="w-full text-xs sm:text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
-                              <th className="text-left py-2.5 px-2 font-semibold text-brand-navy">Mes</th>
-                              <th className="text-right py-2.5 px-2 font-semibold text-brand-green">Receitas</th>
-                              <th className="text-right py-2.5 px-2 font-semibold text-red-500">Despesas</th>
-                              <th className="text-right py-2.5 px-2 font-semibold text-brand-navy">Saldo</th>
+                              <th className="text-left py-2.5 px-1.5 sm:px-2 font-semibold text-brand-navy">Mes</th>
+                              <th className="text-right py-2.5 px-1.5 sm:px-2 font-semibold text-muted-foreground">Saldo Ini.</th>
+                              <th className="text-right py-2.5 px-1.5 sm:px-2 font-semibold text-brand-green">Receitas</th>
+                              <th className="text-right py-2.5 px-1.5 sm:px-2 font-semibold text-red-500">Despesas</th>
+                              <th className="text-right py-2.5 px-1.5 sm:px-2 font-semibold text-brand-navy">Saldo Final</th>
                             </tr>
                           </thead>
                           <tbody>
                             {monthsData.map((m, idx) => (
                               <tr key={m.month} className={idx % 2 === 0 ? 'bg-gray-50/50' : ''}>
-                                <td className="py-2.5 px-2 font-medium text-brand-navy capitalize">{formatMonthName(m.month)}</td>
-                                <td className="py-2.5 px-2 text-right text-brand-green font-medium">R$ {m.income.toFixed(2)}</td>
-                                <td className="py-2.5 px-2 text-right text-red-500 font-medium">R$ {m.expense.toFixed(2)}</td>
-                                <td className={`py-2.5 px-2 text-right font-medium ${m.balance >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
-                                  R$ {m.balance.toFixed(2)}
+                                <td className="py-2.5 px-1.5 sm:px-2 font-medium text-brand-navy capitalize">{formatMonthName(m.month)}</td>
+                                <td className="py-2.5 px-1.5 sm:px-2 text-right text-muted-foreground font-medium">R$ {m.saldoInicial.toFixed(2)}</td>
+                                <td className="py-2.5 px-1.5 sm:px-2 text-right text-brand-green font-medium">R$ {m.income.toFixed(2)}</td>
+                                <td className="py-2.5 px-1.5 sm:px-2 text-right text-red-500 font-medium">R$ {m.expense.toFixed(2)}</td>
+                                <td className={`py-2.5 px-1.5 sm:px-2 text-right font-medium ${m.saldoFinal >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
+                                  R$ {m.saldoFinal.toFixed(2)}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
                             <tr className="border-t-2 border-gray-300">
-                              <td className="py-2.5 px-2 font-bold text-brand-navy">Total</td>
-                              <td className="py-2.5 px-2 text-right font-bold text-brand-green">R$ {annualTotalIncome.toFixed(2)}</td>
-                              <td className="py-2.5 px-2 text-right font-bold text-red-500">R$ {annualTotalExpense.toFixed(2)}</td>
-                              <td className={`py-2.5 px-2 text-right font-bold ${annualBalance >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
-                                R$ {annualBalance.toFixed(2)}
+                              <td className="py-2.5 px-1.5 sm:px-2 font-bold text-brand-navy">Total</td>
+                              <td className="py-2.5 px-1.5 sm:px-2 text-right font-bold text-muted-foreground">R$ {annualSaldoInicial.toFixed(2)}</td>
+                              <td className="py-2.5 px-1.5 sm:px-2 text-right font-bold text-brand-green">R$ {annualTotalIncome.toFixed(2)}</td>
+                              <td className="py-2.5 px-1.5 sm:px-2 text-right font-bold text-red-500">R$ {annualTotalExpense.toFixed(2)}</td>
+                              <td className={`py-2.5 px-1.5 sm:px-2 text-right font-bold ${annualSaldoFinal >= 0 ? 'text-brand-green' : 'text-red-500'}`}>
+                                R$ {annualSaldoFinal.toFixed(2)}
                               </td>
                             </tr>
                           </tfoot>
@@ -712,86 +801,112 @@ export default function PublicPage() {
                     )}
                   </div>
 
-                  {/* Member payment compliance */}
+                  {/* Member payment compliance - collapsible */}
                   {memberCompliance.length > 0 && (
-                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '280ms' }}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Users className="h-4 w-4 text-brand-navy" />
-                        <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
-                      </div>
-                      <div className="space-y-2.5">
-                        {memberCompliance.map((member) => (
-                          <div key={member.name} className="flex items-center justify-between text-sm py-1.5">
-                            <span className="font-medium text-brand-navy">{member.name}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground">
-                                {member.paidMonths}/{member.totalMonths} meses
-                              </span>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${complianceBg(member.percentage)} ${complianceColor(member.percentage)}`}>
-                                {member.percentage}%
-                              </span>
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '380ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCompliance(!showCompliance)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-brand-navy" />
+                          <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{memberCompliance.length}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showCompliance ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showCompliance && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                          {memberCompliance.map((member) => (
+                            <div key={member.name} className="flex items-center justify-between text-sm py-1.5">
+                              <span className="font-medium text-brand-navy">{member.name}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground">
+                                  {member.paidMonths}/{member.totalMonths} meses
+                                </span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${complianceBg(member.percentage)} ${complianceColor(member.percentage)}`}>
+                                  {member.percentage}%
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Total matches and guest revenue */}
-                  {(annualTotalMatches > 0 || annualGuestRevenue > 0) && (
-                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '360ms' }}>
-                      <h2 className="font-bold text-brand-navy mb-4">Jogos e Avulsos</h2>
-                      <div className="space-y-2.5 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground flex items-center gap-2">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            Total de jogos no ano
-                          </span>
-                          <span className="font-bold text-brand-navy">{annualTotalMatches}</span>
+                  {/* Receitas Detalhadas - collapsible */}
+                  {annualTotalIncome > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '460ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAnnualReceitas(!showAnnualReceitas)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-brand-green" />
+                          <h2 className="font-bold text-brand-navy">Receitas Detalhadas</h2>
                         </div>
-                        {annualGuestRevenue > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground flex items-center gap-2">
-                              <DollarSign className="h-3.5 w-3.5" />
-                              Receita de avulsos
-                            </span>
-                            <span className="font-bold text-brand-green">R$ {annualGuestRevenue.toFixed(2)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">R$ {annualTotalIncome.toFixed(2)}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAnnualReceitas ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showAnnualReceitas && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5 text-sm">
+                          <div className="flex justify-between py-1.5">
+                            <span className="text-muted-foreground">Mensalidades pagas</span>
+                            <span className="font-semibold text-brand-green">R$ {annualFeeRevenue.toFixed(2)}</span>
                           </div>
-                        )}
-                      </div>
+                          {annualGuestRevenue > 0 && (
+                            <div className="flex justify-between py-1.5">
+                              <span className="text-muted-foreground">Jogadores avulsos</span>
+                              <span className="font-semibold text-brand-green">R$ {annualGuestRevenue.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="border-t pt-2 flex justify-between font-bold">
+                            <span className="text-brand-navy">Total Receitas</span>
+                            <span className="text-brand-green">R$ {annualTotalIncome.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* PIX info */}
-                  {group.pix_key && (
-                    <div className="card-modern-elevated p-4 sm:p-5 border-brand-green/20 bg-gradient-to-br from-brand-green/5 to-transparent animate-fade-in-up animate-pulse-subtle" style={{ animationDelay: '440ms' }}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 rounded-lg gradient-green flex items-center justify-center shadow-sm">
-                          <DollarSign className="h-4 w-4 text-white" />
+                  {/* Despesas Detalhadas - collapsible */}
+                  {annualTotalExpense > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '540ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAnnualDespesas(!showAnnualDespesas)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <TrendingDown className="h-4 w-4 text-red-500" />
+                          <h2 className="font-bold text-brand-navy">Despesas Detalhadas</h2>
                         </div>
-                        <h2 className="font-bold text-brand-navy">Pagar via PIX</h2>
-                      </div>
-                      <div className="space-y-2.5 text-sm">
-                        {group.pix_key_type && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Tipo:</span>
-                            <span className="font-semibold">{PIX_KEY_TYPES[group.pix_key_type]}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Chave:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-brand-navy text-xs sm:text-sm break-all">{group.pix_key}</span>
-                            <CopyPixButton pixKey={group.pix_key} />
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-500">R$ {annualTotalExpense.toFixed(2)}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAnnualDespesas ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showAnnualDespesas && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5 text-sm">
+                          {Object.entries(annualExpenseByCategory).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => (
+                            <div key={cat} className="flex justify-between py-1.5">
+                              <span className="text-muted-foreground">{EXPENSE_CATEGORIES[cat] || cat}</span>
+                              <span className="font-semibold text-red-500">R$ {amount.toFixed(2)}</span>
+                            </div>
+                          ))}
+                          <div className="border-t pt-2 flex justify-between font-bold">
+                            <span className="text-brand-navy">Total Despesas</span>
+                            <span className="text-red-500">R$ {annualTotalExpense.toFixed(2)}</span>
                           </div>
                         </div>
-                        {group.pix_beneficiary_name && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Beneficiario:</span>
-                            <span className="font-semibold">{group.pix_beneficiary_name}</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
 

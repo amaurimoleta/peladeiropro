@@ -108,6 +108,16 @@ export default function FinanceiroPage() {
   const [paymentDate, setPaymentDate] = useState('')
   const receiptInputRef = useRef<HTMLInputElement>(null)
 
+  // Edit payment dialog state
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false)
+  const [editingFeeId, setEditingFeeId] = useState<string | null>(null)
+  const [editingFeeName, setEditingFeeName] = useState<string>('')
+  const [editPaymentDate, setEditPaymentDate] = useState('')
+  const [editPaymentStatus, setEditPaymentStatus] = useState<string>('paid')
+  const [editReceiptFile, setEditReceiptFile] = useState<File | null>(null)
+  const [savingEditPayment, setSavingEditPayment] = useState(false)
+  const editReceiptInputRef = useRef<HTMLInputElement>(null)
+
   // Receipt viewer state
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
 
@@ -376,6 +386,68 @@ export default function FinanceiroPage() {
     setPaymentDialogOpen(false)
     setPayingFeeId(null)
     setReceiptFile(null)
+  }
+
+  function openEditPaymentDialog(fee: any) {
+    setEditingFeeId(fee.id)
+    setEditingFeeName(fee.member?.name || '')
+    setEditPaymentDate(fee.paid_at ? format(new Date(fee.paid_at), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+    setEditPaymentStatus(fee.status)
+    setEditReceiptFile(null)
+    setEditPaymentDialogOpen(true)
+  }
+
+  async function saveEditPayment() {
+    if (!editingFeeId) return
+    setSavingEditPayment(true)
+
+    let receiptUrl: string | null = null
+    if (editReceiptFile) {
+      receiptUrl = await uploadReceipt(supabase, editReceiptFile, groupId)
+      if (!receiptUrl) {
+        toast.error('Erro ao enviar comprovante.')
+      }
+    }
+
+    const paidAtDate = editPaymentStatus === 'paid' && editPaymentDate
+      ? new Date(editPaymentDate + 'T12:00:00').toISOString()
+      : editPaymentStatus === 'paid' ? new Date().toISOString() : null
+
+    const updateData: Record<string, any> = {
+      status: editPaymentStatus,
+      paid_at: paidAtDate,
+    }
+    if (editPaymentStatus !== 'paid') {
+      updateData.paid_at = null
+      updateData.payment_method = null
+    }
+    if (receiptUrl) {
+      updateData.receipt_url = receiptUrl
+    }
+
+    const { error } = await supabase
+      .from('monthly_fees')
+      .update(updateData)
+      .eq('id', editingFeeId)
+
+    if (error) {
+      toast.error('Erro ao editar pagamento')
+    } else {
+      toast.success('Pagamento atualizado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_fee_payment',
+        entityType: 'monthly_fee',
+        entityId: editingFeeId,
+        details: { member: editingFeeName, month: currentMonth, status: editPaymentStatus, date: editPaymentDate },
+      })
+      loadData()
+      loadAccumulatedBalance()
+    }
+    setSavingEditPayment(false)
+    setEditPaymentDialogOpen(false)
+    setEditingFeeId(null)
+    setEditReceiptFile(null)
   }
 
   async function markAsDmLeave(feeId: string, memberName?: string) {
@@ -960,6 +1032,77 @@ export default function FinanceiroPage() {
               </DialogContent>
             </Dialog>
 
+            {/* Edit payment dialog */}
+            <Dialog open={editPaymentDialogOpen} onOpenChange={(v) => { setEditPaymentDialogOpen(v); if (!v) { setEditingFeeId(null); setEditReceiptFile(null) } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Pagamento</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Editando pagamento de <span className="font-semibold text-foreground">{editingFeeName}</span>
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={editPaymentStatus} onValueChange={(v) => v && setEditPaymentStatus(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">Pago</SelectItem>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="overdue">Atrasado</SelectItem>
+                        <SelectItem value="waived">Dispensado</SelectItem>
+                        <SelectItem value="dm_leave">Afastado (DM)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editPaymentStatus === 'paid' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Data do pagamento</Label>
+                        <Input
+                          type="date"
+                          value={editPaymentDate}
+                          onChange={(e) => setEditPaymentDate(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Novo comprovante (opcional)</Label>
+                        <Input
+                          ref={editReceiptInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setEditReceiptFile(e.target.files?.[0] || null)}
+                          className="text-sm"
+                        />
+                        {editReceiptFile && (
+                          <p className="text-xs text-muted-foreground">
+                            <Image className="h-3 w-3 inline mr-1" />
+                            {editReceiptFile.name}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-[#1B1F4B] hover:bg-[#1B1F4B]/90 text-white"
+                      onClick={saveEditPayment}
+                      disabled={savingEditPayment}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      {savingEditPayment ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditPaymentDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Card>
               <CardContent className="p-0">
                 <Table>
@@ -1022,6 +1165,11 @@ export default function FinanceiroPage() {
                                   Dispensar
                                 </Button>
                               </div>
+                            ) : (fee.status === 'paid' || fee.status === 'dm_leave' || fee.status === 'waived') && isAdmin ? (
+                              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy" onClick={() => openEditPaymentDialog(fee)}>
+                                <Pencil className="h-3 w-3 mr-1" />
+                                Editar
+                              </Button>
                             ) : null}
                           </TableCell>
                         </TableRow>
