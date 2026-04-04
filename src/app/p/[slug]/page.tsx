@@ -744,6 +744,8 @@ export default function PublicPage() {
                       totalIncome={totalIncome}
                       totalExpenses={totalExpenses_}
                       balance={balance}
+                      priorBalance={priorBalance}
+                      saldoFinal={saldoFinal}
                     />
                   </div>
 
@@ -976,10 +978,18 @@ export default function PublicPage() {
                         income: m.income,
                         expenses: m.expense,
                         balance: m.balance,
+                        saldoInicial: m.saldoInicial,
+                        saldoFinal: m.saldoFinal,
                       }))}
                       totalIncome={annualTotalIncome}
                       totalExpenses={annualTotalExpense}
                       balance={annualBalance}
+                      annualSaldoInicial={annualSaldoInicial}
+                      annualSaldoFinal={annualSaldoFinal}
+                      annualFeeRevenue={annualFeeRevenue}
+                      annualGuestRevenue={annualGuestRevenue}
+                      annualExpenseByCategory={annualExpenseByCategory}
+                      memberCompliance={memberCompliance}
                     />
                   </div>
 

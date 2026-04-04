@@ -6,27 +6,54 @@ import { Button } from '@/components/ui/button'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+const FEE_STATUS_LABELS: Record<string, string> = {
+  paid: 'Pago',
+  pending: 'Pendente',
+  overdue: 'Atrasado',
+  waived: 'Dispensado',
+  dm_leave: 'Afastado DM',
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  court_rental: 'Quadra',
+  goalkeeper: 'Goleiro',
+  equipment: 'Equipamento',
+  drinks: 'Bebidas',
+  churrasco: 'Churrasco',
+  other: 'Outros',
+}
+
 interface ExportPdfProps {
   type: 'monthly' | 'annual'
   groupName: string
   // Monthly data
-  month?: string // "2026-04"
+  month?: string
   fees?: Array<{ memberName: string; amount: number; status: string; paidAt: string | null }>
   guests?: Array<{ name: string; matchDate: string; amount: number; paid: boolean }>
   expenses?: Array<{ description: string; category: string; amount: number; date: string }>
   totalIncome?: number
   totalExpenses?: number
   balance?: number
+  priorBalance?: number
+  saldoFinal?: number
   // Annual data
   year?: number
-  monthlyData?: Array<{ month: string; income: number; expenses: number; balance: number }>
-  memberCompliance?: Array<{ name: string; percentage: number }>
+  monthlyData?: Array<{ month: string; income: number; expenses: number; balance: number; saldoInicial: number; saldoFinal: number }>
+  annualSaldoInicial?: number
+  annualSaldoFinal?: number
+  annualFeeRevenue?: number
+  annualGuestRevenue?: number
+  annualExpenseByCategory?: Record<string, number>
+  memberCompliance?: Array<{ name: string; paidMonths: number; totalMonths: number; percentage: number }>
 }
 
 const NAVY = '#1B1F4B'
 const GREEN = '#00C853'
 const RED = '#EF4444'
 const LIGHT_GRAY = '#F3F4F6'
+const AMBER = '#F59E0B'
+const BLUE = '#3B82F6'
+const GRAY = '#9CA3AF'
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -54,6 +81,28 @@ function hexToRgb(hex: string): [number, number, number] {
     : [0, 0, 0]
 }
 
+function addFooter(doc: jsPDF) {
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  doc.setFillColor(...hexToRgb(NAVY))
+  doc.rect(0, pageHeight - 20, pageWidth, 20, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 14, pageHeight - 8)
+  doc.text('PeladeiroPro - Gestao de tesouraria', pageWidth - 14, pageHeight - 8, { align: 'right' })
+}
+
+function checkPageBreak(doc: jsPDF, y: number, needed: number = 40): number {
+  const pageHeight = doc.internal.pageSize.getHeight()
+  if (y + needed > pageHeight - 30) {
+    addFooter(doc)
+    doc.addPage()
+    return 15
+  }
+  return y
+}
+
 function generateMonthlyPdf(props: ExportPdfProps) {
   const {
     groupName,
@@ -63,7 +112,8 @@ function generateMonthlyPdf(props: ExportPdfProps) {
     expenses = [],
     totalIncome = 0,
     totalExpenses = 0,
-    balance = 0,
+    priorBalance = 0,
+    saldoFinal = 0,
   } = props
 
   const doc = new jsPDF()
@@ -73,22 +123,18 @@ function generateMonthlyPdf(props: ExportPdfProps) {
   // Header
   doc.setFillColor(...hexToRgb(NAVY))
   doc.rect(0, 0, pageWidth, 40, 'F')
-
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(22)
   doc.setFont('helvetica', 'bold')
   doc.text('PeladeiroPro', 14, y + 5)
-
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
   doc.text(groupName, 14, y + 14)
-
   doc.setFontSize(12)
-  doc.text(`Relatorio Mensal - ${formatMonthLabel(month)}`, 14, y + 22)
-
+  doc.text(`Prestacao de Contas - ${formatMonthLabel(month)}`, 14, y + 22)
   y = 50
 
-  // Summary Section
+  // Balance Summary (4 values like the page)
   doc.setTextColor(...hexToRgb(NAVY))
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
@@ -99,113 +145,73 @@ function generateMonthlyPdf(props: ExportPdfProps) {
   doc.setFont('helvetica', 'normal')
 
   doc.setTextColor(60, 60, 60)
-  doc.text(`Receitas (mensalidades + convidados):`, 14, y)
+  doc.text('Saldo Inicial:', 14, y)
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFont('helvetica', 'bold')
+  doc.text(formatCurrency(priorBalance), pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Receitas:', 14, y)
   doc.setTextColor(...hexToRgb(GREEN))
   doc.text(formatCurrency(totalIncome), pageWidth - 14, y, { align: 'right' })
   y += 7
 
   doc.setTextColor(60, 60, 60)
-  doc.text(`Despesas:`, 14, y)
+  doc.text('Despesas:', 14, y)
   doc.setTextColor(...hexToRgb(RED))
   doc.text(formatCurrency(totalExpenses), pageWidth - 14, y, { align: 'right' })
   y += 7
 
   doc.setTextColor(60, 60, 60)
-  doc.text(`Saldo:`, 14, y)
-  const balanceColor = balance >= 0 ? GREEN : RED
-  doc.setTextColor(...hexToRgb(balanceColor))
+  doc.text('Saldo Final:', 14, y)
+  doc.setTextColor(...hexToRgb(saldoFinal >= 0 ? GREEN : RED))
   doc.setFont('helvetica', 'bold')
-  doc.text(formatCurrency(balance), pageWidth - 14, y, { align: 'right' })
+  doc.text(formatCurrency(saldoFinal), pageWidth - 14, y, { align: 'right' })
   y += 12
 
-  // Mensalidades Table
-  if (fees.length > 0) {
-    doc.setTextColor(...hexToRgb(NAVY))
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Mensalidades', 14, y)
-    y += 2
+  // Receitas section
+  const totalFeesPaid = fees.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0)
+  const totalGuestsPaid = guests.filter(g => g.paid).reduce((s, g) => s + g.amount, 0)
 
-    autoTable(doc, {
-      startY: y,
-      head: [['Membro', 'Valor', 'Status', 'Data Pagamento']],
-      body: fees.map((f) => [
-        f.memberName,
-        formatCurrency(f.amount),
-        f.status,
-        formatDate(f.paidAt),
-      ]),
-      headStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
-      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
-      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
-      margin: { left: 14, right: 14 },
-      didParseCell(data) {
-        if (data.section === 'body' && data.column.index === 2) {
-          const status = data.cell.raw as string
-          if (status === 'paid' || status === 'pago') {
-            data.cell.styles.textColor = hexToRgb(GREEN)
-            data.cell.styles.fontStyle = 'bold'
-          } else {
-            data.cell.styles.textColor = hexToRgb(RED)
-            data.cell.styles.fontStyle = 'bold'
-          }
-        }
-      },
-    })
+  y = checkPageBreak(doc, y, 30)
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Receitas', 14, y)
+  y += 8
 
-    y = (doc as any).lastAutoTable.finalY + 10
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  if (totalFeesPaid > 0) {
+    doc.setTextColor(60, 60, 60)
+    doc.text('Mensalidades pagas:', 18, y)
+    doc.setTextColor(...hexToRgb(GREEN))
+    doc.text(formatCurrency(totalFeesPaid), pageWidth - 14, y, { align: 'right' })
+    y += 6
   }
-
-  // Guests Table
-  if (guests.length > 0) {
-    doc.setTextColor(...hexToRgb(NAVY))
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Convidados', 14, y)
-    y += 2
-
-    autoTable(doc, {
-      startY: y,
-      head: [['Nome', 'Data do Jogo', 'Valor', 'Pago']],
-      body: guests.map((g) => [
-        g.name,
-        formatDate(g.matchDate),
-        formatCurrency(g.amount),
-        g.paid ? 'Sim' : 'Nao',
-      ]),
-      headStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
-      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
-      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
-      margin: { left: 14, right: 14 },
-      didParseCell(data) {
-        if (data.section === 'body' && data.column.index === 3) {
-          const val = data.cell.raw as string
-          if (val === 'Sim') {
-            data.cell.styles.textColor = hexToRgb(GREEN)
-            data.cell.styles.fontStyle = 'bold'
-          } else {
-            data.cell.styles.textColor = hexToRgb(RED)
-            data.cell.styles.fontStyle = 'bold'
-          }
-        }
-      },
-    })
-
-    y = (doc as any).lastAutoTable.finalY + 10
+  if (totalGuestsPaid > 0) {
+    doc.setTextColor(60, 60, 60)
+    doc.text('Jogadores avulsos:', 18, y)
+    doc.setTextColor(...hexToRgb(GREEN))
+    doc.text(formatCurrency(totalGuestsPaid), pageWidth - 14, y, { align: 'right' })
+    y += 6
   }
+  // Total
+  doc.setDrawColor(200, 200, 200)
+  doc.line(14, y, pageWidth - 14, y)
+  y += 4
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFont('helvetica', 'bold')
+  doc.text('Total Receitas:', 18, y)
+  doc.setTextColor(...hexToRgb(GREEN))
+  doc.text(formatCurrency(totalIncome), pageWidth - 14, y, { align: 'right' })
+  y += 10
 
-  // Expenses Table
+  // Despesas Table
   if (expenses.length > 0) {
+    y = checkPageBreak(doc, y, 30)
     doc.setTextColor(...hexToRgb(NAVY))
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
@@ -217,45 +223,107 @@ function generateMonthlyPdf(props: ExportPdfProps) {
       head: [['Descricao', 'Categoria', 'Valor', 'Data']],
       body: expenses.map((e) => [
         e.description,
-        e.category,
+        CATEGORY_LABELS[e.category] || e.category,
         formatCurrency(e.amount),
         formatDate(e.date),
       ]),
-      headStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
       bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
       alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
       margin: { left: 14, right: 14 },
     })
-
     y = (doc as any).lastAutoTable.finalY + 10
   }
 
-  // Footer
-  const pageHeight = doc.internal.pageSize.getHeight()
-  doc.setFillColor(...hexToRgb(NAVY))
-  doc.rect(0, pageHeight - 20, pageWidth, 20, 'F')
+  // Mensalidades categorized
+  if (fees.length > 0) {
+    const sortByName = (a: any, b: any) => a.memberName.localeCompare(b.memberName)
+    const paidFees = fees.filter(f => f.status === 'paid').sort(sortByName)
+    const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'overdue').sort(sortByName)
+    const dmFees = fees.filter(f => f.status === 'dm_leave').sort(sortByName)
+    const waivedFees = fees.filter(f => f.status === 'waived').sort(sortByName)
 
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.text(
-    `Gerado em ${new Date().toLocaleDateString('pt-BR')}`,
-    14,
-    pageHeight - 8,
-  )
-  doc.text(
-    'PeladeiroPro - Gestao de tesouraria',
-    pageWidth - 14,
-    pageHeight - 8,
-    { align: 'right' },
-  )
+    const allSorted = [
+      ...paidFees.map(f => ({ ...f, displayStatus: 'Pago', displayAmount: formatCurrency(f.amount) })),
+      ...pendingFees.map(f => ({ ...f, displayStatus: FEE_STATUS_LABELS[f.status] || f.status, displayAmount: 'R$ 0,00' })),
+      ...dmFees.map(f => ({ ...f, displayStatus: 'Afastado DM', displayAmount: 'R$ 0,00' })),
+      ...waivedFees.map(f => ({ ...f, displayStatus: 'Dispensado', displayAmount: 'R$ 0,00' })),
+    ]
 
-  doc.save(`relatorio-${groupName.toLowerCase().replace(/\s+/g, '-')}-${month}.pdf`)
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Mensalidades (${paidFees.length}/${fees.length} pagos)`, 14, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Membro', 'Valor', 'Status', 'Data Pagamento']],
+      body: allSorted.map((f) => [
+        f.memberName,
+        f.displayAmount,
+        f.displayStatus,
+        f.status === 'paid' ? formatDate(f.paidAt) : '-',
+      ]),
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
+      margin: { left: 14, right: 14 },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 2) {
+          const status = data.cell.raw as string
+          if (status === 'Pago') {
+            data.cell.styles.textColor = hexToRgb(GREEN)
+          } else if (status === 'Pendente' || status === 'Atrasado') {
+            data.cell.styles.textColor = hexToRgb(AMBER)
+          } else if (status === 'Afastado DM') {
+            data.cell.styles.textColor = hexToRgb(BLUE)
+          } else {
+            data.cell.styles.textColor = hexToRgb(GRAY)
+          }
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+    y = (doc as any).lastAutoTable.finalY + 10
+  }
+
+  // Guests Table
+  if (guests.length > 0) {
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Jogadores Avulsos', 14, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Nome', 'Data', 'Valor', 'Status']],
+      body: guests.map((g) => [
+        g.name,
+        formatDate(g.matchDate),
+        formatCurrency(g.amount),
+        g.paid ? 'Pago' : 'Pendente',
+      ]),
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
+      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
+      margin: { left: 14, right: 14 },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 3) {
+          const val = data.cell.raw as string
+          data.cell.styles.textColor = val === 'Pago' ? hexToRgb(GREEN) : hexToRgb(AMBER)
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+    y = (doc as any).lastAutoTable.finalY + 10
+  }
+
+  addFooter(doc)
+  doc.save(`prestacao-contas-${groupName.toLowerCase().replace(/\s+/g, '-')}-${month}.pdf`)
 }
 
 function generateAnnualPdf(props: ExportPdfProps) {
@@ -263,6 +331,13 @@ function generateAnnualPdf(props: ExportPdfProps) {
     groupName,
     year = new Date().getFullYear(),
     monthlyData = [],
+    totalIncome = 0,
+    totalExpenses = 0,
+    annualSaldoInicial = 0,
+    annualSaldoFinal = 0,
+    annualFeeRevenue = 0,
+    annualGuestRevenue = 0,
+    annualExpenseByCategory = {},
     memberCompliance = [],
   } = props
 
@@ -273,75 +348,162 @@ function generateAnnualPdf(props: ExportPdfProps) {
   // Header
   doc.setFillColor(...hexToRgb(NAVY))
   doc.rect(0, 0, pageWidth, 36, 'F')
-
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(22)
   doc.setFont('helvetica', 'bold')
   doc.text('PeladeiroPro', 14, y + 5)
-
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
-  doc.text(`${groupName} - Relatorio Anual ${year}`, 14, y + 16)
-
+  doc.text(`${groupName} - Prestacao de Contas Anual ${year}`, 14, y + 16)
   y = 46
 
-  // Monthly Summary Table
+  // Summary cards equivalent
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Resumo Anual', 14, y)
+  y += 8
+
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Saldo Inicial:', 14, y)
+  doc.setTextColor(...hexToRgb(NAVY))
+  doc.setFont('helvetica', 'bold')
+  doc.text(formatCurrency(annualSaldoInicial), pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(60, 60, 60)
+  doc.text('Receitas:', 14, y)
+  doc.setTextColor(...hexToRgb(GREEN))
+  doc.text(formatCurrency(totalIncome), pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setTextColor(60, 60, 60)
+  doc.text('Despesas:', 14, y)
+  doc.setTextColor(...hexToRgb(RED))
+  doc.text(formatCurrency(totalExpenses), pageWidth - 14, y, { align: 'right' })
+  y += 7
+
+  doc.setTextColor(60, 60, 60)
+  doc.text('Saldo Final:', 14, y)
+  doc.setTextColor(...hexToRgb(annualSaldoFinal >= 0 ? GREEN : RED))
+  doc.setFont('helvetica', 'bold')
+  doc.text(formatCurrency(annualSaldoFinal), pageWidth - 14, y, { align: 'right' })
+  y += 12
+
+  // Resumo por Mes (with saldo inicial and saldo final)
   if (monthlyData.length > 0) {
+    y = checkPageBreak(doc, y, 30)
     doc.setTextColor(...hexToRgb(NAVY))
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
-    doc.text('Resumo Mensal', 14, y)
+    doc.text('Resumo por Mes', 14, y)
     y += 2
-
-    const totalIncome = monthlyData.reduce((s, m) => s + m.income, 0)
-    const totalExp = monthlyData.reduce((s, m) => s + m.expenses, 0)
-    const totalBal = monthlyData.reduce((s, m) => s + m.balance, 0)
 
     autoTable(doc, {
       startY: y,
-      head: [['Mes', 'Receitas', 'Despesas', 'Saldo']],
+      head: [['Mes', 'Saldo Ini.', 'Receitas', 'Despesas', 'Saldo Final']],
       body: monthlyData.map((m) => [
         formatMonthLabel(m.month),
+        formatCurrency(m.saldoInicial),
         formatCurrency(m.income),
         formatCurrency(m.expenses),
-        formatCurrency(m.balance),
+        formatCurrency(m.saldoFinal),
       ]),
       foot: [[
         'TOTAL',
+        formatCurrency(annualSaldoInicial),
         formatCurrency(totalIncome),
-        formatCurrency(totalExp),
-        formatCurrency(totalBal),
+        formatCurrency(totalExpenses),
+        formatCurrency(annualSaldoFinal),
       ]],
-      headStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
-      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
-      footStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8, textColor: [40, 40, 40] },
+      footStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
-        if (data.section === 'body' && data.column.index === 3) {
+        if (data.section === 'body' && data.column.index === 4) {
           const raw = data.cell.raw as string
-          const isNegative = raw.includes('-')
-          data.cell.styles.textColor = isNegative ? hexToRgb(RED) : hexToRgb(GREEN)
+          data.cell.styles.textColor = raw.includes('-') ? hexToRgb(RED) : hexToRgb(GREEN)
           data.cell.styles.fontStyle = 'bold'
         }
       },
     })
-
     y = (doc as any).lastAutoTable.finalY + 12
   }
 
-  // Member Compliance Table
+  // Receitas Detalhadas
+  if (totalIncome > 0) {
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Receitas Detalhadas', 14, y)
+    y += 8
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    if (annualFeeRevenue > 0) {
+      doc.setTextColor(60, 60, 60)
+      doc.text('Mensalidades pagas:', 18, y)
+      doc.setTextColor(...hexToRgb(GREEN))
+      doc.text(formatCurrency(annualFeeRevenue), pageWidth - 14, y, { align: 'right' })
+      y += 6
+    }
+    if (annualGuestRevenue > 0) {
+      doc.setTextColor(60, 60, 60)
+      doc.text('Jogadores avulsos:', 18, y)
+      doc.setTextColor(...hexToRgb(GREEN))
+      doc.text(formatCurrency(annualGuestRevenue), pageWidth - 14, y, { align: 'right' })
+      y += 6
+    }
+    doc.setDrawColor(200, 200, 200)
+    doc.line(14, y, pageWidth - 14, y)
+    y += 4
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFont('helvetica', 'bold')
+    doc.text('Total Receitas:', 18, y)
+    doc.setTextColor(...hexToRgb(GREEN))
+    doc.text(formatCurrency(totalIncome), pageWidth - 14, y, { align: 'right' })
+    y += 10
+  }
+
+  // Despesas Detalhadas
+  const expenseEntries = Object.entries(annualExpenseByCategory).sort((a, b) => b[1] - a[1])
+  if (expenseEntries.length > 0) {
+    y = checkPageBreak(doc, y, 30)
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Despesas Detalhadas', 14, y)
+    y += 8
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    for (const [cat, amount] of expenseEntries) {
+      doc.setTextColor(60, 60, 60)
+      doc.text(`${CATEGORY_LABELS[cat] || cat}:`, 18, y)
+      doc.setTextColor(...hexToRgb(RED))
+      doc.text(formatCurrency(amount), pageWidth - 14, y, { align: 'right' })
+      y += 6
+    }
+    doc.setDrawColor(200, 200, 200)
+    doc.line(14, y, pageWidth - 14, y)
+    y += 4
+    doc.setTextColor(...hexToRgb(NAVY))
+    doc.setFont('helvetica', 'bold')
+    doc.text('Total Despesas:', 18, y)
+    doc.setTextColor(...hexToRgb(RED))
+    doc.text(formatCurrency(totalExpenses), pageWidth - 14, y, { align: 'right' })
+    y += 10
+  }
+
+  // Adimplencia dos Membros
   if (memberCompliance.length > 0) {
+    y = checkPageBreak(doc, y, 30)
     doc.setTextColor(...hexToRgb(NAVY))
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
@@ -350,56 +512,31 @@ function generateAnnualPdf(props: ExportPdfProps) {
 
     autoTable(doc, {
       startY: y,
-      head: [['Membro', '% Meses Pagos']],
+      head: [['Membro', 'Meses Pagos', '% Adimplencia']],
       body: memberCompliance.map((m) => [
         m.name,
-        `${m.percentage.toFixed(0)}%`,
+        `${m.paidMonths}/${m.totalMonths}`,
+        `${m.percentage}%`,
       ]),
-      headStyles: {
-        fillColor: hexToRgb(NAVY),
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
+      headStyles: { fillColor: hexToRgb(NAVY), textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
       bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
       alternateRowStyles: { fillColor: hexToRgb(LIGHT_GRAY) },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
-        if (data.section === 'body' && data.column.index === 1) {
+        if (data.section === 'body' && data.column.index === 2) {
           const raw = data.cell.raw as string
           const pct = parseFloat(raw)
-          if (pct >= 80) {
-            data.cell.styles.textColor = hexToRgb(GREEN)
-          } else if (pct < 50) {
-            data.cell.styles.textColor = hexToRgb(RED)
-          }
+          if (pct >= 80) data.cell.styles.textColor = hexToRgb(GREEN)
+          else if (pct < 50) data.cell.styles.textColor = hexToRgb(RED)
+          else data.cell.styles.textColor = hexToRgb(AMBER)
           data.cell.styles.fontStyle = 'bold'
         }
       },
     })
   }
 
-  // Footer
-  const pageHeight = doc.internal.pageSize.getHeight()
-  doc.setFillColor(...hexToRgb(NAVY))
-  doc.rect(0, pageHeight - 20, pageWidth, 20, 'F')
-
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.text(
-    `Gerado em ${new Date().toLocaleDateString('pt-BR')}`,
-    14,
-    pageHeight - 8,
-  )
-  doc.text(
-    'PeladeiroPro - Gestao de tesouraria',
-    pageWidth - 14,
-    pageHeight - 8,
-    { align: 'right' },
-  )
-
-  doc.save(`relatorio-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
+  addFooter(doc)
+  doc.save(`prestacao-contas-anual-${groupName.toLowerCase().replace(/\s+/g, '-')}-${year}.pdf`)
 }
 
 export function ExportPdf(props: ExportPdfProps) {
