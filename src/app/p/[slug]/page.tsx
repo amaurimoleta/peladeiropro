@@ -16,7 +16,7 @@ import {
 import {
   DollarSign, TrendingUp, TrendingDown, CheckCircle2, Clock,
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
-  ChevronRight, Users, Camera, Share2, Trophy, Award, Megaphone, Pin,
+  ChevronRight, ChevronDown, Users, Camera, Share2, Trophy, Award, Megaphone, Pin,
 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -121,6 +121,9 @@ export default function PublicPage() {
   const [campTournaments, setCampTournaments] = useState<any[]>([])
   const [campMatches, setCampMatches] = useState<any[]>([])
   const [campLoading, setCampLoading] = useState(false)
+
+  // Campeonatos expand state
+  const [expandedTournaments, setExpandedTournaments] = useState<Set<string>>(new Set())
 
   // Mural de avisos state
   const [announcements, setAnnouncements] = useState<any[]>([])
@@ -367,18 +370,51 @@ export default function PublicPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+        {/* Mural de Avisos - sempre visivel */}
+        {!announcementsLoading && announcements.length > 0 && (
+          <div className="card-modern-elevated overflow-hidden">
+            <div className="bg-gradient-to-r from-brand-navy to-indigo-700 px-4 py-2.5 flex items-center gap-2">
+              <Megaphone className="h-3.5 w-3.5 text-white" />
+              <h3 className="text-xs font-bold text-white">Mural de Avisos</h3>
+            </div>
+            <div className="divide-y max-h-[300px] overflow-y-auto">
+              {announcements.map((a: any) => {
+                const createdAt = new Date(a.created_at)
+                const isRecent = (Date.now() - createdAt.getTime()) < 3 * 24 * 60 * 60 * 1000
+
+                return (
+                  <div
+                    key={a.id}
+                    className={`px-4 py-3 ${a.pinned ? 'bg-[#1B1F4B]/5' : ''}`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {a.pinned && <Pin className="h-3 w-3 text-[#1B1F4B] shrink-0 rotate-45" />}
+                      <span className={`text-sm font-semibold ${a.pinned ? 'text-[#1B1F4B]' : 'text-gray-900'}`}>
+                        {a.title}
+                      </span>
+                      {isRecent && !a.pinned && (
+                        <Badge variant="secondary" className="bg-[#00C853]/10 text-[#00C853] text-[9px] px-1 py-0 shrink-0">
+                          Novo
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">{a.content}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      {a.author?.name || 'Admin'} &middot; {format(createdAt, "dd/MM/yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* View Toggle */}
         <Tabs defaultValue="mensal" onValueChange={setActiveTab}>
           <TabsList className="w-full transition-all duration-300">
             <TabsTrigger value="mensal" className="flex-1 transition-all duration-200">Mensal</TabsTrigger>
             <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Anual</TabsTrigger>
             <TabsTrigger value="campeonatos" className="flex-1 transition-all duration-200">Campeonatos</TabsTrigger>
-            <TabsTrigger value="avisos" className="flex-1 transition-all duration-200">
-              Avisos
-              {announcements.filter(a => a.pinned).length > 0 && (
-                <span className="ml-1 h-2 w-2 rounded-full bg-red-500 inline-block" />
-              )}
-            </TabsTrigger>
           </TabsList>
 
           {/* ===================== MONTHLY VIEW ===================== */}
@@ -830,19 +866,21 @@ export default function PublicPage() {
                 const totalGames = campMatches.length
                 const scoredGames = campMatches.filter((m: any) => m.score_a != null && m.score_b != null)
 
-                // Build team stats: wins per game AND championship wins
-                const teamStats: Record<string, { name: string; gameWins: number; gameLosses: number; gameDraws: number; totalGames: number; champWins: number }> = {}
+                // Build team stats: wins per game AND championship wins + goals
+                const teamStats: Record<string, { name: string; gameWins: number; gameLosses: number; gameDraws: number; totalGames: number; champWins: number; goalsFor: number; goalsAgainst: number }> = {}
 
                 function ensureTeam(name: string) {
-                  if (!teamStats[name]) teamStats[name] = { name, gameWins: 0, gameLosses: 0, gameDraws: 0, totalGames: 0, champWins: 0 }
+                  if (!teamStats[name]) teamStats[name] = { name, gameWins: 0, gameLosses: 0, gameDraws: 0, totalGames: 0, champWins: 0, goalsFor: 0, goalsAgainst: 0 }
                 }
 
-                // Count game wins
+                // Count game wins + goals
                 for (const m of scoredGames) {
                   const tA = m.team_a_name || 'Time A'
                   const tB = m.team_b_name || 'Time B'
                   ensureTeam(tA); ensureTeam(tB)
                   teamStats[tA].totalGames++; teamStats[tB].totalGames++
+                  teamStats[tA].goalsFor += Number(m.score_a); teamStats[tA].goalsAgainst += Number(m.score_b)
+                  teamStats[tB].goalsFor += Number(m.score_b); teamStats[tB].goalsAgainst += Number(m.score_a)
                   if (m.score_a > m.score_b) { teamStats[tA].gameWins++; teamStats[tB].gameLosses++ }
                   else if (m.score_b > m.score_a) { teamStats[tB].gameWins++; teamStats[tA].gameLosses++ }
                   else { teamStats[tA].gameDraws++; teamStats[tB].gameDraws++ }
@@ -885,7 +923,10 @@ export default function PublicPage() {
                 const ranking = Object.values(teamStats).sort((a, b) => {
                   if (b.champWins !== a.champWins) return b.champWins - a.champWins
                   if (b.gameWins !== a.gameWins) return b.gameWins - a.gameWins
-                  return b.totalGames - a.totalGames
+                  const diffA = a.goalsFor - a.goalsAgainst
+                  const diffB = b.goalsFor - b.goalsAgainst
+                  if (diffB !== diffA) return diffB - diffA
+                  return b.goalsFor - a.goalsFor
                 })
 
                 return (
@@ -953,13 +994,19 @@ export default function PublicPage() {
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                                <div className="flex items-center gap-2 sm:gap-3 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
                                   <span>{team.totalGames}J</span>
                                   <span className="text-green-600 font-medium">{team.gameWins}V</span>
                                   <span className="text-amber-600">{team.gameDraws}E</span>
                                   <span className="text-red-500">{team.gameLosses}D</span>
                                   <span className="text-brand-navy font-medium">
                                     {team.totalGames > 0 ? Math.round((team.gameWins / team.totalGames) * 100) : 0}%
+                                  </span>
+                                  <span className="text-muted-foreground/50">|</span>
+                                  <span>{team.goalsFor}GP</span>
+                                  <span>{team.goalsAgainst}GC</span>
+                                  <span className={`font-medium ${(team.goalsFor - team.goalsAgainst) > 0 ? 'text-green-600' : (team.goalsFor - team.goalsAgainst) < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                    {(team.goalsFor - team.goalsAgainst) > 0 ? '+' : ''}{team.goalsFor - team.goalsAgainst}SG
                                   </span>
                                 </div>
                               </div>
@@ -979,7 +1026,7 @@ export default function PublicPage() {
                       </div>
                     )}
 
-                    {/* Lista de campeonatos com campeao */}
+                    {/* Lista de campeonatos com campeao + jogos colapsaveis */}
                     <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '400ms' }}>
                       <div className="px-4 py-3 border-b">
                         <h3 className="text-sm font-bold text-brand-navy flex items-center gap-2">
@@ -990,13 +1037,28 @@ export default function PublicPage() {
                       <div className="divide-y">
                         {champResults.map((cr, idx) => {
                           const t = campTournaments[idx]
-                          const tMatches = campMatches.filter((m: any) => m.tournament_id === t.id)
+                          const tMatches = campMatches.filter((m: any) => m.tournament_id === t.id).sort((a: any, b: any) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
                           const statusLabel = TOURNAMENT_STATUSES[t.status] || t.status
                           const statusColor = t.status === 'active' ? 'text-green-600 bg-green-50' : t.status === 'finished' ? 'text-gray-600 bg-gray-100' : 'text-red-600 bg-red-50'
+                          const isExpanded = expandedTournaments.has(t.id)
+
+                          function toggleExpand() {
+                            setExpandedTournaments(prev => {
+                              const next = new Set(prev)
+                              if (next.has(t.id)) next.delete(t.id)
+                              else next.add(t.id)
+                              return next
+                            })
+                          }
 
                           return (
-                            <div key={t.id} className="px-4 py-3">
-                              <div className="flex items-center justify-between">
+                            <div key={t.id}>
+                              {/* Tournament header - clickable */}
+                              <button
+                                type="button"
+                                onClick={toggleExpand}
+                                className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors text-left"
+                              >
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-bold text-sm text-brand-navy">{t.name}</span>
@@ -1010,17 +1072,76 @@ export default function PublicPage() {
                                     <span>{tMatches.length} jogos</span>
                                   </div>
                                 </div>
-                                {cr.winner ? (
-                                  <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-3 py-1.5 shrink-0">
-                                    <Trophy className="h-3.5 w-3.5 text-amber-600" />
-                                    <span className="text-sm font-bold text-amber-800">{cr.winner}</span>
-                                  </div>
-                                ) : t.status === 'active' ? (
-                                  <span className="text-[11px] text-green-600 font-medium bg-green-50 rounded-full px-2 py-0.5">Em andamento</span>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground">Sem vencedor</span>
-                                )}
-                              </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {cr.winner ? (
+                                    <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-2.5 py-1 shrink-0">
+                                      <Trophy className="h-3 w-3 text-amber-600" />
+                                      <span className="text-xs font-bold text-amber-800">{cr.winner}</span>
+                                    </div>
+                                  ) : t.status === 'active' ? (
+                                    <span className="text-[11px] text-green-600 font-medium bg-green-50 rounded-full px-2 py-0.5">Em andamento</span>
+                                  ) : null}
+                                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+                              </button>
+
+                              {/* Match results - collapsible */}
+                              {isExpanded && (
+                                <div className="px-4 pb-3">
+                                  {tMatches.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground text-center py-3">Nenhum jogo registrado.</p>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {tMatches.map((m: any) => {
+                                        const hasScore = m.score_a != null && m.score_b != null
+                                        const teamA = m.team_a_name || 'Time A'
+                                        const teamB = m.team_b_name || 'Time B'
+                                        const matchDate = m.match_date ? format(new Date(m.match_date + 'T12:00:00'), 'dd/MM', { locale: ptBR }) : ''
+                                        const phase = m.tournament_phase
+
+                                        return (
+                                          <div key={m.id} className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs">
+                                            {/* Date */}
+                                            <span className="text-[10px] text-muted-foreground w-10 shrink-0">{matchDate}</span>
+
+                                            {/* Phase badge */}
+                                            {phase && (
+                                              <span className="text-[9px] bg-brand-navy/10 text-brand-navy rounded px-1 py-0.5 shrink-0">
+                                                {phase}
+                                              </span>
+                                            )}
+
+                                            {/* Team A */}
+                                            <span className={`flex-1 text-right truncate font-medium ${hasScore && m.score_a > m.score_b ? 'text-brand-navy' : 'text-foreground'}`}>
+                                              {teamA}
+                                            </span>
+
+                                            {/* Score */}
+                                            {hasScore ? (
+                                              <div className="flex items-center gap-1 shrink-0 bg-white rounded-md px-2 py-0.5 shadow-sm border">
+                                                <span className={`font-bold text-sm min-w-[14px] text-center ${m.score_a > m.score_b ? 'text-green-600' : m.score_a < m.score_b ? 'text-red-500' : 'text-foreground'}`}>
+                                                  {m.score_a}
+                                                </span>
+                                                <span className="text-muted-foreground text-[10px] font-bold">x</span>
+                                                <span className={`font-bold text-sm min-w-[14px] text-center ${m.score_b > m.score_a ? 'text-green-600' : m.score_b < m.score_a ? 'text-red-500' : 'text-foreground'}`}>
+                                                  {m.score_b}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-muted-foreground shrink-0 bg-white rounded-md px-2 py-0.5 shadow-sm border text-[10px]">vs</span>
+                                            )}
+
+                                            {/* Team B */}
+                                            <span className={`flex-1 truncate font-medium ${hasScore && m.score_b > m.score_a ? 'text-brand-navy' : 'text-foreground'}`}>
+                                              {teamB}
+                                            </span>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -1032,81 +1153,6 @@ export default function PublicPage() {
             </div>
           </TabsContent>
 
-          {/* ===================== AVISOS VIEW ===================== */}
-          <TabsContent value="avisos" className="transition-all duration-300">
-            <div className="space-y-3 pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-[#1B1F4B] flex items-center justify-center">
-                  <Megaphone className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-[#1B1F4B]">Mural de Avisos</h2>
-                  <p className="text-xs text-muted-foreground">Comunicados e informacoes do grupo</p>
-                </div>
-              </div>
-
-              {announcementsLoading ? (
-                <div className="text-center py-12 text-muted-foreground">Carregando avisos...</div>
-              ) : announcements.length === 0 ? (
-                <div className="text-center py-12">
-                  <Megaphone className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground font-medium">Nenhum aviso publicado</p>
-                  <p className="text-xs text-muted-foreground mt-1">Avisos do grupo aparecerão aqui</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {announcements.map((a: any) => {
-                    const createdAt = new Date(a.created_at)
-                    const isRecent = (Date.now() - createdAt.getTime()) < 3 * 24 * 60 * 60 * 1000 // 3 dias
-
-                    return (
-                      <div
-                        key={a.id}
-                        className={`rounded-xl border p-4 transition-all ${
-                          a.pinned
-                            ? 'border-[#1B1F4B]/30 bg-[#1B1F4B]/5 shadow-sm'
-                            : 'bg-white'
-                        }`}
-                      >
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {a.pinned && (
-                              <Pin className="h-3.5 w-3.5 text-[#1B1F4B] shrink-0 rotate-45" />
-                            )}
-                            <h3 className={`text-sm font-semibold truncate ${a.pinned ? 'text-[#1B1F4B]' : 'text-gray-900'}`}>
-                              {a.title}
-                            </h3>
-                            {isRecent && !a.pinned && (
-                              <Badge variant="secondary" className="bg-[#00C853]/10 text-[#00C853] text-[10px] px-1.5 py-0 shrink-0">
-                                Novo
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                          {a.content}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100">
-                          <span className="text-[11px] text-muted-foreground">
-                            {a.author?.name || 'Admin'}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">•</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {format(createdAt, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </TabsContent>
         </Tabs>
 
         {/* Footer */}
