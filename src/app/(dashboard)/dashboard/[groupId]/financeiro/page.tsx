@@ -17,13 +17,12 @@ import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
   MessageCircle, Send, Image, Eye, Wallet, Users, Calculator, ShieldAlert,
-  ChevronLeft, ChevronRight, CalendarDays, Trophy, Shield, ListOrdered, GitBranch, Repeat,
+  ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
 import { MonthNavigator } from '@/components/shared/month-navigator'
-import Link from 'next/link'
-import { EXPENSE_CATEGORIES, TOURNAMENT_STATUSES, TOURNAMENT_FORMATS, type Expense, type GroupMember, type Group, type MonthlyFee, type Tournament, type Match } from '@/lib/types'
+import { EXPENSE_CATEGORIES, type Expense, type GroupMember, type Group, type MonthlyFee } from '@/lib/types'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { uploadReceipt } from '@/lib/upload-receipt'
 import { logAudit } from '@/lib/audit'
@@ -114,11 +113,6 @@ export default function FinanceiroPage() {
   // Rateio state
   const [rateioMatches, setRateioMatches] = useState<RateioMatch[]>([])
   const [loadingRateio, setLoadingRateio] = useState(false)
-
-  // Campeonatos dashboard state
-  const [campeonatosData, setCampeonatosData] = useState<{ tournaments: Tournament[]; matches: Match[]; teamWins: Record<string, { name: string; wins: number; total: number }> }>({ tournaments: [], matches: [], teamWins: {} })
-  const [loadingCampeonatos, setLoadingCampeonatos] = useState(false)
-  const [campeonatosYear, setCampeonatosYear] = useState(new Date().getFullYear())
 
   const currentMonth = format(currentDate, 'yyyy-MM')
 
@@ -247,65 +241,6 @@ export default function FinanceiroPage() {
     setLoadingRateio(false)
   }, [groupId, currentMonth])
 
-  // Load campeonatos dashboard data
-  const loadCampeonatos = useCallback(async () => {
-    setLoadingCampeonatos(true)
-    const yearStart = `${campeonatosYear}-01-01`
-    const yearEnd = `${campeonatosYear}-12-31`
-
-    // Get all tournaments for this group
-    const { data: tournamentsData } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: false })
-
-    const allTournaments = tournamentsData || []
-
-    // Filter by year (start_date or created_at)
-    const yearTournaments = allTournaments.filter(t => {
-      const d = t.start_date || t.created_at
-      if (!d) return false
-      const y = new Date(d).getFullYear()
-      return y === campeonatosYear
-    })
-
-    // Get all matches for these tournaments
-    const tournamentIds = yearTournaments.map(t => t.id)
-    let allMatches: Match[] = []
-    if (tournamentIds.length > 0) {
-      const { data: matchesData } = await supabase
-        .from('matches')
-        .select('*')
-        .in('tournament_id', tournamentIds)
-        .order('match_date', { ascending: true })
-      allMatches = matchesData || []
-    }
-
-    // Build team wins ranking (across all tournaments)
-    const teamWins: Record<string, { name: string; wins: number; total: number }> = {}
-
-    for (const tournament of yearTournaments) {
-      if (tournament.status === 'cancelled') continue
-      const tMatches = allMatches.filter(m => m.tournament_id === tournament.id)
-      const scored = tMatches.filter(m => m.score_a != null && m.score_b != null)
-
-      for (const m of scored) {
-        const teamA = m.team_a_name || 'Time A'
-        const teamB = m.team_b_name || 'Time B'
-        if (!teamWins[teamA]) teamWins[teamA] = { name: teamA, wins: 0, total: 0 }
-        if (!teamWins[teamB]) teamWins[teamB] = { name: teamB, wins: 0, total: 0 }
-        teamWins[teamA].total++
-        teamWins[teamB].total++
-        if (m.score_a! > m.score_b!) teamWins[teamA].wins++
-        else if (m.score_b! > m.score_a!) teamWins[teamB].wins++
-      }
-    }
-
-    setCampeonatosData({ tournaments: yearTournaments, matches: allMatches, teamWins })
-    setLoadingCampeonatos(false)
-  }, [groupId, campeonatosYear])
-
   useEffect(() => {
     loadData()
     loadAccumulatedBalance()
@@ -314,11 +249,6 @@ export default function FinanceiroPage() {
   useEffect(() => {
     loadRateio()
   }, [loadRateio])
-
-  // Load campeonatos when year changes
-  useEffect(() => {
-    loadCampeonatos()
-  }, [loadCampeonatos])
 
   // Load DRE annual data
   useEffect(() => {
@@ -871,10 +801,6 @@ export default function FinanceiroPage() {
           <TabsTrigger value="rateio">
             <Calculator className="h-4 w-4 mr-1.5" />
             Rateio
-          </TabsTrigger>
-          <TabsTrigger value="campeonatos" onClick={() => { if (campeonatosData.tournaments.length === 0) loadCampeonatos() }}>
-            <Trophy className="h-4 w-4 mr-1.5" />
-            Campeonatos
           </TabsTrigger>
         </TabsList>
 
@@ -1653,187 +1579,6 @@ export default function FinanceiroPage() {
                   </Table>
                 </CardContent>
               </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ── Tab: Campeonatos ── */}
-        <TabsContent value="campeonatos">
-          <div className="space-y-4 mt-4">
-            {/* Year filter */}
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCampeonatosYear(y => y - 1) }}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-lg font-bold text-brand-navy">{campeonatosYear}</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCampeonatosYear(y => y + 1) }}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="ml-2 h-8 text-xs" onClick={loadCampeonatos}>
-                Atualizar
-              </Button>
-            </div>
-
-            {loadingCampeonatos ? (
-              <div className="text-center py-8 text-muted-foreground">Carregando campeonatos...</div>
-            ) : campeonatosData.tournaments.length === 0 ? (
-              <Card className="card-modern-elevated">
-                <CardContent className="text-center py-8 text-muted-foreground">
-                  Nenhum campeonato encontrado em {campeonatosYear}.
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Summary cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <Card className="card-modern-elevated">
-                    <CardContent className="p-4 text-center">
-                      <Trophy className="h-5 w-5 mx-auto mb-1 text-brand-navy" />
-                      <p className="text-2xl font-bold text-brand-navy">{campeonatosData.tournaments.length}</p>
-                      <p className="text-xs text-muted-foreground">Campeonatos</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="card-modern-elevated">
-                    <CardContent className="p-4 text-center">
-                      <CalendarDays className="h-5 w-5 mx-auto mb-1 text-brand-navy" />
-                      <p className="text-2xl font-bold text-brand-navy">{campeonatosData.matches.length}</p>
-                      <p className="text-xs text-muted-foreground">Jogos</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="card-modern-elevated">
-                    <CardContent className="p-4 text-center">
-                      <Check className="h-5 w-5 mx-auto mb-1 text-[#00C853]" />
-                      <p className="text-2xl font-bold text-[#00C853]">
-                        {campeonatosData.tournaments.filter(t => t.status === 'finished').length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Finalizados</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="card-modern-elevated">
-                    <CardContent className="p-4 text-center">
-                      <Clock className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                      <p className="text-2xl font-bold text-amber-500">
-                        {campeonatosData.tournaments.filter(t => t.status === 'active').length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Em andamento</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Ranking de vitorias */}
-                {(() => {
-                  const ranking = Object.values(campeonatosData.teamWins)
-                    .sort((a, b) => b.wins !== a.wins ? b.wins - a.wins : b.total - a.total)
-                  return ranking.length > 0 ? (
-                    <Card className="card-modern-elevated">
-                      <CardContent className="p-4">
-                        <h3 className="text-sm font-bold text-brand-navy mb-3 flex items-center gap-2">
-                          <Trophy className="h-4 w-4" />
-                          Ranking de Vitorias - {campeonatosYear}
-                        </h3>
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-[#1B1F4B]">
-                              <TableHead className="text-white font-semibold text-center w-12">#</TableHead>
-                              <TableHead className="text-white font-semibold">Time</TableHead>
-                              <TableHead className="text-white font-semibold text-center">Jogos</TableHead>
-                              <TableHead className="text-white font-semibold text-center">Vitorias</TableHead>
-                              <TableHead className="text-white font-semibold text-center">Aproveitamento</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {ranking.map((team, idx) => (
-                              <TableRow key={team.name} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <TableCell className="text-center font-bold text-brand-navy">
-                                  {idx === 0 ? <span className="flex items-center justify-center gap-1">🏆 1</span> : idx + 1}
-                                </TableCell>
-                                <TableCell className="font-semibold text-brand-navy">{team.name}</TableCell>
-                                <TableCell className="text-center">{team.total}</TableCell>
-                                <TableCell className="text-center text-green-600 font-bold">{team.wins}</TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-[#00C853] rounded-full transition-all"
-                                        style={{ width: `${team.total > 0 ? (team.wins / team.total) * 100 : 0}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-xs font-medium text-muted-foreground">
-                                      {team.total > 0 ? Math.round((team.wins / team.total) * 100) : 0}%
-                                    </span>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  ) : null
-                })()}
-
-                {/* Lista de campeonatos do ano */}
-                <Card className="card-modern-elevated">
-                  <CardContent className="p-4">
-                    <h3 className="text-sm font-bold text-brand-navy mb-3 flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4" />
-                      Campeonatos de {campeonatosYear}
-                    </h3>
-                    <div className="space-y-3">
-                      {campeonatosData.tournaments.map(tournament => {
-                        const fmtIcons: Record<string, typeof ListOrdered> = { league: ListOrdered, playoff: GitBranch, best_of_4: Repeat }
-                        const FormatIcon = fmtIcons[tournament.format] || ListOrdered
-                        const tMatches = campeonatosData.matches.filter(m => m.tournament_id === tournament.id)
-                        const scoredMatches = tMatches.filter(m => m.score_a != null && m.score_b != null)
-                        const statusColor = tournament.status === 'active' ? 'bg-green-100 text-green-700' : tournament.status === 'finished' ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'
-
-                        // Find tournament winner (team with most wins)
-                        const teamWinsInTournament: Record<string, number> = {}
-                        for (const m of scoredMatches) {
-                          const tA = m.team_a_name || 'Time A'
-                          const tB = m.team_b_name || 'Time B'
-                          if (!teamWinsInTournament[tA]) teamWinsInTournament[tA] = 0
-                          if (!teamWinsInTournament[tB]) teamWinsInTournament[tB] = 0
-                          if (m.score_a! > m.score_b!) teamWinsInTournament[tA]++
-                          else if (m.score_b! > m.score_a!) teamWinsInTournament[tB]++
-                        }
-                        const leader = Object.entries(teamWinsInTournament).sort((a, b) => b[1] - a[1])[0]
-
-                        return (
-                          <Link
-                            key={tournament.id}
-                            href={`/dashboard/${groupId}/campeonatos/${tournament.id}`}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-brand-navy/20 transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-sm text-brand-navy">{tournament.name}</span>
-                                <Badge className={statusColor + ' text-[10px]'}>
-                                  {TOURNAMENT_STATUSES[tournament.status]}
-                                </Badge>
-                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 gap-0.5 text-[10px]">
-                                  <FormatIcon className="h-2.5 w-2.5" />
-                                  {TOURNAMENT_FORMATS[tournament.format]}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                                <span>{tMatches.length} jogos</span>
-                                <span>{scoredMatches.length} com placar</span>
-                                {leader && (
-                                  <span className="text-brand-navy font-medium">
-                                    Lider: {leader[0]} ({leader[1]}V)
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
             )}
           </div>
         </TabsContent>

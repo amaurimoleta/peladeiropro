@@ -16,11 +16,11 @@ import {
 import {
   DollarSign, TrendingUp, TrendingDown, CheckCircle2, Clock,
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
-  ChevronRight, Users, Camera, Share2,
+  ChevronRight, Users, Camera, Share2, Trophy, Award,
 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { EXPENSE_CATEGORIES, PIX_KEY_TYPES } from '@/lib/types'
+import { EXPENSE_CATEGORIES, PIX_KEY_TYPES, TOURNAMENT_STATUSES, TOURNAMENT_FORMATS } from '@/lib/types'
 import { ShareButton } from '@/components/shared/share-button'
 import { CopyPixButton } from '@/components/shared/copy-pix-button'
 import { Logo } from '@/components/shared/logo'
@@ -116,6 +116,12 @@ export default function PublicPage() {
   const [annualMembers, setAnnualMembers] = useState<any[]>([])
   const [annualLoading, setAnnualLoading] = useState(false)
 
+  // Campeonatos state
+  const [campYear, setCampYear] = useState(new Date().getFullYear())
+  const [campTournaments, setCampTournaments] = useState<any[]>([])
+  const [campMatches, setCampMatches] = useState<any[]>([])
+  const [campLoading, setCampLoading] = useState(false)
+
   const currentMonth = format(currentDate, 'yyyy-MM')
 
   useEffect(() => {
@@ -190,6 +196,40 @@ export default function PublicPage() {
     }
     loadAnnualData()
   }, [group, selectedYear])
+
+  // Campeonatos data
+  useEffect(() => {
+    if (!group) return
+    async function loadCampData() {
+      setCampLoading(true)
+      const { data: tournamentsData } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('group_id', group.id)
+        .order('created_at', { ascending: false })
+
+      const all = tournamentsData || []
+      const yearFiltered = all.filter((t: any) => {
+        const d = t.start_date || t.created_at
+        return d && new Date(d).getFullYear() === campYear
+      })
+      setCampTournaments(yearFiltered)
+
+      const ids = yearFiltered.map((t: any) => t.id)
+      if (ids.length > 0) {
+        const { data: matchesData } = await supabase
+          .from('matches')
+          .select('*')
+          .in('tournament_id', ids)
+          .order('match_date', { ascending: true })
+        setCampMatches(matchesData || [])
+      } else {
+        setCampMatches([])
+      }
+      setCampLoading(false)
+    }
+    loadCampData()
+  }, [group, campYear])
 
   if (notFound) {
     return (
@@ -307,6 +347,7 @@ export default function PublicPage() {
           <TabsList className="w-full transition-all duration-300">
             <TabsTrigger value="mensal" className="flex-1 transition-all duration-200">Mensal</TabsTrigger>
             <TabsTrigger value="anual" className="flex-1 transition-all duration-200">Resumo Anual</TabsTrigger>
+            <TabsTrigger value="campeonatos" className="flex-1 transition-all duration-200">Campeonatos</TabsTrigger>
           </TabsList>
 
           {/* ===================== MONTHLY VIEW ===================== */}
@@ -722,6 +763,241 @@ export default function PublicPage() {
                   </div>
                 </>
               )}
+            </div>
+          </TabsContent>
+
+          {/* ===================== CAMPEONATOS VIEW ===================== */}
+          <TabsContent value="campeonatos" className="transition-all duration-300">
+            <div className="space-y-3 sm:space-y-4 pt-4">
+              {/* Year navigation */}
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setCampYear(y => y - 1)}
+                  className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-muted-foreground hover:text-brand-navy hover:border-brand-navy/30 transition-all"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-lg font-bold text-brand-navy min-w-[60px] text-center">{campYear}</span>
+                <button
+                  onClick={() => setCampYear(y => y + 1)}
+                  className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-muted-foreground hover:text-brand-navy hover:border-brand-navy/30 transition-all"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              {campLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Carregando campeonatos...</div>
+              ) : campTournaments.length === 0 ? (
+                <div className="card-modern-elevated p-6 text-center text-muted-foreground">
+                  Nenhum campeonato em {campYear}.
+                </div>
+              ) : (() => {
+                // Build comprehensive data
+                const finishedCount = campTournaments.filter((t: any) => t.status === 'finished').length
+                const activeCount = campTournaments.filter((t: any) => t.status === 'active').length
+                const totalGames = campMatches.length
+                const scoredGames = campMatches.filter((m: any) => m.score_a != null && m.score_b != null)
+
+                // Build team stats: wins per game AND championship wins
+                const teamStats: Record<string, { name: string; gameWins: number; gameLosses: number; gameDraws: number; totalGames: number; champWins: number }> = {}
+
+                function ensureTeam(name: string) {
+                  if (!teamStats[name]) teamStats[name] = { name, gameWins: 0, gameLosses: 0, gameDraws: 0, totalGames: 0, champWins: 0 }
+                }
+
+                // Count game wins
+                for (const m of scoredGames) {
+                  const tA = m.team_a_name || 'Time A'
+                  const tB = m.team_b_name || 'Time B'
+                  ensureTeam(tA); ensureTeam(tB)
+                  teamStats[tA].totalGames++; teamStats[tB].totalGames++
+                  if (m.score_a > m.score_b) { teamStats[tA].gameWins++; teamStats[tB].gameLosses++ }
+                  else if (m.score_b > m.score_a) { teamStats[tB].gameWins++; teamStats[tA].gameLosses++ }
+                  else { teamStats[tA].gameDraws++; teamStats[tB].gameDraws++ }
+                }
+
+                // Count championship wins (for finished tournaments, team with most wins)
+                const champResults: { tournament: string; winner: string | null; format: string }[] = []
+                for (const t of campTournaments) {
+                  const tMatches = scoredGames.filter((m: any) => m.tournament_id === t.id)
+                  if (tMatches.length === 0) { champResults.push({ tournament: t.name, winner: null, format: t.format }); continue }
+
+                  const winsMap: Record<string, number> = {}
+                  for (const m of tMatches) {
+                    const tA = m.team_a_name || 'Time A'
+                    const tB = m.team_b_name || 'Time B'
+                    if (!winsMap[tA]) winsMap[tA] = 0
+                    if (!winsMap[tB]) winsMap[tB] = 0
+                    if (m.score_a > m.score_b) winsMap[tA]++
+                    else if (m.score_b > m.score_a) winsMap[tB]++
+                  }
+
+                  const sorted = Object.entries(winsMap).sort((a, b) => b[1] - a[1])
+                  let winner: string | null = null
+
+                  if (t.format === 'best_of_4') {
+                    // Winner is first team to 4 wins
+                    const w = sorted.find(([, v]) => v >= 4)
+                    winner = w ? w[0] : null
+                  } else if (t.status === 'finished' && sorted.length > 0 && sorted[0][1] > (sorted[1]?.[1] || 0)) {
+                    winner = sorted[0][0]
+                  }
+
+                  champResults.push({ tournament: t.name, winner, format: t.format })
+                  if (winner) {
+                    ensureTeam(winner)
+                    teamStats[winner].champWins++
+                  }
+                }
+
+                const ranking = Object.values(teamStats).sort((a, b) => {
+                  if (b.champWins !== a.champWins) return b.champWins - a.champWins
+                  if (b.gameWins !== a.gameWins) return b.gameWins - a.gameWins
+                  return b.totalGames - a.totalGames
+                })
+
+                return (
+                  <>
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-brand-navy to-indigo-700 flex items-center justify-center mx-auto mb-1.5 shadow-sm">
+                          <Trophy className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Campeonatos</p>
+                        <p className="text-lg sm:text-xl font-bold text-brand-navy">{campTournaments.length}</p>
+                      </div>
+                      <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-1.5 shadow-sm">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Finalizados</p>
+                        <p className="text-lg sm:text-xl font-bold text-[#00C853]">{finishedCount}</p>
+                      </div>
+                      <div className="card-modern-elevated p-3 text-center animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-brand-navy to-blue-600 flex items-center justify-center mx-auto mb-1.5 shadow-sm">
+                          <CalendarDays className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Jogos</p>
+                        <p className="text-lg sm:text-xl font-bold text-brand-navy">{totalGames}</p>
+                      </div>
+                    </div>
+
+                    {/* Ranking de Campeonatos Ganhos - DESTAQUE PRINCIPAL */}
+                    {ranking.length > 0 && (
+                      <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+                        <div className="bg-gradient-to-r from-brand-navy to-indigo-700 px-4 py-3">
+                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Award className="h-4 w-4" />
+                            Ranking de Campeonatos Ganhos - {campYear}
+                          </h3>
+                        </div>
+                        <div className="divide-y">
+                          {ranking.map((team, idx) => (
+                            <div key={team.name} className={`flex items-center gap-3 px-4 py-3 ${idx === 0 && team.champWins > 0 ? 'bg-amber-50/50' : ''}`}>
+                              {/* Position */}
+                              <div className="w-8 text-center shrink-0">
+                                {idx === 0 && team.champWins > 0 ? (
+                                  <span className="text-lg">🏆</span>
+                                ) : idx === 1 && team.champWins > 0 ? (
+                                  <span className="text-lg">🥈</span>
+                                ) : idx === 2 && team.champWins > 0 ? (
+                                  <span className="text-lg">🥉</span>
+                                ) : (
+                                  <span className="text-sm font-bold text-muted-foreground">{idx + 1}</span>
+                                )}
+                              </div>
+
+                              {/* Team info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-bold text-sm ${idx === 0 && team.champWins > 0 ? 'text-brand-navy' : 'text-foreground'}`}>
+                                    {team.name}
+                                  </span>
+                                  {team.champWins > 0 && (
+                                    <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 text-[10px] font-bold">
+                                      <Trophy className="h-2.5 w-2.5" />
+                                      {team.champWins} {team.champWins === 1 ? 'titulo' : 'titulos'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                                  <span>{team.totalGames}J</span>
+                                  <span className="text-green-600 font-medium">{team.gameWins}V</span>
+                                  <span className="text-amber-600">{team.gameDraws}E</span>
+                                  <span className="text-red-500">{team.gameLosses}D</span>
+                                  <span className="text-brand-navy font-medium">
+                                    {team.totalGames > 0 ? Math.round((team.gameWins / team.totalGames) * 100) : 0}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Championship wins - BIG number */}
+                              <div className="text-center shrink-0">
+                                <p className={`text-2xl font-extrabold ${team.champWins > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                                  {team.champWins}
+                                </p>
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">
+                                  {team.champWins === 1 ? 'titulo' : 'titulos'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de campeonatos com campeao */}
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+                      <div className="px-4 py-3 border-b">
+                        <h3 className="text-sm font-bold text-brand-navy flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4" />
+                          Campeonatos de {campYear}
+                        </h3>
+                      </div>
+                      <div className="divide-y">
+                        {champResults.map((cr, idx) => {
+                          const t = campTournaments[idx]
+                          const tMatches = campMatches.filter((m: any) => m.tournament_id === t.id)
+                          const statusLabel = TOURNAMENT_STATUSES[t.status] || t.status
+                          const statusColor = t.status === 'active' ? 'text-green-600 bg-green-50' : t.status === 'finished' ? 'text-gray-600 bg-gray-100' : 'text-red-600 bg-red-50'
+
+                          return (
+                            <div key={t.id} className="px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-sm text-brand-navy">{t.name}</span>
+                                    <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${statusColor}`}>
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                    <span>{TOURNAMENT_FORMATS[t.format]}</span>
+                                    <span>-</span>
+                                    <span>{tMatches.length} jogos</span>
+                                  </div>
+                                </div>
+                                {cr.winner ? (
+                                  <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-3 py-1.5 shrink-0">
+                                    <Trophy className="h-3.5 w-3.5 text-amber-600" />
+                                    <span className="text-sm font-bold text-amber-800">{cr.winner}</span>
+                                  </div>
+                                ) : t.status === 'active' ? (
+                                  <span className="text-[11px] text-green-600 font-medium bg-green-50 rounded-full px-2 py-0.5">Em andamento</span>
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground">Sem vencedor</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </TabsContent>
         </Tabs>
