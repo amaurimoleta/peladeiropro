@@ -618,11 +618,12 @@ export default function FinanceiroPage() {
   )
 
   // Saldo Acumulado
+  const groupInitialBalance = Number(group?.initial_balance ?? 0)
   const allTimeIncome = allTimeFees + allTimeGuests
-  const accumulatedBalance = allTimeIncome - allTimeExpenses
+  const accumulatedBalance = groupInitialBalance + allTimeIncome - allTimeExpenses
 
   // Saldo Inicial (tudo antes do mes selecionado) e Saldo Final
-  const saldoInicial = (priorFees + priorGuests) - priorExpenses
+  const saldoInicial = groupInitialBalance + (priorFees + priorGuests) - priorExpenses
   const receitasDoMes = dreTotalIncome
   const despesasDoMes = dreTotalExpenses
   const saldoFinal = saldoInicial + receitasDoMes - despesasDoMes

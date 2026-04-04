@@ -19,6 +19,7 @@ export interface Group {
   public_slug: string | null
   cover_url: string | null
   goalkeeper_pays_fee: boolean
+  initial_balance: number
   created_by: string
   created_at: string
   updated_at: string

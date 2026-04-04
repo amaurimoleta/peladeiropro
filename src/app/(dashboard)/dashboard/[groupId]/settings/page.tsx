@@ -91,6 +91,7 @@ export default function SettingsPage() {
   const [pixKeyType, setPixKeyType] = useState('')
   const [pixBeneficiary, setPixBeneficiary] = useState('')
   const [goalkeeperPaysFee, setGoalkeeperPaysFee] = useState(true)
+  const [initialBalance, setInitialBalance] = useState('')
 
   // Members state (for admin management)
   const [members, setMembers] = useState<GroupMember[]>([])
@@ -120,6 +121,7 @@ export default function SettingsPage() {
         setPixKeyType(data.pix_key_type || '')
         setPixBeneficiary(data.pix_beneficiary_name || '')
         setGoalkeeperPaysFee(data.goalkeeper_pays_fee ?? true)
+        setInitialBalance(String(data.initial_balance ?? 0))
       }
       setLoading(false)
     }
@@ -175,6 +177,8 @@ export default function SettingsPage() {
       if ((pixKeyType || null) !== group.pix_key_type) changes.pix_key_type = { from: group.pix_key_type, to: pixKeyType || null }
       if ((pixBeneficiary || null) !== group.pix_beneficiary_name) changes.pix_beneficiary_name = { from: group.pix_beneficiary_name, to: pixBeneficiary || null }
       if (goalkeeperPaysFee !== group.goalkeeper_pays_fee) changes.goalkeeper_pays_fee = { from: group.goalkeeper_pays_fee, to: goalkeeperPaysFee }
+      const newInitialBalance = parseFloat(initialBalance) || 0
+      if (newInitialBalance !== (group.initial_balance ?? 0)) changes.initial_balance = { from: group.initial_balance ?? 0, to: newInitialBalance }
     }
 
     const { error } = await supabase.from('groups').update({
@@ -186,6 +190,7 @@ export default function SettingsPage() {
       pix_key_type: pixKeyType || null,
       pix_beneficiary_name: pixBeneficiary || null,
       goalkeeper_pays_fee: goalkeeperPaysFee,
+      initial_balance: parseFloat(initialBalance) || 0,
     }).eq('id', groupId)
 
     if (error) {
@@ -203,6 +208,7 @@ export default function SettingsPage() {
         pix_key_type: (pixKeyType || null) as Group['pix_key_type'],
         pix_beneficiary_name: pixBeneficiary || null,
         goalkeeper_pays_fee: goalkeeperPaysFee,
+        initial_balance: parseFloat(initialBalance) || 0,
       } : null)
 
       // Log audit with details of what changed
@@ -437,6 +443,20 @@ export default function SettingsPage() {
                 <Label>Dia de vencimento</Label>
                 <Input type="number" min="1" max="28" value={dueDay} onChange={(e) => setDueDay(e.target.value)} disabled={isReadOnly} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Saldo inicial (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={initialBalance}
+                onChange={(e) => setInitialBalance(e.target.value)}
+                disabled={isReadOnly}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Valor do caixa antes de comecar a usar o sistema. Sera somado ao saldo acumulado.
+              </p>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
               <div>

@@ -101,7 +101,8 @@ export default async function GroupDashboard({
   const totalAllFeesPaid = allFees?.reduce((acc, f) => acc + Number(f.amount), 0) || 0
   const totalAllGuestsPaid = allGuests?.reduce((acc, g) => acc + Number(g.amount), 0) || 0
   const totalAllExpenses = allExpenses?.reduce((acc, e) => acc + Number(e.amount), 0) || 0
-  const accumulatedBalance = totalAllFeesPaid + totalAllGuestsPaid - totalAllExpenses
+  const groupInitialBalance = Number(group?.initial_balance ?? 0)
+  const accumulatedBalance = groupInitialBalance + totalAllFeesPaid + totalAllGuestsPaid - totalAllExpenses
 
   // ---- Current month calculations ----
   const totalFeesPaid = filteredFees?.filter(f => f.status === 'paid').reduce((acc, f) => acc + Number(f.amount), 0) || 0
