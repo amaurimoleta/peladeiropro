@@ -507,6 +507,27 @@ export default function FinanceiroPage() {
     }
   }
 
+  async function deleteFee(feeId: string, memberName?: string) {
+    const { error } = await supabase
+      .from('monthly_fees')
+      .delete()
+      .eq('id', feeId)
+    if (error) {
+      toast.error('Erro ao excluir mensalidade')
+    } else {
+      toast.success('Mensalidade excluida.')
+      await logAudit(supabase, {
+        groupId,
+        action: 'delete_fee',
+        entityType: 'monthly_fee',
+        entityId: feeId,
+        details: { member: memberName, month: currentMonth },
+      })
+      loadData()
+      loadAccumulatedBalance()
+    }
+  }
+
   // ── Guest CRUD functions ──
 
   function resetGuestForm() {
@@ -1348,12 +1369,20 @@ export default function FinanceiroPage() {
                                 <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
                                   Dispensar
                                 </Button>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
                             ) : (fee.status === 'paid' || fee.status === 'dm_leave' || fee.status === 'waived') && isAdmin ? (
-                              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy" onClick={() => openEditPaymentDialog(fee)}>
-                                <Pencil className="h-3 w-3 mr-1" />
-                                Editar
-                              </Button>
+                              <div className="flex gap-1 justify-end">
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy" onClick={() => openEditPaymentDialog(fee)}>
+                                  <Pencil className="h-3 w-3 mr-1" />
+                                  Editar
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ) : null}
                           </TableCell>
                         </TableRow>
