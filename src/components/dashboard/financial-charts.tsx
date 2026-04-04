@@ -47,7 +47,7 @@ const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6', '#ec4899'
 function CustomBarTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border bg-white p-3 shadow-md text-sm">
+    <div className="rounded-lg border bg-white dark:bg-[#1e2235] dark:border-white/10 p-3 shadow-md text-sm">
       <p className="font-semibold text-brand-navy mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} style={{ color: entry.color }}>
@@ -61,7 +61,7 @@ function CustomBarTooltip({ active, payload, label }: any) {
 function CustomLineTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border bg-white p-3 shadow-md text-sm">
+    <div className="rounded-lg border bg-white dark:bg-[#1e2235] dark:border-white/10 p-3 shadow-md text-sm">
       <p className="font-semibold text-brand-navy mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} style={{ color: entry.color }}>
@@ -76,7 +76,7 @@ function CustomPieTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
   const data = payload[0]
   return (
-    <div className="rounded-lg border bg-white p-3 shadow-md text-sm">
+    <div className="rounded-lg border bg-white dark:bg-[#1e2235] dark:border-white/10 p-3 shadow-md text-sm">
       <p className="font-semibold text-brand-navy">{data.name}</p>
       <p style={{ color: data.payload.color }}>R$ {Number(data.value).toFixed(2)}</p>
     </div>
