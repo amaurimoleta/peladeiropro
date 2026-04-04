@@ -321,17 +321,17 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
   ).length
 
   return (
-    <div className="card-modern-elevated p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card-modern-elevated p-3 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm shrink-0">
             <RepeatIcon className="h-4 w-4 text-white" />
           </div>
-          <h2 className="font-bold text-[#1B1F4B]">Despesas Recorrentes</h2>
+          <h2 className="font-bold text-sm sm:text-base text-[#1B1F4B] dark:text-gray-100">Despesas Recorrentes</h2>
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
@@ -344,7 +344,8 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
               ) : (
                 <CalendarClock className="h-3.5 w-3.5 mr-1" />
               )}
-              Gerar Despesas do Mes
+              <span className="hidden sm:inline">Gerar Despesas do Mes</span>
+              <span className="sm:hidden">Gerar</span>
               {pendingCount > 0 && (
                 <Badge variant="destructive" className="ml-1.5 text-[10px] px-1.5">
                   {pendingCount}
@@ -357,8 +358,9 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
               className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm hover:opacity-90"
               onClick={openCreateDialog}
             >
-              <Plus className="h-4 w-4 mr-1" />
-              Nova Despesa Recorrente
+              <Plus className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Nova Despesa Recorrente</span>
+              <span className="sm:hidden">Nova</span>
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogContent>
@@ -369,7 +371,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                   <div>
-                    <Label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">
+                    <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
                       Descricao
                     </Label>
                     <Input
@@ -379,7 +381,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                     />
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">
+                    <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
                       Valor (R$)
                     </Label>
                     <Input
@@ -392,7 +394,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                     />
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">
+                    <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
                       Categoria
                     </Label>
                     <Select
@@ -431,7 +433,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-[#1B1F4B] mb-1.5 block">
+                    <Label className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-1.5 block">
                       Dia do mes
                     </Label>
                     <Input
@@ -481,7 +483,7 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-sm text-[#1B1F4B] truncate">
+                    <h3 className="font-semibold text-sm text-[#1B1F4B] dark:text-gray-100 truncate">
                       {expense.description}
                     </h3>
                     <Badge
@@ -495,14 +497,14 @@ export default function RecurringExpenses({ groupId }: { groupId: string }) {
                       {expense.active ? 'Ativa' : 'Pausada'}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="font-medium text-[#1B1F4B]">
+                  <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground flex-wrap">
+                    <span className="font-medium text-[#1B1F4B] dark:text-gray-100">
                       R$ {expense.amount.toFixed(2)}
                     </span>
-                    <span>{getCategoryLabel(expense.category, expense.custom_category_id)}</span>
+                    <span className="truncate max-w-[80px] sm:max-w-none">{getCategoryLabel(expense.category, expense.custom_category_id)}</span>
                     <span>Dia {expense.day_of_month}</span>
                     {expense.last_generated_month && (
-                      <span>
+                      <span className="hidden sm:inline">
                         Ultimo: {expense.last_generated_month}
                       </span>
                     )}

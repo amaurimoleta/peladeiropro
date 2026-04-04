@@ -38,7 +38,7 @@ export default async function GroupLayout({
   return (
     <div className="flex min-h-screen gradient-surface">
       <Sidebar groupId={groupId} groupName={group.name} />
-      <main className="flex-1 lg:pl-0">
+      <main className="flex-1 min-w-0 overflow-x-hidden lg:pl-0">
         <div className="p-4 lg:p-8 pt-14 lg:pt-8 max-w-6xl mx-auto">
           {children}
         </div>

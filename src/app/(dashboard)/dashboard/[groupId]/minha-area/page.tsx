@@ -414,7 +414,7 @@ export default function MinhaAreaPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Minha Area</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Minha Area</h1>
         <p className="text-sm text-muted-foreground">Acompanhe seus pagamentos, ranking e presenca</p>
       </div>
 
@@ -488,7 +488,7 @@ export default function MinhaAreaPage() {
           <CardContent className="pt-4 pb-4 px-3 sm:px-6">
             <div className="flex flex-col items-center gap-4">
               <div className="w-full">
-                <h3 className="font-bold text-[#1B1F4B] mb-1">Pague via PIX</h3>
+                <h3 className="font-bold text-[#1B1F4B] dark:text-gray-100 mb-1">Pague via PIX</h3>
                 <p className="text-sm text-muted-foreground mb-2">
                   Escaneie o QR Code para pagar suas pendencias. Depois, envie o comprovante.
                 </p>
@@ -539,8 +539,8 @@ export default function MinhaAreaPage() {
         <Card className="mb-6">
           <CardContent className="p-0">
             <div className="p-4 border-b flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#1B1F4B]" />
-              <h3 className="font-bold text-[#1B1F4B]">Proximos Jogos</h3>
+              <Calendar className="h-4 w-4 text-[#1B1F4B] dark:text-gray-100" />
+              <h3 className="font-bold text-[#1B1F4B] dark:text-gray-100">Proximos Jogos</h3>
             </div>
             <div className="divide-y">
               {upcomingMatches.map(match => {
@@ -556,7 +556,7 @@ export default function MinhaAreaPage() {
                   <div key={match.id} className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="font-semibold text-[#1B1F4B] capitalize">
+                        <p className="font-semibold text-[#1B1F4B] dark:text-gray-100 capitalize">
                           {format(new Date(match.match_date + 'T12:00:00'), "EEEE, dd/MM", { locale: ptBR })}
                         </p>
                         {match.location && (
@@ -624,7 +624,7 @@ export default function MinhaAreaPage() {
       <Card>
         <CardContent className="p-0">
           <div className="p-3 sm:p-4 border-b flex items-center justify-between">
-            <h3 className="font-bold text-[#1B1F4B] text-sm sm:text-base">Minhas Mensalidades</h3>
+            <h3 className="font-bold text-[#1B1F4B] dark:text-gray-100 text-sm sm:text-base">Minhas Mensalidades</h3>
             <span className="text-xs sm:text-sm text-muted-foreground">{fees.length} registros</span>
           </div>
           <div className="overflow-x-auto">
@@ -696,7 +696,7 @@ export default function MinhaAreaPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-[#1B1F4B]"
+                className="text-[#1B1F4B] dark:text-gray-100"
                 onClick={() => setShowAllFees(!showAllFees)}
               >
                 {showAllFees ? (

@@ -564,7 +564,7 @@ export default function TournamentDetailPage() {
                       </TableHeader>
                       <TableBody>
                         {standings.map((s, idx) => (
-                          <TableRow key={s.team} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <TableRow key={s.team} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
                             <TableCell className="text-center font-bold text-brand-navy">
                               {idx === 0 ? <span className="flex items-center justify-center gap-1">🏆 1</span> : idx + 1}
                             </TableCell>

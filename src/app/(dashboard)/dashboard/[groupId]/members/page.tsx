@@ -438,10 +438,10 @@ export default function MembersPage() {
         <Card className="mb-6 border-dashed border-[#1B1F4B]/20">
           <CardContent className="flex items-center gap-4 py-4">
             <div className="flex-shrink-0 rounded-full bg-[#1B1F4B]/5 p-2">
-              <Link2 className="h-5 w-5 text-[#1B1F4B]" />
+              <Link2 className="h-5 w-5 text-[#1B1F4B] dark:text-gray-100" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-[#1B1F4B]">Link publico do grupo</p>
+              <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100">Link publico do grupo</p>
               <p className="text-xs text-muted-foreground">
                 Compartilhe o link publico do grupo para que membros possam ver a prestacao de contas
               </p>
@@ -458,7 +458,7 @@ export default function MembersPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-[#1B1F4B]">Membros</h1>
+            <h1 className="text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Membros</h1>
             <p className="text-muted-foreground text-sm">
               {activeMembers.length} ativos{inactiveMembers.length > 0 ? ` | ${inactiveMembers.length} inativos` : ''}
             </p>
@@ -637,17 +637,17 @@ export default function MembersPage() {
             <div className="space-y-4">
               {attendanceStats && (
                 <div className="rounded-lg border p-3 bg-muted/30">
-                  <p className="text-sm font-medium text-[#1B1F4B] mb-2">Presenca em Peladas</p>
+                  <p className="text-sm font-medium text-[#1B1F4B] dark:text-gray-100 mb-2">Presenca em Peladas</p>
                   {attendanceStats.totalMatches === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum registro de presenca.</p>
                   ) : (
                     <div className="flex items-center gap-4">
                       <div className="text-center">
-                        <p className="text-lg font-bold text-[#1B1F4B]">{attendanceStats.attended}</p>
+                        <p className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">{attendanceStats.attended}</p>
                         <p className="text-xs text-muted-foreground">Presencas</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-[#1B1F4B]">{attendanceStats.totalMatches}</p>
+                        <p className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">{attendanceStats.totalMatches}</p>
                         <p className="text-xs text-muted-foreground">Total</p>
                       </div>
                       <div className="text-center">
@@ -728,7 +728,7 @@ export default function MembersPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className={`text-xs gap-1.5 ${hasActiveFilters ? 'border-[#1B1F4B] text-[#1B1F4B]' : ''}`}
+              className={`text-xs gap-1.5 ${hasActiveFilters ? 'border-[#1B1F4B] text-[#1B1F4B] dark:text-gray-100' : ''}`}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Filtros
@@ -890,7 +890,7 @@ export default function MembersPage() {
                           className="h-12 w-12 rounded-full object-cover border-2 border-white shadow-sm"
                         />
                       ) : (
-                        <div className="h-12 w-12 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-lg font-bold text-[#1B1F4B] border-2 border-white shadow-sm">
+                        <div className="h-12 w-12 rounded-full bg-[#1B1F4B]/10 dark:bg-gray-700 flex items-center justify-center text-lg font-bold text-[#1B1F4B] dark:text-gray-100 border-2 border-white dark:border-gray-800 shadow-sm">
                           {member.name.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -900,7 +900,7 @@ export default function MembersPage() {
                     <div className="flex-1 min-w-0">
                       <button
                         type="button"
-                        className="text-sm font-semibold text-[#1B1F4B] hover:text-[#1B1F4B]/70 truncate block text-left cursor-pointer"
+                        className="text-sm font-semibold text-[#1B1F4B] dark:text-gray-100 hover:text-[#1B1F4B] dark:text-gray-100/70 truncate block text-left cursor-pointer"
                         onClick={() => openHistoryDialog(member)}
                         title="Ver historico"
                       >

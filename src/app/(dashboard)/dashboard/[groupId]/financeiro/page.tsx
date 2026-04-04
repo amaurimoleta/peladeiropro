@@ -30,20 +30,20 @@ import { logAudit } from '@/lib/audit'
 type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES
 
 const categoryColors: Record<string, string> = {
-  court_rental: 'bg-blue-100 text-blue-700',
-  goalkeeper: 'bg-purple-100 text-purple-700',
-  equipment: 'bg-orange-100 text-orange-700',
-  drinks: 'bg-amber-100 text-amber-700',
-  other: 'bg-gray-100 text-gray-700',
+  court_rental: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  goalkeeper: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+  equipment: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  drinks: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
 }
 
 const revenueCategoryColors: Record<string, string> = {
-  sponsorship: 'bg-indigo-100 text-indigo-700',
-  donation: 'bg-pink-100 text-pink-700',
-  event: 'bg-cyan-100 text-cyan-700',
-  prize: 'bg-yellow-100 text-yellow-700',
-  rental: 'bg-teal-100 text-teal-700',
-  other: 'bg-gray-100 text-gray-700',
+  sponsorship: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  donation: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300',
+  event: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+  prize: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  rental: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
 }
 
 
@@ -1036,14 +1036,14 @@ export default function FinanceiroPage() {
 
     return (
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {icon}
-            <span className="text-sm font-medium text-[#1B1F4B]">{label}</span>
+            <span className="text-xs sm:text-sm font-medium text-[#1B1F4B] dark:text-gray-100 truncate">{label}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{pct}%</span>
-            <span className="text-xs sm:text-sm font-semibold tabular-nums min-w-[70px] sm:min-w-[100px] text-right">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <span className="text-[10px] sm:text-xs text-muted-foreground">{pct}%</span>
+            <span className="text-xs sm:text-sm font-semibold tabular-nums text-right whitespace-nowrap">
               {formatCurrency(value)}
             </span>
           </div>
@@ -1153,7 +1153,7 @@ export default function FinanceiroPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Financeiro</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Financeiro</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado</p>
           </div>
           {isReadOnly && (
@@ -1170,16 +1170,16 @@ export default function FinanceiroPage() {
         <CardContent className="pt-4 pb-4">
           <div className="flex items-center gap-2 mb-4">
             <div className="rounded-full bg-[#1B1F4B]/10 p-2">
-              <Wallet className="h-5 w-5 text-[#1B1F4B]" />
+              <Wallet className="h-5 w-5 text-[#1B1F4B] dark:text-gray-100" />
             </div>
-            <h2 className="text-lg font-bold text-[#1B1F4B]">Caixa do Grupo</h2>
+            <h2 className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">Caixa do Grupo</h2>
           </div>
 
           {/* Saldo Inicial → Movimentacao → Saldo Final */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 items-center">
             <div className="flex flex-col items-center sm:items-start p-2 sm:p-3 rounded-lg bg-slate-50">
               <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase">Saldo Inicial</span>
-              <span className={`text-sm sm:text-lg font-bold ${saldoInicial >= 0 ? 'text-[#1B1F4B]' : 'text-red-500'}`}>
+              <span className={`text-sm sm:text-lg font-bold ${saldoInicial >= 0 ? 'text-[#1B1F4B] dark:text-gray-100' : 'text-red-500'}`}>
                 {formatCurrency(saldoInicial)}
               </span>
             </div>
@@ -1465,19 +1465,95 @@ export default function FinanceiroPage() {
 
             {/* Batch actions bar */}
             {isAdmin && selectedFees.size > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
-                <span className="text-sm font-medium text-red-700">{selectedFees.size} selecionada{selectedFees.size > 1 ? 's' : ''}</span>
-                <Button size="sm" variant="outline" className="text-red-600 border-red-400 hover:bg-red-100" onClick={deleteFeesBatch}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                  Excluir Selecionadas
+              <div className="flex items-center gap-2 sm:gap-3 p-3 bg-red-50 border border-red-200 rounded-xl flex-wrap">
+                <span className="text-xs sm:text-sm font-medium text-red-700">{selectedFees.size} selecionada{selectedFees.size > 1 ? 's' : ''}</span>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-400 hover:bg-red-100 text-xs" onClick={deleteFeesBatch}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Excluir
                 </Button>
-                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setSelectedFees(new Set())}>
+                <Button size="sm" variant="ghost" className="text-muted-foreground text-xs" onClick={() => setSelectedFees(new Set())}>
                   Cancelar
                 </Button>
               </div>
             )}
 
-            <Card>
+            {/* ── Mobile card list ── */}
+            <div className="sm:hidden space-y-2">
+              {loading ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
+              ) : displayFees.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhuma mensalidade gerada. Clique em &quot;Gerar&quot; para criar.
+                </p>
+              ) : (
+                displayFees.map((fee) => (
+                  <div key={fee.id} className={`p-3 rounded-xl border-l-[3px] border border-gray-100 dark:border-gray-800 shadow-sm ${
+                    selectedFees.has(fee.id)
+                      ? 'bg-red-50/50 dark:bg-red-950/30 !border-red-300 dark:!border-red-800'
+                      : fee.status === 'paid' ? 'border-l-[#00C853] bg-white dark:bg-gray-900'
+                      : fee.status === 'dm_leave' ? 'border-l-blue-400 bg-white dark:bg-gray-900'
+                      : fee.status === 'overdue' ? 'border-l-red-400 bg-white dark:bg-gray-900'
+                      : fee.status === 'waived' ? 'border-l-amber-400 bg-white dark:bg-gray-900'
+                      : 'border-l-gray-300 dark:border-l-gray-600 bg-white dark:bg-gray-900'
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isAdmin && (
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-[#1B1F4B] cursor-pointer shrink-0 mt-0.5"
+                            checked={selectedFees.has(fee.id)}
+                            onChange={() => toggleFeeSelection(fee.id)}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold truncate">{fee.member?.name}</span>
+                            {fee.status === 'paid' && fee.receipt_url && (
+                              <button onClick={() => setViewingReceipt(fee.receipt_url!)} className="text-blue-500 shrink-0"><Eye className="h-3.5 w-3.5" /></button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground tabular-nums">R$ {Number(fee.amount).toFixed(2)}</span>
+                            {fee.paid_at && <span className="text-[10px] text-muted-foreground">Pago {format(new Date(fee.paid_at), 'dd/MM')}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      {statusBadge(fee.status)}
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1.5 mt-2 pt-2 border-t border-dashed dark:border-gray-700 border-gray-200">
+                        {(fee.status === 'pending' || fee.status === 'overdue') ? (
+                          <>
+                            <button className="inline-flex items-center justify-center rounded-lg bg-[#00C853] hover:bg-[#00A843] text-white h-8 px-3 text-xs font-medium flex-1 shadow-sm transition-colors" onClick={() => openPaymentDialog(fee.id, fee.member?.name || '')}>
+                              <Check className="h-3.5 w-3.5 mr-1" />Pago
+                            </button>
+                            <Button size="sm" variant="outline" className="text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/50 h-8 px-3 text-xs" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
+                              <Stethoscope className="h-3.5 w-3.5 mr-1" />DM
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (fee.status === 'paid' || fee.status === 'dm_leave' || fee.status === 'waived') ? (
+                          <>
+                            <Button size="sm" variant="ghost" className="text-muted-foreground h-8 px-3 text-xs" onClick={() => openEditPaymentDialog(fee)}>
+                              <Pencil className="h-3.5 w-3.5 mr-1" />Editar
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ── Desktop table ── */}
+            <Card className="hidden sm:block">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
@@ -1539,7 +1615,7 @@ export default function FinanceiroPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>R$ {Number(fee.amount).toFixed(2)}</TableCell>
+                          <TableCell className="whitespace-nowrap">R$ {Number(fee.amount).toFixed(2)}</TableCell>
                           <TableCell>{format(new Date(fee.due_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>{statusBadge(fee.status)}</TableCell>
                           <TableCell>
@@ -1549,14 +1625,12 @@ export default function FinanceiroPage() {
                             {(fee.status === 'pending' || fee.status === 'overdue') && isAdmin ? (
                               <div className="flex gap-1 justify-end flex-wrap">
                                 <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10 h-7 px-2 text-xs" onClick={() => openPaymentDialog(fee.id, fee.member?.name || '')}>
-                                  <Check className="h-3 w-3 sm:mr-1" />
-                                  <span className="hidden sm:inline">Pago</span>
+                                  <Check className="h-3 w-3 mr-1" />Pago
                                 </Button>
-                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-400 hover:bg-blue-50 h-7 px-2 text-xs" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
-                                  <Stethoscope className="h-3 w-3 sm:mr-1" />
-                                  <span className="hidden sm:inline">DM</span>
+                                <Button size="sm" variant="outline" className="text-blue-600 dark:text-blue-400 border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 h-7 px-2 text-xs" onClick={() => markAsDmLeave(fee.id, fee.member?.name)}>
+                                  <Stethoscope className="h-3 w-3 mr-1" />DM
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-muted-foreground h-7 px-2 text-xs hidden sm:inline-flex" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground h-7 px-2 text-xs" onClick={() => markAsWaived(fee.id, fee.member?.name)}>
                                   Dispensar
                                 </Button>
                                 <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
@@ -1566,8 +1640,7 @@ export default function FinanceiroPage() {
                             ) : (fee.status === 'paid' || fee.status === 'dm_leave' || fee.status === 'waived') && isAdmin ? (
                               <div className="flex gap-1 justify-end flex-wrap">
                                 <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-brand-navy h-7 px-2 text-xs" onClick={() => openEditPaymentDialog(fee)}>
-                                  <Pencil className="h-3 w-3 sm:mr-1" />
-                                  <span className="hidden sm:inline">Editar</span>
+                                  <Pencil className="h-3 w-3 mr-1" />Editar
                                 </Button>
                                 <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0" onClick={() => deleteFee(fee.id, fee.member?.name)}>
                                   <Trash2 className="h-3 w-3" />
@@ -1589,23 +1662,23 @@ export default function FinanceiroPage() {
         {/* ── Tab: Avulsos ── */}
         <TabsContent value="avulsos">
           <div className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {allGuests.length} avulso{allGuests.length !== 1 ? 's' : ''} no mes
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {allGuests.length} avulso{allGuests.length !== 1 ? 's' : ''}
                   {' '}&bull;{' '}
                   <span className="text-[#00C853] font-medium">
                     {allGuests.filter(g => g.paid).length} pago{allGuests.filter(g => g.paid).length !== 1 ? 's' : ''}
                   </span>
                   {' '}&bull;{' '}
                   <span className="text-amber-500 font-medium">
-                    {allGuests.filter(g => !g.paid).length} pendente{allGuests.filter(g => !g.paid).length !== 1 ? 's' : ''}
+                    {allGuests.filter(g => !g.paid).length} pend.
                   </span>
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                   Total: R$ {allGuests.reduce((s, g) => s + Number(g.amount), 0).toFixed(2)}
                   {' '}&bull;{' '}
-                  Recebido: R$ {allGuests.filter(g => g.paid).reduce((s, g) => s + Number(g.amount), 0).toFixed(2)}
+                  Receb.: R$ {allGuests.filter(g => g.paid).reduce((s, g) => s + Number(g.amount), 0).toFixed(2)}
                 </p>
               </div>
               {isAdmin && (
@@ -1684,7 +1757,59 @@ export default function FinanceiroPage() {
               </DialogContent>
             </Dialog>
 
-            <Card>
+            {/* ── Mobile card list ── */}
+            <div className="sm:hidden space-y-2">
+              {allGuests.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhum jogador avulso neste mes.</p>
+              ) : (
+                allGuests.map((guest) => (
+                  <div key={guest.id} className={`p-3 rounded-xl border-l-[3px] border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900 ${guest.paid ? 'border-l-[#00C853]' : 'border-l-amber-400'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold truncate">{guest.name}</span>
+                          {guest.receipt_url && (
+                            <button onClick={() => setViewingReceipt(guest.receipt_url)} className="text-blue-500 shrink-0"><Eye className="h-3.5 w-3.5" /></button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground tabular-nums">R$ {Number(guest.amount).toFixed(2)}</span>
+                          <span className="text-[10px] text-muted-foreground">{format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
+                          {guest.notes && <span className="text-[10px] text-muted-foreground truncate">{guest.notes}</span>}
+                        </div>
+                      </div>
+                      {guest.paid ? (
+                        <Badge className="bg-[#00C853]/10 text-[#00C853] shrink-0 text-xs"><Check className="h-3 w-3 mr-0.5" />Pago</Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 text-xs"><Clock className="h-3 w-3 mr-0.5" />Pend.</Badge>
+                      )}
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1.5 mt-2 pt-2 border-t border-dashed dark:border-gray-700">
+                        {!guest.paid ? (
+                          <button className="inline-flex items-center justify-center rounded-lg bg-[#00C853] hover:bg-[#00A843] text-white h-8 px-3 text-xs font-medium flex-1 shadow-sm transition-colors" onClick={() => markGuestPaid(guest.id, guest.name)}>
+                            <Check className="h-3.5 w-3.5 mr-1" />Pago
+                          </button>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="text-muted-foreground h-8 px-3 text-xs" onClick={() => markGuestUnpaid(guest.id, guest.name)}>
+                            <Minus className="h-3.5 w-3.5 mr-1" />Desfazer
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="text-muted-foreground h-8 w-8 p-0" onClick={() => openEditGuestDialog(guest)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 p-0" onClick={() => deleteGuest(guest.id, guest.name)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ── Desktop table ── */}
+            <Card className="hidden sm:block">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
@@ -1711,39 +1836,28 @@ export default function FinanceiroPage() {
                             <div className="flex items-center gap-1.5">
                               {guest.name}
                               {guest.receipt_url && (
-                                <button
-                                  onClick={() => setViewingReceipt(guest.receipt_url)}
-                                  className="text-blue-500 hover:text-blue-700 transition-colors"
-                                  title="Ver comprovante"
-                                >
+                                <button onClick={() => setViewingReceipt(guest.receipt_url)} className="text-blue-500 hover:text-blue-700 transition-colors" title="Ver comprovante">
                                   <Eye className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
-                            {guest.notes && (
-                              <p className="text-xs text-muted-foreground">{guest.notes}</p>
-                            )}
+                            {guest.notes && <p className="text-xs text-muted-foreground">{guest.notes}</p>}
                           </TableCell>
                           <TableCell>{format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
                           <TableCell>R$ {Number(guest.amount).toFixed(2)}</TableCell>
                           <TableCell>
                             {guest.paid ? (
-                              <Badge className="bg-[#00C853]/10 text-[#00C853] hover:bg-[#00C853]/20">
-                                <Check className="h-3 w-3 mr-1" />Pago
-                              </Badge>
+                              <Badge className="bg-[#00C853]/10 text-[#00C853] hover:bg-[#00C853]/20"><Check className="h-3 w-3 mr-1" />Pago</Badge>
                             ) : (
-                              <Badge variant="outline">
-                                <Clock className="h-3 w-3 mr-1" />Pendente
-                              </Badge>
+                              <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
-                              <div className="flex gap-1 justify-end flex-wrap">
+                              <div className="flex gap-1 justify-end">
                                 {!guest.paid ? (
                                   <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10 h-7 px-2 text-xs" onClick={() => markGuestPaid(guest.id, guest.name)}>
-                                    <Check className="h-3 w-3 sm:mr-1" />
-                                    <span className="hidden sm:inline">Pago</span>
+                                    <Check className="h-3 w-3 mr-1" />Pago
                                   </Button>
                                 ) : (
                                   <Button size="sm" variant="ghost" className="text-muted-foreground h-7 px-2 text-xs" onClick={() => markGuestUnpaid(guest.id, guest.name)}>
@@ -1812,7 +1926,46 @@ export default function FinanceiroPage() {
               </div>
             )}
 
-            <Card>
+            {/* ── Mobile card list ── */}
+            <div className="sm:hidden space-y-2">
+              {loading ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
+              ) : expenses.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma despesa neste mes.</p>
+              ) : (
+                expenses.map((exp: any) => (
+                  <div key={exp.id} className="p-3 rounded-xl border-l-[3px] border-l-red-400 border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold">{exp.description}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={`${categoryColors[exp.category]} text-[10px]`} variant="secondary">
+                            {EXPENSE_CATEGORIES[exp.category as keyof typeof EXPENSE_CATEGORIES]}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM')}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-sm font-medium text-red-500">R$ {Number(exp.amount).toFixed(2)}</span>
+                        {isAdmin && (
+                          <>
+                            <Button size="sm" variant="ghost" className="text-muted-foreground h-7 w-7 p-0" onClick={() => openEditExpense(exp)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-500 h-7 w-7 p-0" onClick={() => deleteExpense(exp.id, exp.description)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ── Desktop table ── */}
+            <Card className="hidden sm:block">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
@@ -1821,8 +1974,8 @@ export default function FinanceiroPage() {
                       <TableHead>Descricao</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
-                      <TableHead className="hidden sm:table-cell">Data</TableHead>
-                      <TableHead className="hidden sm:table-cell">Pago por</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Pago por</TableHead>
                       <TableHead className="text-right">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1833,9 +1986,7 @@ export default function FinanceiroPage() {
                       </TableRow>
                     ) : expenses.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          Nenhuma despesa neste mes.
-                        </TableCell>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma despesa neste mes.</TableCell>
                       </TableRow>
                     ) : (
                       expenses.map((exp: any) => (
@@ -1847,8 +1998,8 @@ export default function FinanceiroPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-red-500 font-medium">R$ {Number(exp.amount).toFixed(2)}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{exp.paid_by_member?.name || '-'}</TableCell>
+                          <TableCell>{format(new Date(exp.expense_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell>{exp.paid_by_member?.name || '-'}</TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
                               <div className="flex gap-1 justify-end">
@@ -1914,7 +2065,46 @@ export default function FinanceiroPage() {
               </div>
             )}
 
-            <Card>
+            {/* ── Mobile card list ── */}
+            <div className="sm:hidden space-y-2">
+              {loading ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
+              ) : revenues.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma receita neste mes.</p>
+              ) : (
+                revenues.map((rev: any) => (
+                  <div key={rev.id} className="p-3 rounded-xl border-l-[3px] border-l-[#00C853] border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold">{rev.description}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={`${revenueCategoryColors[rev.category] || 'bg-gray-100'} text-[10px]`} variant="secondary">
+                            {REVENUE_CATEGORIES[rev.category] || rev.category}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM')}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-sm font-medium text-[#00C853]">R$ {Number(rev.amount).toFixed(2)}</span>
+                        {isAdmin && (
+                          <>
+                            <Button size="sm" variant="ghost" className="text-muted-foreground h-7 w-7 p-0" onClick={() => openEditRevenue(rev)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-500 h-7 w-7 p-0" onClick={() => deleteRevenue(rev.id, rev.description)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ── Desktop table ── */}
+            <Card className="hidden sm:block">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
@@ -1923,8 +2113,8 @@ export default function FinanceiroPage() {
                       <TableHead>Descricao</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Valor</TableHead>
-                      <TableHead className="hidden sm:table-cell">Data</TableHead>
-                      <TableHead className="hidden sm:table-cell">Obs</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Obs</TableHead>
                       <TableHead className="text-right">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1949,8 +2139,8 @@ export default function FinanceiroPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-[#00C853] font-medium whitespace-nowrap">R$ {Number(rev.amount).toFixed(2)}</TableCell>
-                          <TableCell className="hidden sm:table-cell">{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-muted-foreground text-sm max-w-[150px] truncate">{rev.notes || '-'}</TableCell>
+                          <TableCell>{format(new Date(rev.revenue_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">{rev.notes || '-'}</TableCell>
                           <TableCell className="text-right">
                             {isAdmin && (
                               <div className="flex gap-1 justify-end">
@@ -1983,8 +2173,8 @@ export default function FinanceiroPage() {
                 onClick={() => setDreView('mensal')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   dreView === 'mensal'
-                    ? 'bg-white shadow-sm text-[#1B1F4B]'
-                    : 'text-muted-foreground hover:text-[#1B1F4B]'
+                    ? 'bg-white dark:bg-gray-800 shadow-sm text-[#1B1F4B] dark:text-gray-100 dark:text-white'
+                    : 'text-muted-foreground hover:text-[#1B1F4B] dark:text-gray-100 dark:hover:text-white'
                 }`}
               >
                 Mensal
@@ -1993,8 +2183,8 @@ export default function FinanceiroPage() {
                 onClick={() => setDreView('anual')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   dreView === 'anual'
-                    ? 'bg-white shadow-sm text-[#1B1F4B]'
-                    : 'text-muted-foreground hover:text-[#1B1F4B]'
+                    ? 'bg-white dark:bg-gray-800 shadow-sm text-[#1B1F4B] dark:text-gray-100 dark:text-white'
+                    : 'text-muted-foreground hover:text-[#1B1F4B] dark:text-gray-100 dark:hover:text-white'
                 }`}
               >
                 Anual
@@ -2011,44 +2201,44 @@ export default function FinanceiroPage() {
                 ) : (
                   <>
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <Card className="border-l-4 border-l-[#00C853]">
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-[#00C853]/10 p-2">
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className="hidden sm:block rounded-full bg-[#00C853]/10 p-2">
                               <TrendingUp className="h-5 w-5 text-[#00C853]" />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Receitas</p>
-                              <p className="text-xl font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</p>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Receitas</p>
+                              <p className="text-sm sm:text-xl font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
 
                       <Card className="border-l-4 border-l-red-500">
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-red-500/10 p-2">
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className="hidden sm:block rounded-full bg-red-500/10 p-2">
                               <TrendingDown className="h-5 w-5 text-red-500" />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Despesas</p>
-                              <p className="text-xl font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</p>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Despesas</p>
+                              <p className="text-sm sm:text-xl font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
 
                       <Card className={`border-l-4 ${dreNetResult >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`rounded-full p-2 ${dreNetResult >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className={`hidden sm:block rounded-full p-2 ${dreNetResult >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
                               <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Resultado</p>
-                              <p className={`text-xl font-bold ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Resultado</p>
+                              <p className={`text-sm sm:text-xl font-bold ${dreNetResult >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
                                 {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
                               </p>
                             </div>
@@ -2064,7 +2254,7 @@ export default function FinanceiroPage() {
                         <section>
                           <div className="flex items-center gap-2 mb-4">
                             <TrendingUp className="h-5 w-5 text-[#00C853]" />
-                            <h2 className="text-lg font-bold text-[#1B1F4B]">Receitas</h2>
+                            <h2 className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">Receitas</h2>
                           </div>
                           <div className="space-y-4 pl-1">
                             <BarLine
@@ -2089,8 +2279,8 @@ export default function FinanceiroPage() {
                               />
                             )}
                           </div>
-                          <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
-                            <span className="text-sm font-bold text-[#1B1F4B]">Total de Receitas</span>
+                          <div className="mt-4 pt-3 border-t border-dashed dark:border-gray-700 flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#1B1F4B] dark:text-gray-100">Total de Receitas</span>
                             <span className="text-sm font-bold text-[#00C853]">{formatCurrency(dreTotalIncome)}</span>
                           </div>
                         </section>
@@ -2106,7 +2296,7 @@ export default function FinanceiroPage() {
                         <section>
                           <div className="flex items-center gap-2 mb-4">
                             <TrendingDown className="h-5 w-5 text-red-500" />
-                            <h2 className="text-lg font-bold text-[#1B1F4B]">Despesas</h2>
+                            <h2 className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">Despesas</h2>
                           </div>
                           <div className="space-y-4 pl-1">
                             {(Object.keys(EXPENSE_CATEGORIES) as ExpenseCategory[]).map((cat) => {
@@ -2126,8 +2316,8 @@ export default function FinanceiroPage() {
                               <p className="text-sm text-muted-foreground italic">Nenhuma despesa registrada neste mes.</p>
                             )}
                           </div>
-                          <div className="mt-4 pt-3 border-t border-dashed flex items-center justify-between">
-                            <span className="text-sm font-bold text-[#1B1F4B]">Total de Despesas</span>
+                          <div className="mt-4 pt-3 border-t border-dashed dark:border-gray-700 flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#1B1F4B] dark:text-gray-100">Total de Despesas</span>
                             <span className="text-sm font-bold text-red-500">{formatCurrency(dreTotalExpenses)}</span>
                           </div>
                         </section>
@@ -2139,7 +2329,7 @@ export default function FinanceiroPage() {
                         <section>
                           <div className="flex items-center gap-2 mb-4">
                             <DollarSign className={`h-5 w-5 ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`} />
-                            <h2 className="text-lg font-bold text-[#1B1F4B]">Resultado</h2>
+                            <h2 className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">Resultado</h2>
                           </div>
                           <div className="rounded-lg p-4 space-y-2"
                             style={{
@@ -2154,9 +2344,9 @@ export default function FinanceiroPage() {
                               <span className="text-muted-foreground">Despesas</span>
                               <span className="text-red-500 font-medium">- {formatCurrency(dreTotalExpenses)}</span>
                             </div>
-                            <div className="border-t pt-2 mt-2 flex items-center justify-between">
-                              <span className="text-base font-bold text-[#1B1F4B]">Resultado Liquido</span>
-                              <span className={`text-lg font-bold ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                            <div className="border-t pt-2 mt-2 flex items-center justify-between gap-2">
+                              <span className="text-sm sm:text-base font-bold text-[#1B1F4B] dark:text-gray-100">Resultado Liquido</span>
+                              <span className={`text-base sm:text-lg font-bold ${dreNetResult >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
                                 {dreNetResult >= 0 ? '+' : ''}{formatCurrency(dreNetResult)}
                               </span>
                             </div>
@@ -2178,8 +2368,8 @@ export default function FinanceiroPage() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <div className="flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4 text-[#1B1F4B]" />
-                    <span className="text-lg font-semibold text-[#1B1F4B] min-w-[60px] text-center">{dreYear}</span>
+                    <CalendarDays className="h-4 w-4 text-[#1B1F4B] dark:text-gray-100" />
+                    <span className="text-lg font-semibold text-[#1B1F4B] dark:text-gray-100 min-w-[60px] text-center">{dreYear}</span>
                   </div>
                   <Button variant="outline" size="icon" onClick={() => setDreYear(y => y + 1)}>
                     <ChevronRight className="h-4 w-4" />
@@ -2193,44 +2383,44 @@ export default function FinanceiroPage() {
                 ) : (
                   <>
                     {/* Annual Summary Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <Card className="border-l-4 border-l-[#00C853]">
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-[#00C853]/10 p-2">
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className="hidden sm:block rounded-full bg-[#00C853]/10 p-2">
                               <TrendingUp className="h-5 w-5 text-[#00C853]" />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Receitas {dreYear}</p>
-                              <p className="text-xl font-bold text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</p>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Receitas</p>
+                              <p className="text-sm sm:text-xl font-bold text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
 
                       <Card className="border-l-4 border-l-red-500">
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-red-500/10 p-2">
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className="hidden sm:block rounded-full bg-red-500/10 p-2">
                               <TrendingDown className="h-5 w-5 text-red-500" />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Despesas {dreYear}</p>
-                              <p className="text-xl font-bold text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</p>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Despesas</p>
+                              <p className="text-sm sm:text-xl font-bold text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
 
                       <Card className={`border-l-4 ${dreAnnualTotals.saldo >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
-                        <CardContent className="pt-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`rounded-full p-2 ${dreAnnualTotals.saldo >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
+                        <CardContent className="pt-3 sm:pt-4 px-2 sm:px-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                            <div className={`hidden sm:block rounded-full p-2 ${dreAnnualTotals.saldo >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
                               <DollarSign className={`h-5 w-5 ${dreAnnualTotals.saldo >= 0 ? 'text-blue-500' : 'text-red-500'}`} />
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Saldo {dreYear}</p>
-                              <p className={`text-xl font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                            <div className="text-center sm:text-left">
+                              <p className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase">Saldo</p>
+                              <p className={`text-sm sm:text-xl font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
                                 {dreAnnualTotals.saldo >= 0 ? '+' : ''}{formatCurrency(dreAnnualTotals.saldo)}
                               </p>
                             </div>
@@ -2246,13 +2436,16 @@ export default function FinanceiroPage() {
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/50">
-                                <TableHead className="font-semibold text-[#1B1F4B]">Mes</TableHead>
-                                <TableHead className="text-right font-semibold text-[#00C853]">Mensalidades</TableHead>
-                                <TableHead className="text-right font-semibold text-[#66BB6A]">Avulsos</TableHead>
-                                <TableHead className="text-right font-semibold text-indigo-500">Outras</TableHead>
-                                <TableHead className="text-right font-semibold text-[#00C853]">Total Receitas</TableHead>
+                                <TableHead className="font-semibold text-[#1B1F4B] dark:text-gray-100">Mes</TableHead>
+                                <TableHead className="hidden sm:table-cell text-right font-semibold text-[#00C853]">Mensalidades</TableHead>
+                                <TableHead className="hidden sm:table-cell text-right font-semibold text-[#66BB6A]">Avulsos</TableHead>
+                                <TableHead className="hidden sm:table-cell text-right font-semibold text-indigo-500">Outras</TableHead>
+                                <TableHead className="text-right font-semibold text-[#00C853]">
+                                  <span className="hidden sm:inline">Total Receitas</span>
+                                  <span className="sm:hidden">Receitas</span>
+                                </TableHead>
                                 <TableHead className="text-right font-semibold text-red-500">Despesas</TableHead>
-                                <TableHead className="text-right font-semibold text-[#1B1F4B]">Saldo</TableHead>
+                                <TableHead className="text-right font-semibold text-[#1B1F4B] dark:text-gray-100">Saldo</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2260,14 +2453,14 @@ export default function FinanceiroPage() {
                                 const hasData = m.mensalidades > 0 || m.avulsos > 0 || m.outrasReceitas > 0 || m.despesas > 0
                                 return (
                                   <TableRow key={m.monthKey} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
-                                    <TableCell className="font-medium text-[#1B1F4B]">{m.name}</TableCell>
-                                    <TableCell className="text-right tabular-nums">
+                                    <TableCell className="font-medium text-[#1B1F4B] dark:text-gray-100">{m.name}</TableCell>
+                                    <TableCell className="hidden sm:table-cell text-right tabular-nums">
                                       {hasData ? formatCurrency(m.mensalidades) : <span className="text-muted-foreground">-</span>}
                                     </TableCell>
-                                    <TableCell className="text-right tabular-nums">
+                                    <TableCell className="hidden sm:table-cell text-right tabular-nums">
                                       {hasData ? formatCurrency(m.avulsos) : <span className="text-muted-foreground">-</span>}
                                     </TableCell>
-                                    <TableCell className="text-right tabular-nums">
+                                    <TableCell className="hidden sm:table-cell text-right tabular-nums">
                                       {hasData ? formatCurrency(m.outrasReceitas) : <span className="text-muted-foreground">-</span>}
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums font-medium text-[#00C853]">
@@ -2292,10 +2485,10 @@ export default function FinanceiroPage() {
                             {/* Total Row */}
                             <tfoot>
                               <TableRow className="border-t-2 bg-muted/40 font-bold">
-                                <TableCell className="font-bold text-[#1B1F4B]">Total</TableCell>
-                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.mensalidades)}</TableCell>
-                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.avulsos)}</TableCell>
-                                <TableCell className="text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.outrasReceitas)}</TableCell>
+                                <TableCell className="font-bold text-[#1B1F4B] dark:text-gray-100">Total</TableCell>
+                                <TableCell className="hidden sm:table-cell text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.mensalidades)}</TableCell>
+                                <TableCell className="hidden sm:table-cell text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.avulsos)}</TableCell>
+                                <TableCell className="hidden sm:table-cell text-right font-bold tabular-nums">{formatCurrency(dreAnnualTotals.outrasReceitas)}</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums text-[#00C853]">{formatCurrency(dreAnnualTotals.totalReceitas)}</TableCell>
                                 <TableCell className="text-right font-bold tabular-nums text-red-500">{formatCurrency(dreAnnualTotals.despesas)}</TableCell>
                                 <TableCell className={`text-right font-bold tabular-nums ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
@@ -2312,8 +2505,8 @@ export default function FinanceiroPage() {
                     <Card className="shadow-lg">
                       <CardContent className="py-6">
                         <div className="flex items-center gap-2 mb-4">
-                          <BarChart3 className="h-5 w-5 text-[#1B1F4B]" />
-                          <h2 className="text-lg font-bold text-[#1B1F4B]">Resumo Anual {dreYear}</h2>
+                          <BarChart3 className="h-5 w-5 text-[#1B1F4B] dark:text-gray-100" />
+                          <h2 className="text-lg font-bold text-[#1B1F4B] dark:text-gray-100">Resumo Anual {dreYear}</h2>
                         </div>
                         <div className="rounded-lg p-4 space-y-3"
                           style={{
@@ -2335,16 +2528,16 @@ export default function FinanceiroPage() {
                             </div>
                           )}
                           <div className="flex items-center justify-between text-sm border-t pt-2">
-                            <span className="font-semibold text-[#1B1F4B]">Total Receitas</span>
+                            <span className="font-semibold text-[#1B1F4B] dark:text-gray-100">Total Receitas</span>
                             <span className="text-[#00C853] font-bold">{formatCurrency(dreAnnualTotals.totalReceitas)}</span>
                           </div>
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Total Despesas</span>
                             <span className="text-red-500 font-medium">- {formatCurrency(dreAnnualTotals.despesas)}</span>
                           </div>
-                          <div className="border-t pt-3 mt-2 flex items-center justify-between">
-                            <span className="text-base font-bold text-[#1B1F4B]">Resultado Liquido Anual</span>
-                            <span className={`text-lg font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
+                          <div className="border-t pt-3 mt-2 flex items-center justify-between gap-2">
+                            <span className="text-sm sm:text-base font-bold text-[#1B1F4B] dark:text-gray-100">Resultado Anual</span>
+                            <span className={`text-base sm:text-lg font-bold ${dreAnnualTotals.saldo >= 0 ? 'text-[#00C853]' : 'text-red-500'}`}>
                               {dreAnnualTotals.saldo >= 0 ? '+' : ''}{formatCurrency(dreAnnualTotals.saldo)}
                             </span>
                           </div>

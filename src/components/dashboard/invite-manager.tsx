@@ -209,16 +209,16 @@ export function InviteManager({ groupId }: InviteManagerProps) {
               return (
                 <div
                   key={invite.id}
-                  className={`flex items-center gap-3 p-4 rounded-xl border ${
+                  className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl border ${
                     inactive
-                      ? 'bg-gray-50 border-gray-200 opacity-60'
-                      : 'bg-white border-gray-200'
+                      ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-60'
+                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
-                        {invite.token.slice(0, 12)}...
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                      <code className="text-[10px] sm:text-xs bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded font-mono truncate max-w-[120px] sm:max-w-[200px]">
+                        {invite.token.slice(0, 8)}...
                       </code>
                       {expired && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
@@ -227,7 +227,7 @@ export function InviteManager({ groupId }: InviteManagerProps) {
                       )}
                       {full && !expired && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                          Limite atingido
+                          Limite
                         </Badge>
                       )}
                       {!inactive && (
@@ -236,14 +236,14 @@ export function InviteManager({ groupId }: InviteManagerProps) {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground flex-wrap">
                       <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Expira: {formatDate(invite.expires_at)}
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {formatDate(invite.expires_at)}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {invite.uses}/{invite.max_uses} usos
+                        <Users className="h-3 w-3 shrink-0" />
+                        {invite.uses}/{invite.max_uses}
                       </span>
                     </div>
                   </div>

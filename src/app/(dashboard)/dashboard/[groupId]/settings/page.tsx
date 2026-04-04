@@ -366,7 +366,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-6 gap-2">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B]">Configuracoes</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Configuracoes</h1>
         {isReadOnly && (
           <Badge variant="secondary">
             <Shield className="h-3 w-3 mr-1" />
@@ -393,7 +393,7 @@ export default function SettingsPage() {
             <Input
               readOnly
               value={getPublicLink() || 'Gerando...'}
-              className="bg-white font-mono text-xs sm:text-sm min-w-0"
+              className="bg-white dark:bg-gray-900 font-mono text-xs sm:text-sm min-w-0"
             />
             <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={copyPublicLink} title="Copiar link">
               <Copy className="h-4 w-4" />
@@ -589,7 +589,7 @@ export default function SettingsPage() {
             <div className="p-3 rounded-lg border border-dashed border-[#00C853]/40 bg-[#00C853]/5 space-y-2">
               <div className="flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-[#00C853]" />
-                <p className="text-[10px] sm:text-xs font-semibold text-[#1B1F4B] uppercase">QR Code PIX (Copia e Cola)</p>
+                <p className="text-[10px] sm:text-xs font-semibold text-[#1B1F4B] dark:text-gray-100 uppercase">QR Code PIX (Copia e Cola)</p>
               </div>
               <p className="text-xs text-muted-foreground">
                 Cole aqui o codigo PIX gerado pelo seu banco. Ele sera usado para gerar o QR Code automaticamente.
@@ -638,7 +638,7 @@ export default function SettingsPage() {
                   {adminMembers.map((member) => (
                     <div key={member.id} className="flex items-center justify-between gap-2 p-2 sm:p-3 rounded-lg border bg-muted/30">
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-xs sm:text-sm font-medium text-[#1B1F4B] shrink-0">
+                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-[#1B1F4B]/10 flex items-center justify-center text-xs sm:text-sm font-medium text-[#1B1F4B] dark:text-gray-100 shrink-0">
                           {member.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
