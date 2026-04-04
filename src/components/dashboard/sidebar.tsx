@@ -132,14 +132,21 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm rounded-xl"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </Button>
+      <div className="fixed top-3 left-3 z-50 lg:hidden flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm rounded-xl"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+        {!mobileOpen && (
+          <Link href="/dashboard" className="opacity-90">
+            <Logo size="sm" variant={resolvedTheme === 'dark' ? 'white' : 'dark'} />
+          </Link>
+        )}
+      </div>
 
       {mobileOpen && (
         <div
