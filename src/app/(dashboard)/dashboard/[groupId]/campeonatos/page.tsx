@@ -98,7 +98,10 @@ export default function CampeonatosPage() {
     const years = new Set<number>()
     for (const t of all) {
       const dateStr = t.start_date || t.created_at
-      if (dateStr) years.add(new Date(dateStr).getFullYear())
+      if (dateStr) {
+        const y = t.start_date ? parseInt(t.start_date.substring(0, 4), 10) : new Date(dateStr).getFullYear()
+        years.add(y)
+      }
     }
     if (years.size === 0) years.add(new Date().getFullYear())
     setAvailableYears([...years].sort((a, b) => b - a))
@@ -130,7 +133,8 @@ export default function CampeonatosPage() {
   const filteredTournaments = tournaments.filter(t => {
     const dateStr = t.start_date || t.created_at
     if (!dateStr) return true
-    return new Date(dateStr).getFullYear() === selectedYear
+    const y = t.start_date ? parseInt(t.start_date.substring(0, 4), 10) : new Date(dateStr).getFullYear()
+    return y === selectedYear
   })
 
   // ── Team toggle ──

@@ -168,7 +168,7 @@ export default async function GroupDashboard({
 
   const summaryCards = [
     {
-      label: 'Saldo do Mes',
+      label: viewMode === 'year' ? 'Saldo do Ano' : 'Saldo do Mes',
       value: `R$ ${balance.toFixed(2)}`,
       subtitle: 'Entradas - Despesas',
       icon: DollarSign,
@@ -194,7 +194,7 @@ export default async function GroupDashboard({
     {
       label: 'Despesas',
       value: `R$ ${totalExpenses.toFixed(2)}`,
-      subtitle: `${expenses?.length || 0} despesas no mes`,
+      subtitle: `${expenses?.length || 0} despesas no ${viewMode === 'year' ? 'ano' : 'mes'}`,
       icon: TrendingDown,
       gradient: 'from-red-500 to-rose-600',
       valueColor: 'text-red-500',
