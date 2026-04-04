@@ -77,6 +77,20 @@ export default function FinanceiroPage() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Avulsos state
+  const [allGuests, setAllGuests] = useState<any[]>([])
+  const [guestDialogOpen, setGuestDialogOpen] = useState(false)
+  const [editGuestDialogOpen, setEditGuestDialogOpen] = useState(false)
+  const [editingGuest, setEditingGuest] = useState<any>(null)
+  const [guestName, setGuestName] = useState('')
+  const [guestDate, setGuestDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [guestAmount, setGuestAmount] = useState('')
+  const [guestNotes, setGuestNotes] = useState('')
+  const [savingGuest, setSavingGuest] = useState(false)
+  const [guestPaymentDate, setGuestPaymentDate] = useState('')
+  const [guestReceiptFile, setGuestReceiptFile] = useState<File | null>(null)
+  const guestReceiptInputRef = useRef<HTMLInputElement>(null)
+
   // DRE state
   const [paidGuests, setPaidGuests] = useState<any[]>([])
   const [dreView, setDreView] = useState<'mensal' | 'anual'>('mensal')
@@ -129,24 +143,27 @@ export default function FinanceiroPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    const endDay = format(endOfMonth(currentDate), 'yyyy-MM-dd')
     const [
       { data: groupData },
       { data: membersData },
       { data: feesData },
       { data: expensesData },
-      { data: guestsData },
+      { data: guestsAllData },
     ] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('*').eq('group_id', groupId).eq('status', 'active').order('name'),
-      supabase.from('monthly_fees').select('*, member:group_members(name, member_type, phone)').eq('group_id', groupId).eq('reference_month', currentMonth),
-      supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).order('expense_date', { ascending: false }),
-      supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', format(endOfMonth(currentDate), 'yyyy-MM-dd')).eq('paid', true),
+      supabase.from('monthly_fees').select('*, member:group_members(name, member_type, phone, position)').eq('group_id', groupId).eq('reference_month', currentMonth),
+      supabase.from('expenses').select('*, paid_by_member:group_members(name)').eq('group_id', groupId).gte('expense_date', `${currentMonth}-01`).lte('expense_date', endDay).order('expense_date', { ascending: false }),
+      supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', `${currentMonth}-01`).lte('match_date', endDay).order('match_date', { ascending: false }),
     ])
     setGroup(groupData)
     setMembers(membersData || [])
     setFees(feesData || [])
     setExpenses(expensesData || [])
-    setPaidGuests(guestsData || [])
+    const guestsArr = guestsAllData || []
+    setAllGuests(guestsArr)
+    setPaidGuests(guestsArr.filter((g: any) => g.paid))
     setLoading(false)
   }, [groupId, currentMonth])
 
@@ -490,6 +507,165 @@ export default function FinanceiroPage() {
     }
   }
 
+  // ── Guest CRUD functions ──
+
+  function resetGuestForm() {
+    setGuestName('')
+    setGuestDate(format(new Date(), 'yyyy-MM-dd'))
+    setGuestAmount('')
+    setGuestNotes('')
+    setGuestPaymentDate('')
+    setGuestReceiptFile(null)
+  }
+
+  async function saveGuest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!guestName.trim() || !guestAmount) return
+    setSavingGuest(true)
+    const { error } = await supabase.from('guest_players').insert({
+      group_id: groupId,
+      name: guestName.trim(),
+      match_date: guestDate,
+      amount: parseFloat(guestAmount) || 0,
+      notes: guestNotes || null,
+      paid: false,
+    })
+    if (error) {
+      toast.error('Erro ao adicionar avulso')
+    } else {
+      toast.success('Jogador avulso adicionado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'add_guest',
+        entityType: 'guest_player',
+        entityId: guestDate,
+        details: { name: guestName, amount: guestAmount },
+      })
+      setGuestDialogOpen(false)
+      resetGuestForm()
+      loadData()
+      loadAccumulatedBalance()
+    }
+    setSavingGuest(false)
+  }
+
+  function openEditGuestDialog(guest: any) {
+    setEditingGuest(guest)
+    setGuestName(guest.name)
+    setGuestDate(guest.match_date)
+    setGuestAmount(String(Number(guest.amount)))
+    setGuestNotes(guest.notes || '')
+    setGuestReceiptFile(null)
+    setEditGuestDialogOpen(true)
+  }
+
+  async function updateGuest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingGuest) return
+    setSavingGuest(true)
+
+    let receiptUrl: string | null = null
+    if (guestReceiptFile) {
+      receiptUrl = await uploadReceipt(supabase, guestReceiptFile, groupId)
+    }
+
+    const updateData: Record<string, any> = {
+      name: guestName.trim(),
+      match_date: guestDate,
+      amount: parseFloat(guestAmount) || 0,
+      notes: guestNotes || null,
+    }
+    if (receiptUrl) {
+      updateData.receipt_url = receiptUrl
+    }
+
+    const { error } = await supabase
+      .from('guest_players')
+      .update(updateData)
+      .eq('id', editingGuest.id)
+
+    if (error) {
+      toast.error('Erro ao atualizar avulso')
+    } else {
+      toast.success('Avulso atualizado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'edit_guest',
+        entityType: 'guest_player',
+        entityId: editingGuest.id,
+        details: { name: guestName, amount: guestAmount },
+      })
+      setEditGuestDialogOpen(false)
+      setEditingGuest(null)
+      resetGuestForm()
+      loadData()
+      loadAccumulatedBalance()
+    }
+    setSavingGuest(false)
+  }
+
+  async function markGuestPaid(guestId: string, guestName_: string) {
+    setGuestPaymentDate(format(new Date(), 'yyyy-MM-dd'))
+    const paidAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('guest_players')
+      .update({ paid: true, paid_at: paidAt })
+      .eq('id', guestId)
+    if (error) {
+      toast.error('Erro ao confirmar pagamento')
+    } else {
+      toast.success('Pagamento confirmado!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'mark_guest_paid',
+        entityType: 'guest_player',
+        entityId: guestId,
+        details: { name: guestName_ },
+      })
+      loadData()
+      loadAccumulatedBalance()
+    }
+  }
+
+  async function markGuestUnpaid(guestId: string, guestName_: string) {
+    const { error } = await supabase
+      .from('guest_players')
+      .update({ paid: false, paid_at: null })
+      .eq('id', guestId)
+    if (error) {
+      toast.error('Erro ao reverter pagamento')
+    } else {
+      toast.success('Pagamento revertido.')
+      await logAudit(supabase, {
+        groupId,
+        action: 'unmark_guest_paid',
+        entityType: 'guest_player',
+        entityId: guestId,
+        details: { name: guestName_ },
+      })
+      loadData()
+      loadAccumulatedBalance()
+    }
+  }
+
+  async function deleteGuest(guestId: string, guestName_: string) {
+    const { error } = await supabase.from('guest_players').delete().eq('id', guestId)
+    if (error) {
+      toast.error('Erro ao remover avulso')
+    } else {
+      toast.success('Avulso removido!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'delete_guest',
+        entityType: 'guest_player',
+        entityId: guestId,
+        details: { name: guestName_ },
+      })
+      loadData()
+      loadAccumulatedBalance()
+    }
+  }
+
   const statusBadge = (status: string) => {
     switch (status) {
       case 'paid':
@@ -513,9 +689,6 @@ export default function FinanceiroPage() {
     const message = `Ola ${name}! 👋\n\nSua mensalidade de ${monthLabel} no valor de R$ ${feeAmount.toFixed(2)} esta pendente.\n\nChave PIX: ${group.pix_key || 'Nao configurada'}\nFavor: ${group.pix_beneficiary_name || 'Nao configurado'}\n\nObrigado! ⚽\n- ${group.name}`
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
   }
-
-  const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'overdue')
-  const pendingFeesWithPhone = pendingFees.filter(f => f.member?.phone)
 
   function cobrarTodos() {
     const monthLabel = format(currentDate, 'MMMM/yyyy')
@@ -635,10 +808,17 @@ export default function FinanceiroPage() {
 
   // ── Computed values ──
 
+  // Filter out goalkeeper fees when setting is off
+  const displayFees = group && !group.goalkeeper_pays_fee
+    ? fees.filter(f => (f.member as any)?.position !== 'goleiro')
+    : fees
+
   // Mensalidades
-  const paidCount = fees.filter(f => f.status === 'paid').length
-  const totalFeesAmount = fees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
-  const dmCount = fees.filter(f => f.status === 'dm_leave').length
+  const paidCount = displayFees.filter(f => f.status === 'paid').length
+  const totalFeesAmount = displayFees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
+  const dmCount = displayFees.filter(f => f.status === 'dm_leave').length
+  const pendingFees = displayFees.filter(f => f.status === 'pending' || f.status === 'overdue')
+  const pendingFeesWithPhone = pendingFees.filter(f => f.member?.phone)
 
   // Despesas
   const totalExpensesAmount = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
@@ -648,7 +828,7 @@ export default function FinanceiroPage() {
   }, {} as Record<string, number>)
 
   // DRE
-  const dreTotalFees = fees.filter(f => f.status === 'paid').reduce((sum, f) => sum + Number(f.amount), 0)
+  const dreTotalFees = displayFees.filter(f => f.status === 'paid').reduce((sum, f) => sum + Number(f.amount), 0)
   const dreTotalGuests = paidGuests.reduce((sum, g) => sum + Number(g.amount), 0)
   const dreTotalIncome = dreTotalFees + dreTotalGuests
   const dreExpensesByCategory = expenses.reduce((acc, e) => {
@@ -874,6 +1054,10 @@ export default function FinanceiroPage() {
             <CreditCard className="h-4 w-4 mr-1.5" />
             Mensalidades
           </TabsTrigger>
+          <TabsTrigger value="avulsos">
+            <Users className="h-4 w-4 mr-1.5" />
+            Avulsos
+          </TabsTrigger>
           <TabsTrigger value="despesas">
             <Receipt className="h-4 w-4 mr-1.5" />
             Despesas
@@ -893,7 +1077,7 @@ export default function FinanceiroPage() {
           <div className="space-y-4 mt-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm text-muted-foreground">
-                {paidCount}/{fees.length} pagas | R$ {totalFeesAmount.toFixed(2)} recebido{dmCount > 0 ? ` | ${dmCount} afastados DM` : ''}
+                {paidCount}/{displayFees.length} pagas | R$ {totalFeesAmount.toFixed(2)} recebido{dmCount > 0 ? ` | ${dmCount} afastados DM` : ''}
               </p>
               <div className="flex gap-2">
                 {isAdmin && pendingFees.length > 0 && (
@@ -1121,14 +1305,14 @@ export default function FinanceiroPage() {
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
                       </TableRow>
-                    ) : fees.length === 0 ? (
+                    ) : displayFees.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhuma mensalidade gerada. Clique em &quot;Gerar Mensalidades&quot; para criar.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      fees.map((fee) => (
+                      displayFees.map((fee) => (
                         <TableRow key={fee.id}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-1.5">
@@ -1171,6 +1355,189 @@ export default function FinanceiroPage() {
                                 Editar
                               </Button>
                             ) : null}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ── Tab: Avulsos ── */}
+        <TabsContent value="avulsos">
+          <div className="space-y-4 mt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {allGuests.length} avulso{allGuests.length !== 1 ? 's' : ''} no mes
+                  {' '}&bull;{' '}
+                  <span className="text-[#00C853] font-medium">
+                    {allGuests.filter(g => g.paid).length} pago{allGuests.filter(g => g.paid).length !== 1 ? 's' : ''}
+                  </span>
+                  {' '}&bull;{' '}
+                  <span className="text-amber-500 font-medium">
+                    {allGuests.filter(g => !g.paid).length} pendente{allGuests.filter(g => !g.paid).length !== 1 ? 's' : ''}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Total: R$ {allGuests.reduce((s, g) => s + Number(g.amount), 0).toFixed(2)}
+                  {' '}&bull;{' '}
+                  Recebido: R$ {allGuests.filter(g => g.paid).reduce((s, g) => s + Number(g.amount), 0).toFixed(2)}
+                </p>
+              </div>
+              {isAdmin && (
+                <Dialog open={guestDialogOpen} onOpenChange={(v) => { setGuestDialogOpen(v); if (!v) resetGuestForm() }}>
+                  <Button className="bg-[#00C853] hover:bg-[#00A843] text-white" onClick={() => setGuestDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Avulso
+                  </Button>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Adicionar Jogador Avulso</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={saveGuest} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Nome *</Label>
+                        <Input placeholder="Nome do jogador" value={guestName} onChange={(e) => setGuestName(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Data *</Label>
+                        <Input type="date" value={guestDate} onChange={(e) => setGuestDate(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Valor (R$) *</Label>
+                        <Input type="number" step="0.01" min="0" placeholder="25.00" value={guestAmount} onChange={(e) => setGuestAmount(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Observacoes</Label>
+                        <Input placeholder="Ex: amigo do Joao" value={guestNotes} onChange={(e) => setGuestNotes(e.target.value)} />
+                      </div>
+                      <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={savingGuest}>
+                        {savingGuest ? 'Salvando...' : 'Adicionar'}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+
+            {/* Edit Guest Dialog */}
+            <Dialog open={editGuestDialogOpen} onOpenChange={(v) => { setEditGuestDialogOpen(v); if (!v) { setEditingGuest(null); resetGuestForm() } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Jogador Avulso</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={updateGuest} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nome *</Label>
+                    <Input placeholder="Nome do jogador" value={guestName} onChange={(e) => setGuestName(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data *</Label>
+                    <Input type="date" value={guestDate} onChange={(e) => setGuestDate(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor (R$) *</Label>
+                    <Input type="number" step="0.01" min="0" placeholder="25.00" value={guestAmount} onChange={(e) => setGuestAmount(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Observacoes</Label>
+                    <Input placeholder="Ex: amigo do Joao" value={guestNotes} onChange={(e) => setGuestNotes(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Comprovante (opcional)</Label>
+                    <Input
+                      ref={guestReceiptInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setGuestReceiptFile(e.target.files?.[0] || null)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full bg-[#1B1F4B] hover:bg-[#1B1F4B]/90 text-white" disabled={savingGuest}>
+                    {savingGuest ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Acoes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allGuests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          Nenhum jogador avulso neste mes.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      allGuests.map((guest) => (
+                        <TableRow key={guest.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-1.5">
+                              {guest.name}
+                              {guest.receipt_url && (
+                                <button
+                                  onClick={() => setViewingReceipt(guest.receipt_url)}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors"
+                                  title="Ver comprovante"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            {guest.notes && (
+                              <p className="text-xs text-muted-foreground">{guest.notes}</p>
+                            )}
+                          </TableCell>
+                          <TableCell>{format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell>R$ {Number(guest.amount).toFixed(2)}</TableCell>
+                          <TableCell>
+                            {guest.paid ? (
+                              <Badge className="bg-[#00C853]/10 text-[#00C853] hover:bg-[#00C853]/20">
+                                <Check className="h-3 w-3 mr-1" />Pago
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                <Clock className="h-3 w-3 mr-1" />Pendente
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isAdmin && (
+                              <div className="flex gap-1 justify-end">
+                                {!guest.paid ? (
+                                  <Button size="sm" variant="outline" className="text-[#00C853] border-[#00C853] hover:bg-[#00C853]/10" onClick={() => markGuestPaid(guest.id, guest.name)}>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Pago
+                                  </Button>
+                                ) : (
+                                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => markGuestUnpaid(guest.id, guest.name)}>
+                                    <Minus className="h-3 w-3 mr-1" />
+                                    Reverter
+                                  </Button>
+                                )}
+                                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => openEditGuestDialog(guest)}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteGuest(guest.id, guest.name)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
