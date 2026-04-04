@@ -125,11 +125,15 @@ export default function FinanceiroPage() {
   // Receipt viewer state
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
 
+  // Batch selection state for fees
+  const [selectedFees, setSelectedFees] = useState<Set<string>>(new Set())
+
 
   const currentMonth = format(currentDate, 'yyyy-MM')
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setSelectedFees(new Set())
     const endDay = format(endOfMonth(currentDate), 'yyyy-MM-dd')
     const [
       { data: groupData },
@@ -441,6 +445,47 @@ export default function FinanceiroPage() {
       })
       loadData()
       loadAccumulatedBalance()
+    }
+  }
+
+  async function deleteFeesBatch() {
+    if (selectedFees.size === 0) return
+    const ids = Array.from(selectedFees)
+    const { error } = await supabase
+      .from('monthly_fees')
+      .delete()
+      .in('id', ids)
+    if (error) {
+      toast.error('Erro ao excluir mensalidades')
+    } else {
+      toast.success(`${ids.length} mensalidade${ids.length > 1 ? 's' : ''} excluida${ids.length > 1 ? 's' : ''}.`)
+      await logAudit(supabase, {
+        groupId,
+        action: 'batch_delete_fees',
+        entityType: 'monthly_fee',
+        entityId: undefined,
+        details: { count: ids.length, month: currentMonth },
+      })
+      setSelectedFees(new Set())
+      loadData()
+      loadAccumulatedBalance()
+    }
+  }
+
+  function toggleFeeSelection(feeId: string) {
+    setSelectedFees(prev => {
+      const next = new Set(prev)
+      if (next.has(feeId)) next.delete(feeId)
+      else next.add(feeId)
+      return next
+    })
+  }
+
+  function toggleAllFees() {
+    if (selectedFees.size === displayFees.length) {
+      setSelectedFees(new Set())
+    } else {
+      setSelectedFees(new Set(displayFees.map(f => f.id)))
     }
   }
 
@@ -1220,11 +1265,35 @@ export default function FinanceiroPage() {
               </DialogContent>
             </Dialog>
 
+            {/* Batch actions bar */}
+            {isAdmin && selectedFees.size > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <span className="text-sm font-medium text-red-700">{selectedFees.size} selecionada{selectedFees.size > 1 ? 's' : ''}</span>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-400 hover:bg-red-100" onClick={deleteFeesBatch}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Excluir Selecionadas
+                </Button>
+                <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setSelectedFees(new Set())}>
+                  Cancelar
+                </Button>
+              </div>
+            )}
+
             <Card>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {isAdmin && (
+                        <TableHead className="w-10">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 accent-[#1B1F4B] cursor-pointer"
+                            checked={displayFees.length > 0 && selectedFees.size === displayFees.length}
+                            onChange={toggleAllFees}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead>Membro</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Vencimento</TableHead>
@@ -1236,17 +1305,27 @@ export default function FinanceiroPage() {
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
+                        <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell>
                       </TableRow>
                     ) : displayFees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
                           Nenhuma mensalidade gerada. Clique em &quot;Gerar Mensalidades&quot; para criar.
                         </TableCell>
                       </TableRow>
                     ) : (
                       displayFees.map((fee) => (
-                        <TableRow key={fee.id}>
+                        <TableRow key={fee.id} className={selectedFees.has(fee.id) ? 'bg-red-50/50' : ''}>
+                          {isAdmin && (
+                            <TableCell className="w-10">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300 accent-[#1B1F4B] cursor-pointer"
+                                checked={selectedFees.has(fee.id)}
+                                onChange={() => toggleFeeSelection(fee.id)}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-1.5">
                               {fee.member?.name}
