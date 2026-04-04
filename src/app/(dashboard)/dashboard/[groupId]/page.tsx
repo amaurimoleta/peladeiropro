@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope, Wallet, UserCheck } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle2, CalendarDays, Stethoscope, Wallet } from 'lucide-react'
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import RankingCard from '@/components/dashboard/ranking-card'
@@ -61,8 +61,6 @@ export default async function GroupDashboard({
     { data: allFees },
     { data: allGuests },
     { data: allExpenses },
-    // Attendance for current month
-    { data: matchAttendance },
     // Last 6 months data for charts
     { data: chartFees },
     { data: chartGuests },
@@ -80,8 +78,6 @@ export default async function GroupDashboard({
     supabase.from('monthly_fees').select('amount').eq('group_id', groupId).eq('status', 'paid'),
     supabase.from('guest_players').select('amount').eq('group_id', groupId).eq('paid', true),
     supabase.from('expenses').select('amount').eq('group_id', groupId),
-    // Match attendance for current month matches
-    supabase.from('match_attendance').select('*, member:group_members(name), match:matches(match_date, group_id)').eq('present', true),
     // Chart data: fees, guests, expenses for last 6 months
     supabase.from('monthly_fees').select('amount, reference_month, status').eq('group_id', groupId).eq('status', 'paid').gte('reference_month', format(subMonths(selectedDate, chartMonthsBack), 'yyyy-MM')),
     supabase.from('guest_players').select('amount, match_date, paid').eq('group_id', groupId).eq('paid', true).gte('match_date', chartStartDate),
@@ -154,27 +150,6 @@ export default async function GroupDashboard({
     value,
     color: EXPENSE_CATEGORY_COLORS[cat] || '#64748b',
   }))
-
-  // ---- Attendance stats (current month) ----
-  const currentMonthMatchIds = new Set(matches?.map(m => m.id) || [])
-  const currentMonthAttendance = matchAttendance?.filter(
-    (a: any) => a.match?.group_id === groupId && currentMonthMatchIds.has(a.match_id)
-  ) || []
-  const totalMatchesThisMonth = matches?.length || 0
-  const averageAttendance = totalMatchesThisMonth > 0
-    ? Math.round(currentMonthAttendance.length / totalMatchesThisMonth)
-    : 0
-
-  // Most frequent player
-  const playerCounts: Record<string, { name: string; count: number }> = {}
-  currentMonthAttendance.forEach((a: any) => {
-    const name = a.member?.name || 'Desconhecido'
-    if (!playerCounts[a.member_id]) {
-      playerCounts[a.member_id] = { name, count: 0 }
-    }
-    playerCounts[a.member_id].count++
-  })
-  const mostFrequentPlayer = Object.values(playerCounts).sort((a, b) => b.count - a.count)[0]
 
   const summaryCards = [
     {
@@ -264,36 +239,6 @@ export default async function GroupDashboard({
           </div>
         ))}
       </div>
-
-      {/* Attendance Stats */}
-      {totalMatchesThisMonth > 0 && (
-        <div className="card-modern-elevated mb-8 p-5 border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-violet-50/50">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm">
-              <UserCheck className="h-4 w-4 text-white" />
-            </div>
-            <h2 className="font-bold text-brand-navy">Frequencia do Mes</h2>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-extrabold text-brand-navy">{totalMatchesThisMonth}</div>
-              <p className="text-xs text-muted-foreground mt-1">Jogos no mes</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-extrabold text-brand-navy">{averageAttendance}</div>
-              <p className="text-xs text-muted-foreground mt-1">Media por jogo</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-extrabold text-brand-navy truncate">
-                {mostFrequentPlayer ? mostFrequentPlayer.name.split(' ')[0] : '-'}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {mostFrequentPlayer ? `${mostFrequentPlayer.count} presenças` : 'Mais frequente'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Financial Charts */}
       <FinancialCharts monthlyData={monthlyData} expenseBreakdown={expenseBreakdown} />
