@@ -202,6 +202,13 @@ export interface TeamMember {
   member?: GroupMember
 }
 
+export interface TournamentTeam {
+  id: string
+  tournament_id: string
+  team_id: string
+  created_at: string
+}
+
 export const EXPENSE_CATEGORIES: Record<string, string> = {
   court_rental: 'Quadra',
   goalkeeper: 'Goleiro',
