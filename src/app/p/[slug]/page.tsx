@@ -16,7 +16,7 @@ import {
 import {
   DollarSign, TrendingUp, TrendingDown, CheckCircle2, Clock,
   AlertCircle, Stethoscope, CalendarDays, MapPin, ChevronLeft,
-  ChevronRight, ChevronDown, Users, Camera, Share2, Trophy, Award, Megaphone, Pin,
+  ChevronRight, ChevronDown, Users, Camera, Share2, Trophy, Award, Megaphone, Pin, Minus,
 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -504,78 +504,108 @@ export default function PublicPage() {
                     </div>
                   </div>
 
-                  {/* Jogos do Mes */}
-                  {matches.length > 0 && (
-                    <div className="card-modern-elevated p-4 sm:p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-bold text-brand-navy">Jogos do Mes</h2>
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">{matches.length} jogos</span>
-                      </div>
-                      <div className="space-y-2.5">
-                        {matches.map((match: any) => (
-                          <div key={match.id} className="flex items-center justify-between text-sm py-1">
-                            <div className="flex items-center gap-2">
-                              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="font-medium text-brand-navy">
-                                {format(new Date(match.match_date + 'T12:00:00'), 'dd/MM/yyyy')}
-                              </span>
-                              {match.location && (
-                                <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                                  <MapPin className="h-3 w-3" />
-                                  {match.location}
-                                </span>
-                              )}
-                            </div>
-                            {/* Attendance count */}
-                            {matchAttendance[match.id] != null && matchAttendance[match.id] > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground bg-gray-50 px-2 py-0.5 rounded-full">
-                                <Users className="h-3 w-3" />
-                                {matchAttendance[match.id]}
-                              </span>
+                  {/* Mensalidades - collapsible with categorization */}
+                  {(() => {
+                    const paidFees = fees.filter((f: any) => f.status === 'paid')
+                    const pendingFeesArr = fees.filter((f: any) => f.status === 'pending' || f.status === 'overdue')
+                    const dmFees = fees.filter((f: any) => f.status === 'dm_leave')
+                    const waivedFees = fees.filter((f: any) => f.status === 'waived')
+
+                    const renderFeeList = (list: any[], emptyText: string) => (
+                      list.length > 0 ? list.map((fee: any) => (
+                        <div key={fee.id} className="flex items-center justify-between text-sm py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-brand-navy">{fee.member?.name}</span>
+                            {fee.member?.member_type === 'avulso' && (
+                              <Badge variant="outline" className="text-[10px] py-0 px-1">Avulso</Badge>
                             )}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mensalidades - collapsible */}
-                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '280ms' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowMensalidades(!showMensalidades)}
-                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
-                    >
-                      <h2 className="font-bold text-brand-navy">Mensalidades</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{paidCount}/{totalFeesCount}</span>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showMensalidades ? 'rotate-180' : ''}`} />
-                      </div>
-                    </button>
-                    {showMensalidades && (
-                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
-                        {fees.map((fee: any) => (
-                          <div key={fee.id} className="flex items-center justify-between text-sm py-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-brand-navy">{fee.member?.name}</span>
-                              {fee.member?.member_type === 'avulso' && (
-                                <Badge variant="outline" className="text-[10px] py-0 px-1">Avulso</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {fee.receipt_url && (
-                                <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
-                              )}
-                              {feeStatusDisplay(fee)}
-                            </div>
+                          <div className="flex items-center gap-2">
+                            {fee.receipt_url && (
+                              <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
+                            )}
+                            <span className="text-xs font-medium">R$ {Number(fee.amount).toFixed(2)}</span>
                           </div>
-                        ))}
-                        {fees.length === 0 && (
-                          <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma mensalidade gerada.</p>
+                        </div>
+                      )) : <p className="text-xs text-muted-foreground py-1 text-center">{emptyText}</p>
+                    )
+
+                    return (
+                      <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowMensalidades(!showMensalidades)}
+                          className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                        >
+                          <h2 className="font-bold text-brand-navy">Mensalidades</h2>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{paidCount}/{totalFeesCount}</span>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showMensalidades ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {showMensalidades && (
+                          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4">
+                            {fees.length === 0 ? (
+                              <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma mensalidade gerada.</p>
+                            ) : (
+                              <>
+                                {/* Pagos */}
+                                {paidFees.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-brand-green" />
+                                      <span className="text-xs font-bold text-brand-green uppercase tracking-wide">Pagos ({paidFees.length})</span>
+                                    </div>
+                                    <div className="space-y-1 pl-5">
+                                      {renderFeeList(paidFees, '')}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Pendentes */}
+                                {pendingFeesArr.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Clock className="h-3.5 w-3.5 text-amber-500" />
+                                      <span className="text-xs font-bold text-amber-500 uppercase tracking-wide">
+                                        Pendentes ({pendingFeesArr.length})
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1 pl-5">
+                                      {renderFeeList(pendingFeesArr, '')}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Afastados DM */}
+                                {dmFees.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Stethoscope className="h-3.5 w-3.5 text-blue-500" />
+                                      <span className="text-xs font-bold text-blue-500 uppercase tracking-wide">Afastados DM ({dmFees.length})</span>
+                                    </div>
+                                    <div className="space-y-1 pl-5">
+                                      {renderFeeList(dmFees, '')}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Dispensados */}
+                                {waivedFees.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Dispensados ({waivedFees.length})</span>
+                                    </div>
+                                    <div className="space-y-1 pl-5">
+                                      {renderFeeList(waivedFees, '')}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    )
+                  })()}
 
                   {/* Despesas - collapsible */}
                   <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '360ms' }}>
@@ -610,39 +640,58 @@ export default function PublicPage() {
                     )}
                   </div>
 
-                  {/* Avulsos - collapsible */}
-                  {guests.length > 0 && (
-                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '440ms' }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowAvulsos(!showAvulsos)}
-                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
-                      >
-                        <h2 className="font-bold text-brand-navy">Jogadores Avulsos</h2>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-500">{guests.length}</span>
-                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAvulsos ? 'rotate-180' : ''}`} />
-                        </div>
-                      </button>
-                      {showAvulsos && (
-                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
-                          {guests.map((guest: any) => (
-                            <div key={guest.id} className="flex items-center justify-between text-sm py-1">
-                              <span className="font-medium text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">R$ {Number(guest.amount).toFixed(2)}</span>
-                                {guest.paid ? (
-                                  <CheckCircle2 className="h-4 w-4 text-brand-green" />
-                                ) : (
-                                  <Clock className="h-4 w-4 text-amber-500" />
-                                )}
-                              </div>
+                  {/* Receitas - collapsible */}
+                  <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '440ms' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAvulsos(!showAvulsos)}
+                      className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                    >
+                      <h2 className="font-bold text-brand-navy">Receitas</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">R$ {totalIncome.toFixed(2)}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showAvulsos ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {showAvulsos && (
+                      <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
+                        {/* Mensalidades pagas */}
+                        {totalFeesPaid > 0 && (
+                          <div className="flex justify-between text-sm py-1">
+                            <span className="text-muted-foreground">Mensalidades pagas</span>
+                            <span className="font-semibold text-brand-green">R$ {totalFeesPaid.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {/* Jogadores Avulsos */}
+                        {guests.length > 0 && (
+                          <div>
+                            <div className="flex justify-between text-sm py-1 mb-1">
+                              <span className="text-muted-foreground">Jogadores avulsos</span>
+                              <span className="font-semibold text-brand-green">R$ {totalGuestsPaid.toFixed(2)}</span>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            <div className="space-y-1 pl-3 border-l-2 border-gray-100">
+                              {guests.map((guest: any) => (
+                                <div key={guest.id} className="flex items-center justify-between text-xs py-0.5">
+                                  <span className="text-brand-navy">{guest.name} - {format(new Date(guest.match_date + 'T12:00:00'), 'dd/MM')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium">R$ {Number(guest.amount).toFixed(2)}</span>
+                                    {guest.paid ? (
+                                      <CheckCircle2 className="h-3 w-3 text-brand-green" />
+                                    ) : (
+                                      <Clock className="h-3 w-3 text-amber-500" />
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {totalIncome === 0 && (
+                          <p className="text-sm text-muted-foreground py-2 text-center">Nenhuma receita no mes.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* PIX info */}
                   {group.pix_key && (
