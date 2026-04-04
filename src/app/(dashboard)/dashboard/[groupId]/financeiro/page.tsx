@@ -438,6 +438,9 @@ export default function FinanceiroPage() {
       updateData.paid_at = null
       updateData.payment_method = null
     }
+    if (editPaymentStatus === 'dm_leave' || editPaymentStatus === 'waived') {
+      updateData.amount = 0
+    }
     if (receiptUrl) {
       updateData.receipt_url = receiptUrl
     }
@@ -470,7 +473,7 @@ export default function FinanceiroPage() {
   async function markAsDmLeave(feeId: string, memberName?: string) {
     const { error } = await supabase
       .from('monthly_fees')
-      .update({ status: 'dm_leave' })
+      .update({ status: 'dm_leave', amount: 0 })
       .eq('id', feeId)
     if (error) {
       toast.error('Erro ao marcar afastamento DM')
@@ -490,7 +493,7 @@ export default function FinanceiroPage() {
   async function markAsWaived(feeId: string, memberName?: string) {
     const { error } = await supabase
       .from('monthly_fees')
-      .update({ status: 'waived' })
+      .update({ status: 'waived', amount: 0 })
       .eq('id', feeId)
     if (error) {
       toast.error('Erro ao dispensar mensalidade')
@@ -504,6 +507,7 @@ export default function FinanceiroPage() {
         details: { member: memberName, month: currentMonth },
       })
       loadData()
+      loadAccumulatedBalance()
     }
   }
 

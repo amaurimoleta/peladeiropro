@@ -506,12 +506,13 @@ export default function PublicPage() {
 
                   {/* Mensalidades - collapsible with categorization */}
                   {(() => {
-                    const paidFees = fees.filter((f: any) => f.status === 'paid')
-                    const pendingFeesArr = fees.filter((f: any) => f.status === 'pending' || f.status === 'overdue')
-                    const dmFees = fees.filter((f: any) => f.status === 'dm_leave')
-                    const waivedFees = fees.filter((f: any) => f.status === 'waived')
+                    const sortByName = (a: any, b: any) => (a.member?.name || '').localeCompare(b.member?.name || '')
+                    const paidFees = fees.filter((f: any) => f.status === 'paid').sort(sortByName)
+                    const pendingFeesArr = fees.filter((f: any) => f.status === 'pending' || f.status === 'overdue').sort(sortByName)
+                    const dmFees = fees.filter((f: any) => f.status === 'dm_leave').sort(sortByName)
+                    const waivedFees = fees.filter((f: any) => f.status === 'waived').sort(sortByName)
 
-                    const renderFeeList = (list: any[], emptyText: string) => (
+                    const renderFeeList = (list: any[], showValue: boolean) => (
                       list.length > 0 ? list.map((fee: any) => (
                         <div key={fee.id} className="flex items-center justify-between text-sm py-1">
                           <div className="flex items-center gap-2">
@@ -524,10 +525,12 @@ export default function PublicPage() {
                             {fee.receipt_url && (
                               <ReceiptViewer receiptUrl={fee.receipt_url} memberName={fee.member?.name || 'Membro'} />
                             )}
-                            <span className="text-xs font-medium">R$ {Number(fee.amount).toFixed(2)}</span>
+                            <span className={`text-xs font-medium ${showValue ? '' : 'text-muted-foreground'}`}>
+                              R$ {showValue ? Number(fee.amount).toFixed(2) : '0,00'}
+                            </span>
                           </div>
                         </div>
-                      )) : <p className="text-xs text-muted-foreground py-1 text-center">{emptyText}</p>
+                      )) : null
                     )
 
                     return (
@@ -557,7 +560,7 @@ export default function PublicPage() {
                                       <span className="text-xs font-bold text-brand-green uppercase tracking-wide">Pagos ({paidFees.length})</span>
                                     </div>
                                     <div className="space-y-1 pl-5">
-                                      {renderFeeList(paidFees, '')}
+                                      {renderFeeList(paidFees, true)}
                                     </div>
                                   </div>
                                 )}
@@ -571,7 +574,7 @@ export default function PublicPage() {
                                       </span>
                                     </div>
                                     <div className="space-y-1 pl-5">
-                                      {renderFeeList(pendingFeesArr, '')}
+                                      {renderFeeList(pendingFeesArr, false)}
                                     </div>
                                   </div>
                                 )}
@@ -583,7 +586,7 @@ export default function PublicPage() {
                                       <span className="text-xs font-bold text-blue-500 uppercase tracking-wide">Afastados DM ({dmFees.length})</span>
                                     </div>
                                     <div className="space-y-1 pl-5">
-                                      {renderFeeList(dmFees, '')}
+                                      {renderFeeList(dmFees, false)}
                                     </div>
                                   </div>
                                 )}
@@ -595,7 +598,7 @@ export default function PublicPage() {
                                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Dispensados ({waivedFees.length})</span>
                                     </div>
                                     <div className="space-y-1 pl-5">
-                                      {renderFeeList(waivedFees, '')}
+                                      {renderFeeList(waivedFees, false)}
                                     </div>
                                   </div>
                                 )}
