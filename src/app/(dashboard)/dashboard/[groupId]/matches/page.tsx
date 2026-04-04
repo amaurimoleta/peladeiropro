@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
+  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -104,6 +105,11 @@ export default function MatchesPage() {
   const [confirmationsMap, setConfirmationsMap] = useState<Record<string, any[]>>({})
   const [myMemberId, setMyMemberId] = useState<string | null>(null)
 
+  // Search, filter, sort
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [filterType, setFilterType] = useState<'all' | 'with_score' | 'no_score' | 'tournament' | 'with_guests'>('all')
+
   const currentMonth = format(currentDate, 'yyyy-MM')
 
   // Load group data
@@ -158,7 +164,7 @@ export default function MatchesPage() {
       { data: matchesData },
       { data: guestsData },
     ] = await Promise.all([
-      supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay).order('match_date', { ascending: false }),
+      supabase.from('matches').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay).order('match_date', { ascending: true }),
       supabase.from('guest_players').select('*').eq('group_id', groupId).gte('match_date', firstDay).lte('match_date', lastDay),
     ])
 
@@ -598,12 +604,49 @@ export default function MatchesPage() {
     return match.team_b_name || 'Time B'
   }
 
-  // Summary
+  // Summary (based on all matches, not filtered)
   const allGuests = matches.flatMap((m) => m.guests || [])
   const totalMatches = matches.length
   const totalGuests = allGuests.length
   const totalCollected = allGuests.filter((g) => g.paid).reduce((s, g) => s + Number(g.amount), 0)
   const totalPending = allGuests.filter((g) => !g.paid).reduce((s, g) => s + Number(g.amount), 0)
+
+  // Filter + Search + Sort
+  const filteredMatches = matches
+    .filter((match) => {
+      // Text search
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase()
+        const matchDate = formatMatchDate(match.match_date).toLowerCase()
+        const location = (match.location || '').toLowerCase()
+        const notes = (match.notes || '').toLowerCase()
+        const teamA = (match.team_a_name || '').toLowerCase()
+        const teamB = (match.team_b_name || '').toLowerCase()
+        const guestNames = (match.guests || []).map(g => g.name.toLowerCase()).join(' ')
+        const tournamentName = (tournaments.find(t => t.id === match.tournament_id)?.name || '').toLowerCase()
+        if (
+          !matchDate.includes(term) &&
+          !location.includes(term) &&
+          !notes.includes(term) &&
+          !teamA.includes(term) &&
+          !teamB.includes(term) &&
+          !guestNames.includes(term) &&
+          !tournamentName.includes(term)
+        ) return false
+      }
+      // Filter by type
+      if (filterType === 'with_score') return match.score_a != null && match.score_b != null
+      if (filterType === 'no_score') return match.score_a == null || match.score_b == null
+      if (filterType === 'tournament') return !!match.tournament_id
+      if (filterType === 'with_guests') return (match.guests || []).length > 0
+      return true
+    })
+    .sort((a, b) => {
+      const cmp = a.match_date.localeCompare(b.match_date)
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+
+  const hasActiveFilters = searchTerm.trim() !== '' || filterType !== 'all' || sortOrder !== 'asc'
 
   return (
     <div>
@@ -655,6 +698,86 @@ export default function MatchesPage() {
         </Card>
       </div>
 
+      {/* Barra de busca, filtro e ordenacao */}
+      {!loading && matches.length > 0 && (
+        <div className="space-y-3 mb-6">
+          {/* Search + Sort row */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por local, time, avulso, campeonato..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 shrink-0"
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            >
+              {sortOrder === 'asc' ? (
+                <><ArrowUp className="h-3.5 w-3.5" /> Antigo</>
+              ) : (
+                <><ArrowDown className="h-3.5 w-3.5" /> Recente</>
+              )}
+            </Button>
+          </div>
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { value: 'all', label: 'Todos' },
+              { value: 'with_score', label: 'Com placar' },
+              { value: 'no_score', label: 'Sem placar' },
+              { value: 'tournament', label: 'Campeonato' },
+              { value: 'with_guests', label: 'Com avulsos' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilterType(opt.value as typeof filterType)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  filterType === opt.value
+                    ? 'bg-brand-navy text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => { setSearchTerm(''); setFilterType('all'); setSortOrder('asc') }}
+                className="px-3 py-1 rounded-full text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1"
+              >
+                <X className="h-3 w-3" />
+                Limpar
+              </button>
+            )}
+          </div>
+
+          {/* Results count */}
+          {(searchTerm || filterType !== 'all') && (
+            <p className="text-xs text-muted-foreground">
+              {filteredMatches.length} de {matches.length} {matches.length === 1 ? 'jogo' : 'jogos'}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Cards de jogos */}
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">Carregando jogos...</div>
@@ -664,9 +787,24 @@ export default function MatchesPage() {
             Nenhum jogo neste mes.
           </CardContent>
         </Card>
+      ) : filteredMatches.length === 0 ? (
+        <Card className="card-modern-elevated">
+          <CardContent className="text-center py-8 text-muted-foreground">
+            <Search className="h-8 w-8 mx-auto mb-2 opacity-40" />
+            <p>Nenhum jogo encontrado com os filtros atuais.</p>
+            <Button
+              variant="link"
+              size="sm"
+              className="mt-1 text-brand-navy"
+              onClick={() => { setSearchTerm(''); setFilterType('all') }}
+            >
+              Limpar filtros
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-4">
-          {matches.map((match) => {
+          {filteredMatches.map((match) => {
             const guests = match.guests || []
             const isExpanded = expandedMatch === match.id
             const matchAttendance = attendanceMap[match.id] || {}
