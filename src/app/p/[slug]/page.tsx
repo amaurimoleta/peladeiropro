@@ -1517,7 +1517,7 @@ export default function PublicPage() {
           <div className="flex justify-center mb-2">
             <Logo size="sm" />
           </div>
-          <p className="text-xs text-muted-foreground">Gestao de tesouraria para peladas</p>
+          <p className="text-xs text-muted-foreground">Agora o seu grupo de futebol e uma SAF</p>
         </div>
       </main>
 

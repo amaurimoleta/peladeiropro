@@ -1,7 +1,7 @@
 {
   "name": "PeladeiroPro",
   "short_name": "PeladeiroPro",
-  "description": "Gestão de tesouraria para grupos de futebol",
+  "description": "Agora o seu grupo de futebol e uma SAF",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#1B1F4B",

@@ -12,10 +12,33 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login')
 
-  const { data: groups } = await supabase
+  // Only show groups where the user is an active member or the creator
+  const { data: memberships } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('profile_id', user.id)
+    .eq('status', 'active')
+
+  const memberGroupIds = memberships?.map(m => m.group_id) || []
+
+  // Also include groups created by the user (even if not a member yet)
+  const { data: createdGroups } = await supabase
     .from('groups')
-    .select('*, group_members(count)')
-    .order('created_at', { ascending: false })
+    .select('id')
+    .eq('created_by', user.id)
+
+  const createdGroupIds = createdGroups?.map(g => g.id) || []
+  const allGroupIds = [...new Set([...memberGroupIds, ...createdGroupIds])]
+
+  let groups: any[] = []
+  if (allGroupIds.length > 0) {
+    const { data } = await supabase
+      .from('groups')
+      .select('*, group_members(count)')
+      .in('id', allGroupIds)
+      .order('created_at', { ascending: false })
+    groups = data || []
+  }
 
   return (
     <div className="min-h-screen gradient-surface mesh-bg">

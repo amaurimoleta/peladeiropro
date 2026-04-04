@@ -440,7 +440,7 @@ export default function LandingPage() {
             <div className="md:col-span-2">
               <Logo size="sm" />
               <p className="text-sm text-muted-foreground mt-3 max-w-sm">
-                Gestao de tesouraria para grupos de futebol. Controle mensalidades, despesas e preste contas com transparencia.
+                Agora o seu grupo de futebol e uma SAF. Controle mensalidades, despesas e preste contas com transparencia.
               </p>
             </div>
             <div>
@@ -461,7 +461,7 @@ export default function LandingPage() {
           </div>
           <div className="border-t pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Feito com &#9917; para peladeiros &middot; &copy; {new Date().getFullYear()} PeladeiroPro
+              &copy; {new Date().getFullYear()} PeladeiroPro - trademark Amauri Moleta
             </p>
           </div>
         </div>
