@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   ArrowLeft, Plus, Trophy, CalendarDays, MapPin, Swords,
   ListOrdered, GitBranch, Repeat, Target, Shield, Users, X,
+  Pencil, Save, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -92,6 +93,11 @@ export default function TournamentDetailPage() {
   // Team management dialog
   const [teamsDialogOpen, setTeamsDialogOpen] = useState(false)
 
+  // Inline score editing
+  const [editingScoreId, setEditingScoreId] = useState<string | null>(null)
+  const [scoreInputs, setScoreInputs] = useState<Record<string, { a: string; b: string }>>({})
+  const [savingScore, setSavingScore] = useState<Record<string, boolean>>({})
+
   const loadTournament = useCallback(async () => {
     const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single()
     setTournament(data)
@@ -103,7 +109,14 @@ export default function TournamentDetailPage() {
       .select('*')
       .eq('tournament_id', tournamentId)
       .order('match_date', { ascending: true })
-    setMatches(data || [])
+    const loaded = data || []
+    setMatches(loaded)
+    // Initialize score inputs
+    const newInputs: Record<string, { a: string; b: string }> = {}
+    for (const m of loaded) {
+      newInputs[m.id] = { a: m.score_a != null ? String(m.score_a) : '', b: m.score_b != null ? String(m.score_b) : '' }
+    }
+    setScoreInputs(prev => ({ ...prev, ...newInputs }))
   }, [tournamentId])
 
   const loadTournamentTeams = useCallback(async () => {
@@ -289,6 +302,24 @@ export default function TournamentDetailPage() {
     setSavingMatch(false)
   }
 
+  async function handleSaveScore(matchId: string) {
+    const inputs = scoreInputs[matchId]
+    if (!inputs) return
+    setSavingScore(prev => ({ ...prev, [matchId]: true }))
+    const scoreA = inputs.a !== '' ? parseInt(inputs.a, 10) : null
+    const scoreB = inputs.b !== '' ? parseInt(inputs.b, 10) : null
+    const { error } = await supabase.from('matches').update({ score_a: scoreA, score_b: scoreB }).eq('id', matchId)
+    if (error) {
+      toast.error('Erro ao salvar placar', { description: error.message })
+    } else {
+      toast.success('Placar salvo!')
+      setEditingScoreId(null)
+      await logAudit(supabase, { groupId, action: 'update_score', entityType: 'match', entityId: matchId, details: { score_a: scoreA, score_b: scoreB } })
+      await loadMatches()
+    }
+    setSavingScore(prev => ({ ...prev, [matchId]: false }))
+  }
+
   function openAddMatch() {
     setMatchDate(format(new Date(), 'yyyy-MM-dd'))
     setMatchLocation('')
@@ -306,47 +337,93 @@ export default function TournamentDetailPage() {
     const hasScore = match.score_a != null && match.score_b != null
     const colorA = getTeamColor(teamA)
     const colorB = getTeamColor(teamB)
+    const isEditing = editingScoreId === match.id
+    const currentInputs = scoreInputs[match.id] || { a: '', b: '' }
+    const isSaving = savingScore[match.id]
 
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-brand-navy/20 transition-colors">
-        <div className="w-28 shrink-0 text-center">
-          {index !== undefined && (
-            <Badge variant="secondary" className="text-[10px] mb-0.5">Jogo {index + 1}</Badge>
-          )}
-          <p className="text-xs font-medium text-brand-navy capitalize">{fmtMatchDateShort(match.match_date)}</p>
-          {match.location && (
-            <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-0.5 mt-0.5">
-              <MapPin className="h-2.5 w-2.5" /> {match.location}
-            </p>
-          )}
-          {match.tournament_phase && (
-            <Badge variant="secondary" className="text-[10px] mt-1 bg-violet-50 text-violet-700">
-              {PLAYOFF_PHASES[match.tournament_phase] || match.tournament_phase}
-            </Badge>
-          )}
-        </div>
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <div className="flex items-center gap-1.5 flex-1 justify-end">
-            {colorA && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorA }} />}
-            <span className="text-sm font-bold text-brand-navy text-right truncate">{teamA}</span>
+      <div className="rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-brand-navy/20 transition-colors overflow-hidden">
+        <div className="flex items-center gap-3 p-3">
+          <div className="w-28 shrink-0 text-center">
+            {index !== undefined && (
+              <Badge variant="secondary" className="text-[10px] mb-0.5">Jogo {index + 1}</Badge>
+            )}
+            <p className="text-xs font-medium text-brand-navy capitalize">{fmtMatchDateShort(match.match_date)}</p>
+            {match.location && (
+              <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-0.5 mt-0.5">
+                <MapPin className="h-2.5 w-2.5" /> {match.location}
+              </p>
+            )}
+            {match.tournament_phase && (
+              <Badge variant="secondary" className="text-[10px] mt-1 bg-violet-50 text-violet-700">
+                {PLAYOFF_PHASES[match.tournament_phase] || match.tournament_phase}
+              </Badge>
+            )}
           </div>
-          {hasScore ? (
-            <>
-              <span className="bg-brand-navy text-white px-2 py-0.5 rounded text-sm font-extrabold min-w-[28px] text-center">{match.score_a}</span>
-              <span className="text-xs text-muted-foreground">x</span>
-              <span className="bg-brand-navy text-white px-2 py-0.5 rounded text-sm font-extrabold min-w-[28px] text-center">{match.score_b}</span>
-            </>
+
+          {/* Score area */}
+          {isEditing && isAdmin ? (
+            <div className="flex-1 flex items-center justify-center gap-2">
+              <div className="flex items-center gap-1.5 flex-1 justify-end">
+                {colorA && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorA }} />}
+                <span className="text-xs font-bold text-brand-navy text-right truncate">{teamA}</span>
+              </div>
+              <Input
+                type="number" min="0" className="w-12 h-8 text-center text-sm font-bold border-brand-navy/30 px-1"
+                value={currentInputs.a}
+                onChange={e => setScoreInputs(prev => ({ ...prev, [match.id]: { ...prev[match.id], a: e.target.value } }))}
+              />
+              <span className="text-xs text-muted-foreground font-bold">x</span>
+              <Input
+                type="number" min="0" className="w-12 h-8 text-center text-sm font-bold border-brand-navy/30 px-1"
+                value={currentInputs.b}
+                onChange={e => setScoreInputs(prev => ({ ...prev, [match.id]: { ...prev[match.id], b: e.target.value } }))}
+              />
+              <div className="flex items-center gap-1.5 flex-1 justify-start">
+                <span className="text-xs font-bold text-brand-navy text-left truncate">{teamB}</span>
+                {colorB && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorB }} />}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button size="sm" className="bg-[#00C853] hover:bg-[#00A843] text-white h-7 w-7 p-0" onClick={() => handleSaveScore(match.id)} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-muted-foreground h-7 w-7 p-0" onClick={() => setEditingScoreId(null)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
           ) : (
-            <>
-              <span className="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-sm min-w-[28px] text-center">-</span>
-              <span className="text-xs text-muted-foreground">x</span>
-              <span className="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-sm min-w-[28px] text-center">-</span>
-            </>
+            <div
+              className={`flex-1 flex items-center justify-center gap-2 ${isAdmin ? 'cursor-pointer' : ''}`}
+              onClick={() => isAdmin && setEditingScoreId(match.id)}
+              title={isAdmin ? 'Clique para editar o placar' : undefined}
+            >
+              <div className="flex items-center gap-1.5 flex-1 justify-end">
+                {colorA && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorA }} />}
+                <span className="text-sm font-bold text-brand-navy text-right truncate">{teamA}</span>
+              </div>
+              {hasScore ? (
+                <>
+                  <span className="bg-brand-navy text-white px-2 py-0.5 rounded text-sm font-extrabold min-w-[28px] text-center">{match.score_a}</span>
+                  <span className="text-xs text-muted-foreground">x</span>
+                  <span className="bg-brand-navy text-white px-2 py-0.5 rounded text-sm font-extrabold min-w-[28px] text-center">{match.score_b}</span>
+                </>
+              ) : (
+                <>
+                  <span className="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-sm min-w-[28px] text-center">-</span>
+                  <span className="text-xs text-muted-foreground">x</span>
+                  <span className="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-sm min-w-[28px] text-center">-</span>
+                </>
+              )}
+              <div className="flex items-center gap-1.5 flex-1 justify-start">
+                <span className="text-sm font-bold text-brand-navy text-left truncate">{teamB}</span>
+                {colorB && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorB }} />}
+              </div>
+              {isAdmin && (
+                <Pencil className="h-3 w-3 text-muted-foreground opacity-40 shrink-0" />
+              )}
+            </div>
           )}
-          <div className="flex items-center gap-1.5 flex-1 justify-start">
-            <span className="text-sm font-bold text-brand-navy text-left truncate">{teamB}</span>
-            {colorB && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colorB }} />}
-          </div>
         </div>
       </div>
     )
