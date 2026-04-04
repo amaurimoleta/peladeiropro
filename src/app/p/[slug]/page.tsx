@@ -853,46 +853,9 @@ export default function PublicPage() {
                     )}
                   </div>
 
-                  {/* Member payment compliance - collapsible */}
-                  {memberCompliance.length > 0 && (
-                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '380ms' }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowCompliance(!showCompliance)}
-                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-brand-navy" />
-                          <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{memberCompliance.length}</span>
-                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showCompliance ? 'rotate-180' : ''}`} />
-                        </div>
-                      </button>
-                      {showCompliance && (
-                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
-                          {memberCompliance.map((member) => (
-                            <div key={member.name} className="flex items-center justify-between text-sm py-1.5">
-                              <span className="font-medium text-brand-navy">{member.name}</span>
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">
-                                  {member.paidMonths}/{member.totalMonths} meses
-                                </span>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${complianceBg(member.percentage)} ${complianceColor(member.percentage)}`}>
-                                  {member.percentage}%
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Receitas Detalhadas - collapsible */}
                   {annualTotalIncome > 0 && (
-                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '460ms' }}>
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '380ms' }}>
                       <button
                         type="button"
                         onClick={() => setShowAnnualReceitas(!showAnnualReceitas)}
@@ -930,7 +893,7 @@ export default function PublicPage() {
 
                   {/* Despesas Detalhadas - collapsible */}
                   {annualTotalExpense > 0 && (
-                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '540ms' }}>
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '460ms' }}>
                       <button
                         type="button"
                         onClick={() => setShowAnnualDespesas(!showAnnualDespesas)}
@@ -957,6 +920,43 @@ export default function PublicPage() {
                             <span className="text-brand-navy">Total Despesas</span>
                             <span className="text-red-500">R$ {annualTotalExpense.toFixed(2)}</span>
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Member payment compliance - collapsible */}
+                  {memberCompliance.length > 0 && (
+                    <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '540ms' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCompliance(!showCompliance)}
+                        className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-brand-navy" />
+                          <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{memberCompliance.length}</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showCompliance ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {showCompliance && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
+                          {memberCompliance.map((member) => (
+                            <div key={member.name} className="flex items-center justify-between text-sm py-1.5">
+                              <span className="font-medium text-brand-navy">{member.name}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground">
+                                  {member.paidMonths}/{member.totalMonths} meses
+                                </span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${complianceBg(member.percentage)} ${complianceColor(member.percentage)}`}>
+                                  {member.percentage}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
