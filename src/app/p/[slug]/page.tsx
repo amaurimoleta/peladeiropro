@@ -393,13 +393,67 @@ export default function PublicPage() {
   const complianceMembers = group && !group.goalkeeper_pays_fee
     ? annualMembers.filter((m: any) => m.position !== 'goleiro')
     : annualMembers
+  const today = new Date()
   const memberCompliance = complianceMembers.map((member: any) => {
     const memberFees = annualFees.filter(f => f.member_id === member.id)
-    const totalMonths = memberFees.length
-    const paidMonths = memberFees.filter(f => f.status === 'paid').length
+    // Exclude DM and waived from counting
+    const relevantFees = memberFees.filter(f => f.status !== 'dm_leave' && f.status !== 'waived')
+    // Exclude pending fees whose due_date hasn't passed yet
+    const scorableFees = relevantFees.filter(f => {
+      if (f.status === 'pending' && new Date(f.due_date + 'T23:59:59') > today) return false
+      return true
+    })
+    const totalMonths = scorableFees.length
+    const paidMonths = scorableFees.filter(f => f.status === 'paid').length
+    const dmMonths = memberFees.filter(f => f.status === 'dm_leave' || f.status === 'waived').length
+
+    // Score based on payment timing
+    let onTimeCount = 0
+    let lateCount = 0
+    let totalDaysEarly = 0
+    let totalDaysLate = 0
+
+    for (const fee of scorableFees) {
+      const dueDate = new Date(fee.due_date + 'T23:59:59')
+      if (fee.status === 'paid' && fee.paid_at) {
+        const paidDate = new Date(fee.paid_at)
+        const diffMs = dueDate.getTime() - paidDate.getTime()
+        const diffDays = diffMs / (1000 * 60 * 60 * 24)
+        if (paidDate <= dueDate) {
+          onTimeCount++
+          if (diffDays > 0) totalDaysEarly += Math.min(diffDays, 15)
+        } else {
+          lateCount++
+          totalDaysLate += Math.min(Math.abs(diffDays), 30)
+        }
+      } else if (fee.status === 'overdue' || (fee.status === 'pending' && dueDate < today)) {
+        lateCount++
+        const daysLate = (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
+        totalDaysLate += Math.min(daysLate, 30)
+      }
+    }
+
+    const relevantCount = onTimeCount + lateCount
+    const onTimeRate = relevantCount > 0 ? onTimeCount / relevantCount : 0
+    const avgDaysEarly = onTimeCount > 0 ? totalDaysEarly / onTimeCount : 0
+    const avgDaysLate = lateCount > 0 ? totalDaysLate / lateCount : 0
+
+    const baseScore = onTimeRate * 70
+    const earlyBonus = Math.min(avgDaysEarly, 10) * 2
+    const latePenalty = Math.min(avgDaysLate, 15) * 1.5
+    const score = totalMonths > 0
+      ? Math.max(0, Math.min(100, baseScore + earlyBonus - latePenalty))
+      : 50
+
+    let badge: string
+    if (score >= 80) badge = 'Craque'
+    else if (score >= 55) badge = 'Em dia'
+    else if (score >= 25) badge = 'Irregular'
+    else badge = 'Devedor'
+
     const percentage = totalMonths > 0 ? Math.round((paidMonths / totalMonths) * 100) : 0
-    return { name: member.name, paidMonths, totalMonths, percentage }
-  }).sort((a, b) => b.percentage - a.percentage)
+    return { name: member.name, paidMonths, totalMonths, dmMonths, percentage, score: Math.round(score * 10) / 10, badge }
+  }).sort((a, b) => b.score - a.score)
 
   // Inadimplentes computed data
   const filteredOverdueFees = group && !group.goalkeeper_pays_fee
@@ -440,16 +494,24 @@ export default function PublicPage() {
     return format(date, 'MMMM', { locale: ptBR })
   }
 
-  function complianceColor(percentage: number) {
-    if (percentage >= 100) return 'text-brand-green'
-    if (percentage >= 50) return 'text-amber-500'
-    return 'text-red-500'
+  function badgeColor(badge: string) {
+    switch (badge) {
+      case 'Craque': return 'text-brand-green'
+      case 'Em dia': return 'text-blue-600'
+      case 'Irregular': return 'text-amber-500'
+      case 'Devedor': return 'text-red-500'
+      default: return 'text-muted-foreground'
+    }
   }
 
-  function complianceBg(percentage: number) {
-    if (percentage >= 100) return 'bg-brand-green/10'
-    if (percentage >= 50) return 'bg-amber-50'
-    return 'bg-red-50'
+  function badgeBg(badge: string) {
+    switch (badge) {
+      case 'Craque': return 'bg-brand-green/10'
+      case 'Em dia': return 'bg-blue-50'
+      case 'Irregular': return 'bg-amber-50'
+      case 'Devedor': return 'bg-red-50'
+      default: return 'bg-muted/30'
+    }
   }
 
   function handleWhatsAppShare() {
@@ -983,7 +1045,7 @@ export default function PublicPage() {
                     </div>
                   )}
 
-                  {/* Member payment compliance - collapsible */}
+                  {/* Member payment compliance ranking - collapsible */}
                   {memberCompliance.length > 0 && (
                     <div className="card-modern-elevated overflow-hidden animate-fade-in-up" style={{ animationDelay: '540ms' }}>
                       <button
@@ -992,8 +1054,8 @@ export default function PublicPage() {
                         className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
                       >
                         <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-brand-navy" />
-                          <h2 className="font-bold text-brand-navy">Adimplencia dos Membros</h2>
+                          <Trophy className="h-4 w-4 text-brand-navy" />
+                          <h2 className="font-bold text-brand-navy">Ranking de Adimplencia</h2>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-green/10 text-brand-green">{memberCompliance.length}</span>
@@ -1001,20 +1063,34 @@ export default function PublicPage() {
                         </div>
                       </button>
                       {showCompliance && (
-                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
-                          {memberCompliance.map((member) => (
-                            <div key={member.name} className="flex items-center justify-between text-sm py-1.5">
-                              <span className="font-medium text-brand-navy">{member.name}</span>
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">
-                                  {member.paidMonths}/{member.totalMonths} meses
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5">
+                          <p className="text-[11px] text-muted-foreground mb-3">Pontuacao baseada em pagamentos em dia e antecedencia. DM e dispensas nao contam.</p>
+                          <div className="space-y-2">
+                            {memberCompliance.map((member, idx) => (
+                              <div key={member.name} className="flex items-center gap-3 text-sm py-2 border-b border-gray-100 last:border-0">
+                                <span className="w-6 text-center font-bold text-muted-foreground text-xs">
+                                  {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
                                 </span>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${complianceBg(member.percentage)} ${complianceColor(member.percentage)}`}>
-                                  {member.percentage}%
-                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium text-brand-navy">{member.name}</span>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {member.paidMonths}/{member.totalMonths} pagos
+                                    </span>
+                                    {member.dmMonths > 0 && (
+                                      <span className="text-[11px] text-blue-500">{member.dmMonths} DM</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeBg(member.badge)} ${badgeColor(member.badge)}`}>
+                                    {member.badge}
+                                  </span>
+                                  <span className="text-xs font-bold text-brand-navy w-8 text-right">{member.score}</span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
