@@ -16,6 +16,7 @@ import {
   Trophy,
   Shield,
   UserCircle,
+  Zap,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
@@ -24,12 +25,14 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
+import { LanguageSwitcher } from '@/components/shared/language-switcher'
 import { GroupSelector } from '@/components/dashboard/group-selector'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/minha-area', icon: UserCircle, label: 'Minha Área' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
+  { href: '/dia-de-jogo', icon: Zap, label: 'Dia de Jogo' },
   { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
   { href: '/times', icon: Shield, label: 'Times' },
   { href: '/members', icon: Users, label: 'Membros' },
@@ -117,9 +120,12 @@ export function Sidebar({ groupId, groupName }: { groupId: string; groupName: st
           <User className="h-4 w-4" />
           Meu Perfil
         </Link>
-        <div className="flex items-center gap-3 px-3 py-1">
-          <ThemeToggle />
-          <span className="text-sm font-medium text-muted-foreground">Tema</span>
+        <div className="flex items-center justify-between px-3 py-1">
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <span className="text-sm font-medium text-muted-foreground">Tema</span>
+          </div>
+          <LanguageSwitcher />
         </div>
         <button
           onClick={handleLogout}

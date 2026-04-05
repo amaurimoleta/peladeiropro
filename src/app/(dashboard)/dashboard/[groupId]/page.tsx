@@ -8,6 +8,8 @@ import AnnouncementsCard from '@/components/dashboard/announcements-card'
 import FinancialCharts from '@/components/dashboard/financial-charts'
 import type { MonthlyFinancialData, ExpenseCategoryData, BalanceEvolutionData } from '@/components/dashboard/financial-charts'
 import { DashboardNav } from '@/components/dashboard/dashboard-nav'
+import ActivityFeed from '@/components/dashboard/activity-feed'
+import { WhatsAppNotifier } from '@/components/dashboard/whatsapp-notifier'
 
 const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   court_rental: 'Quadra',
@@ -449,15 +451,25 @@ export default async function GroupDashboard({
         </div>
       )}
 
+      {/* WhatsApp Notifier for overdue fees */}
+      <div className="mb-8">
+        <WhatsAppNotifier groupId={groupId} />
+      </div>
+
       {/* Rankings side by side */}
       <div className="grid gap-4 md:grid-cols-2 mb-8">
         <RankingCard groupId={groupId} />
         <AttendanceRanking groupId={groupId} />
       </div>
 
+      {/* Activity Feed */}
+      <div className="mb-8">
+        <ActivityFeed groupId={groupId} />
+      </div>
+
       {/* Footer */}
-      <div className="mt-8 text-center text-xs text-muted-foreground py-4 border-t border-gray-100">
-        Agora o seu grupo de futebol e uma SAF
+      <div className="mt-8 text-center text-xs text-muted-foreground py-4 border-t border-gray-100 dark:border-gray-800">
+        Agora o seu grupo de futebol é uma SAF
       </div>
     </div>
   )

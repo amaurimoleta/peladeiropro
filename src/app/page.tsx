@@ -19,26 +19,26 @@ const features = [
   },
   {
     icon: Receipt,
-    title: 'Gestao de Despesas',
+    title: 'Gestão de Despesas',
     description: 'Controle gastos com quadra, goleiro, equipamentos e muito mais.',
     gradient: 'from-orange-500 to-red-500',
   },
   {
     icon: Trophy,
     title: 'Ranking de Pagadores',
-    description: 'Gamificacao: quem paga em dia sobe no ranking e ganha destaque.',
+    description: 'Gamificação: quem paga em dia sobe no ranking e ganha destaque.',
     gradient: 'from-yellow-500 to-amber-600',
   },
   {
     icon: Share2,
     title: 'Prestação de Contas',
-    description: 'Link público para compartilhar no WhatsApp com total transparencia.',
+    description: 'Link público para compartilhar no WhatsApp com total transparência.',
     gradient: 'from-green-500 to-teal-600',
   },
   {
     icon: BarChart3,
     title: 'Dashboard Financeiro',
-    description: 'Visao completa de entradas, saidas e saldo do seu grupo.',
+    description: 'Visão completa de entradas, saidas e saldo do seu grupo.',
     gradient: 'from-purple-500 to-violet-600',
   },
   {
@@ -49,13 +49,13 @@ const features = [
   },
   {
     icon: Shield,
-    title: 'Controle de Permissoes',
+    title: 'Controle de Permissões',
     description: 'Presidente, tesoureiro e membro: cada um ve e edita apenas o que pode.',
     gradient: 'from-cyan-500 to-blue-600',
   },
   {
     icon: Globe,
-    title: 'Relatorio PDF',
+    title: 'Relatório PDF',
     description: 'Exporte a prestação de contas em PDF profissional para enviar ao grupo.',
     gradient: 'from-indigo-500 to-purple-600',
   },
@@ -65,7 +65,7 @@ const stats = [
   { value: 500, suffix: '+', label: 'Grupos ativos' },
   { value: 10000, suffix: '+', label: 'Jogadores' },
   { value: 2, prefix: 'R$ ', suffix: 'M+', label: 'Gerenciados' },
-  { value: 98, suffix: '%', label: 'Satisfacao' },
+  { value: 98, suffix: '%', label: 'Satisfação' },
 ]
 
 const testimonials = [
@@ -91,16 +91,16 @@ const testimonials = [
 
 const faqs = [
   {
-    q: 'E realmente gratis?',
-    a: 'Sim! O PeladeiroPro e 100% gratuito. Acreditamos que todo grupo de pelada merece uma gestao financeira organizada.',
+    q: 'E realmente grátis?',
+    a: 'Sim! O PeladeiroPro e 100% gratuito. Acreditamos que todo grupo de pelada merece uma gestão financeira organizada.',
   },
   {
     q: 'Preciso instalar alguma coisa?',
-    a: 'Nao! Funciona direto no navegador. Mas você pode instalar como app no celular para acesso rapido (PWA).',
+    a: 'Não! Funciona direto no navegador. Mas você pode instalar como app no celular para acesso rápido (PWA).',
   },
   {
     q: 'Meus dados estao seguros?',
-    a: 'Sim. Usamos Supabase (infraestrutura da AWS) com criptografia e Row Level Security. Cada grupo so ve seus proprios dados.',
+    a: 'Sim. Usamos Supabase (infraestrutura da AWS) com criptografia e Row Level Security. Cada grupo so ve seus próprios dados.',
   },
   {
     q: 'Quantos membros posso ter no grupo?',
@@ -112,7 +112,7 @@ const faqs = [
   },
   {
     q: 'Como funciona a prestação de contas?',
-    a: 'Geramos um link público que você compartilha no WhatsApp. Qualquer pessoa acessa e ve receitas, despesas e saldo — sem precisar de conta.',
+    a: 'Geramos um link público que você compartilha no WhatsApp. Qualquer pessoa acessa e vê receitas, despesas e saldo — sem precisar de conta.',
   },
 ]
 
@@ -120,11 +120,11 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Nav */}
-      <nav className="glass fixed top-0 left-0 right-0 z-50 border-b border-white/10">
+      <nav className="glass fixed top-0 left-0 right-0 z-50 border-b border-white/10 dark:border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Logo size="sm" />
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link href="/login" className="text-sm font-medium text-brand-navy hover:text-brand-green transition-colors px-3 py-2">
+            <Link href="/login" className="text-sm font-medium text-brand-navy dark:text-gray-100 hover:text-brand-green transition-colors px-3 py-2">
               Entrar
             </Link>
             <Link href="/register" className="btn-modern-green !py-2 !px-4 text-sm !rounded-lg">
@@ -157,14 +157,14 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
             <Link href="/register" className="btn-modern-green text-lg !px-8 !py-4 flex items-center gap-2 animate-pulse-subtle">
               <Zap className="h-5 w-5" />
-              Comecar Gratis
+              Começar Grátis
             </Link>
             <Link href="#features" className="btn-modern-outline flex items-center gap-2 !py-4">
-              Conheca as funcionalidades
+              Conheça as funcionalidades
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <p className="text-sm text-white/40 mt-6 tracking-wide animate-fade-in-up" style={{ animationDelay: '600ms' }}>Gratis para sempre. Sem cartao de credito.</p>
+          <p className="text-sm text-white/40 mt-6 tracking-wide animate-fade-in-up" style={{ animationDelay: '600ms' }}>Grátis para sempre. Sem cartão de crédito.</p>
 
           {/* Scroll indicator */}
           <div className="mt-12 animate-bounce">
@@ -174,13 +174,13 @@ export default function LandingPage() {
       </section>
 
       {/* Stats */}
-      <section className="py-16 bg-white relative -mt-8 z-10">
+      <section className="py-16 bg-white dark:bg-gray-950 relative -mt-8 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="card-modern-elevated p-8 rounded-2xl">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {stats.map((stat, i) => (
                 <AnimateOnScroll key={stat.label} delay={i * 100} className="text-center">
-                  <div className="text-3xl md:text-4xl font-extrabold text-brand-navy tracking-tight">
+                  <div className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 tracking-tight">
                     <AnimatedCounter target={stat.value} prefix={stat.prefix} suffix={stat.suffix} />
                   </div>
                   <p className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</p>
@@ -198,11 +198,11 @@ export default function LandingPage() {
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-brand-green/10 text-brand-green mb-4">
               Funcionalidades
             </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy mb-4 tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 mb-4 tracking-tight">
               Tudo que você precisa para organizar a pelada
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Chega de planilha, caderninho e &ldquo;depois eu pago&rdquo;. Seu grupo merece gestao profissional.
+              Chega de planilha, caderninho e &ldquo;depois eu pago&rdquo;. Seu grupo merece gestão profissional.
             </p>
           </AnimateOnScroll>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -212,7 +212,7 @@ export default function LandingPage() {
                   <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                     <feature.icon className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="font-bold text-brand-navy text-lg mb-2 tracking-tight">{feature.title}</h3>
+                  <h3 className="font-bold text-brand-navy dark:text-gray-100 text-lg mb-2 tracking-tight">{feature.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
               </AnimateOnScroll>
@@ -222,21 +222,21 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-white dark:bg-gray-950">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <AnimateOnScroll className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-brand-navy/10 text-brand-navy mb-4">
-              Simples e Rapido
+              Simples e Rápido
             </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 tracking-tight">
               Como funciona
             </h2>
           </AnimateOnScroll>
           <div className="grid gap-8 md:grid-cols-3">
             {[
-              { step: '1', title: 'Crie seu grupo', desc: 'Cadastre o grupo, adicione os membros e pronto. Mais rapido que escalar o time no WhatsApp.' },
+              { step: '1', title: 'Crie seu grupo', desc: 'Cadastre o grupo, adicione os membros e pronto. Mais rápido que escalar o time no WhatsApp.' },
               { step: '2', title: 'Gerencie tudo', desc: 'Mensalidades, avulsos, despesas... tudo num so lugar. Seu Excel pode finalmente descansar em paz.' },
-              { step: '3', title: 'Compartilhe', desc: 'Mande o link no grupo e deixe a transparencia fazer o trabalho sujo. Ninguem reclama de dados.' },
+              { step: '3', title: 'Compartilhe', desc: 'Mande o link no grupo e deixe a transparência fazer o trabalho sujo. Ninguem reclama de dados.' },
             ].map((item, i) => (
               <AnimateOnScroll key={item.step} delay={i * 150} className="text-center group">
                 <div className="relative mx-auto mb-6">
@@ -247,7 +247,7 @@ export default function LandingPage() {
                     <div className="hidden md:block absolute top-1/2 -right-[calc(50%-2rem)] w-[calc(100%-4rem)] h-px bg-gradient-to-r from-brand-green/30 to-transparent" />
                   )}
                 </div>
-                <h3 className="font-bold text-brand-navy text-xl mb-3 tracking-tight">{item.title}</h3>
+                <h3 className="font-bold text-brand-navy dark:text-gray-100 text-xl mb-3 tracking-tight">{item.title}</h3>
                 <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
               </AnimateOnScroll>
             ))}
@@ -262,7 +262,7 @@ export default function LandingPage() {
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-brand-green/10 text-brand-green mb-4">
               Depoimentos
             </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 tracking-tight">
               O que dizem os tesoureiros
             </h2>
           </AnimateOnScroll>
@@ -277,7 +277,7 @@ export default function LandingPage() {
                   </div>
                   <p className="text-muted-foreground leading-relaxed flex-1 italic">&ldquo;{t.text}&rdquo;</p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
-                    <p className="font-bold text-brand-navy text-sm">{t.name}</p>
+                    <p className="font-bold text-brand-navy dark:text-gray-100 text-sm">{t.name}</p>
                     <p className="text-xs text-muted-foreground">{t.group}</p>
                   </div>
                 </div>
@@ -288,29 +288,29 @@ export default function LandingPage() {
       </section>
 
       {/* Benefits */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white dark:bg-gray-950">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <AnimateOnScroll>
             <div className="card-modern-elevated p-8 md:p-12 text-center">
-              <h2 className="text-2xl md:text-3xl font-extrabold text-brand-navy mb-8 tracking-tight">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-brand-navy dark:text-gray-100 mb-8 tracking-tight">
                 Por que usar o PeladeiroPro?
               </h2>
               <div className="grid gap-4 md:grid-cols-2 text-left max-w-2xl mx-auto">
                 {[
-                  'Geracao automatica de mensalidades',
+                  'Geração automática de mensalidades',
                   'Ranking gamificado de pagadores',
                   'Prestação de contas transparente',
                   'Compartilhamento via WhatsApp',
                   'Lista de presença por jogo',
-                  'Rateio automatico de custos',
+                  'Rateio automático de custos',
                   'Comprovante de pagamento (foto)',
-                  'Exportação de relatorio em PDF',
+                  'Exportação de relatório em PDF',
                   'Dashboard financeiro completo',
                   'Instale como app no celular',
                 ].map((benefit) => (
                   <div key={benefit} className="flex items-center gap-3 py-2">
                     <CheckCircle2 className="h-5 w-5 text-brand-green flex-shrink-0" />
-                    <span className="font-medium text-brand-navy">{benefit}</span>
+                    <span className="font-medium text-brand-navy dark:text-gray-100">{benefit}</span>
                   </div>
                 ))}
               </div>
@@ -324,9 +324,9 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <AnimateOnScroll className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-brand-navy/10 text-brand-navy mb-4">
-              Precos
+              Preços
             </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 tracking-tight">
               Simples e transparente
             </h2>
           </AnimateOnScroll>
@@ -337,21 +337,21 @@ export default function LandingPage() {
                 <div className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold bg-brand-green text-white">
                   ATUAL
                 </div>
-                <h3 className="text-xl font-bold text-brand-navy mb-2">Gratis</h3>
+                <h3 className="text-xl font-bold text-brand-navy dark:text-gray-100 mb-2">Grátis</h3>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-4xl font-extrabold text-brand-navy">R$ 0</span>
+                  <span className="text-4xl font-extrabold text-brand-navy dark:text-gray-100">R$ 0</span>
                   <span className="text-muted-foreground">/para sempre</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Grupos ilimitados', 'Membros ilimitados', 'Mensalidades e despesas', 'Prestação de contas publica', 'Ranking de pagadores', 'Compartilhamento WhatsApp', 'Lista de presença', 'Exportação PDF', 'PWA (instalar como app)'].map((f) => (
+                  {['Grupos ilimitados', 'Membros ilimitados', 'Mensalidades e despesas', 'Prestação de contas pública', 'Ranking de pagadores', 'Compartilhamento WhatsApp', 'Lista de presença', 'Exportação PDF', 'PWA (instalar como app)'].map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-brand-green flex-shrink-0" />
-                      <span className="text-brand-navy">{f}</span>
+                      <span className="text-brand-navy dark:text-gray-100">{f}</span>
                     </li>
                   ))}
                 </ul>
                 <Link href="/register" className="btn-modern-green w-full text-center">
-                  Comecar Agora
+                  Começar Agora
                 </Link>
               </div>
             </AnimateOnScroll>
@@ -362,13 +362,13 @@ export default function LandingPage() {
                 <div className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold bg-brand-navy/10 text-brand-navy">
                   EM BREVE
                 </div>
-                <h3 className="text-xl font-bold text-brand-navy mb-2">Pro</h3>
+                <h3 className="text-xl font-bold text-brand-navy dark:text-gray-100 mb-2">Pro</h3>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-4xl font-extrabold text-brand-navy">R$ 19</span>
-                  <span className="text-muted-foreground">/mes</span>
+                  <span className="text-4xl font-extrabold text-brand-navy dark:text-gray-100">R$ 19</span>
+                  <span className="text-muted-foreground">/mês</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Tudo do plano Gratis', 'Notificações automaticas', 'Integracao bancaria PIX', 'Relatorios avancados', 'Sorteio de times', 'Agenda de jogos integrada', 'Suporte prioritario'].map((f) => (
+                  {['Tudo do plano Grátis', 'Notificações automáticas', 'Integração bancaria PIX', 'Relatórios avançados', 'Sorteio de times', 'Agenda de jogos integrada', 'Suporte prioritário'].map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-muted-foreground">{f}</span>
@@ -385,13 +385,13 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-white dark:bg-gray-950">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <AnimateOnScroll className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase bg-brand-green/10 text-brand-green mb-4">
               FAQ
             </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-navy dark:text-gray-100 tracking-tight">
               Perguntas frequentes
             </h2>
           </AnimateOnScroll>
@@ -400,7 +400,7 @@ export default function LandingPage() {
               <AnimateOnScroll key={faq.q} delay={i * 60}>
                 <details className="group card-modern-elevated overflow-hidden">
                   <summary className="flex items-center justify-between p-5 cursor-pointer list-none">
-                    <span className="font-bold text-brand-navy pr-4">{faq.q}</span>
+                    <span className="font-bold text-brand-navy dark:text-gray-100 pr-4">{faq.q}</span>
                     <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-300 group-open:rotate-180 flex-shrink-0" />
                   </summary>
                   <div className="px-5 pb-5 -mt-1">
@@ -426,7 +426,7 @@ export default function LandingPage() {
               Crie sua conta em segundos e comece a gerenciar a tesouraria do seu grupo agora mesmo.
             </p>
             <Link href="/register" className="btn-modern-green text-lg !px-10 !py-4 inline-flex items-center gap-2 animate-pulse-subtle">
-              Criar Conta Gratis
+              Criar Conta Grátis
               <ArrowRight className="h-5 w-5" />
             </Link>
           </AnimateOnScroll>
@@ -434,17 +434,17 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t py-12">
+      <footer className="bg-white dark:bg-gray-950 border-t dark:border-gray-800 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid gap-8 md:grid-cols-4 mb-8">
             <div className="md:col-span-2">
               <Logo size="sm" />
               <p className="text-sm text-muted-foreground mt-3 max-w-sm">
-                Agora o seu grupo de futebol e uma SAF. Controle mensalidades, despesas e preste contas com transparencia.
+                Agora o seu grupo de futebol e uma SAF. Controle mensalidades, despesas e preste contas com transparência.
               </p>
             </div>
             <div>
-              <h4 className="font-bold text-brand-navy text-sm mb-3">Produto</h4>
+              <h4 className="font-bold text-brand-navy dark:text-gray-100 text-sm mb-3">Produto</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="#features" className="hover:text-brand-green transition-colors">Funcionalidades</Link></li>
                 <li><Link href="/register" className="hover:text-brand-green transition-colors">Criar Conta</Link></li>
@@ -452,7 +452,7 @@ export default function LandingPage() {
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-brand-navy text-sm mb-3">Suporte</h4>
+              <h4 className="font-bold text-brand-navy dark:text-gray-100 text-sm mb-3">Suporte</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><span className="cursor-default">contato@peladeiropro.com</span></li>
                 <li><span className="cursor-default">WhatsApp</span></li>
