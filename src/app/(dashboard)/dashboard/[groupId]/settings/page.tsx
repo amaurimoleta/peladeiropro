@@ -297,36 +297,10 @@ export default function SettingsPage() {
     const code = String(Math.floor(100000 + Math.random() * 900000))
     setExpectedDeleteCode(code)
 
-    // Get user email
-    const { data: { user } } = await supabase.auth.getUser()
-    const userEmail = user?.email || ''
-
-    // Try to send code via email using Supabase Edge Function or Auth
-    try {
-      // Use Supabase's auth.resetPasswordForEmail as a mechanism to send a notification
-      // For now, we'll show the code in a toast as a fallback + send email via database function
-      const { error: rpcError } = await supabase.rpc('send_delete_confirmation', {
-        p_email: userEmail,
-        p_code: code,
-        p_group_name: group?.name || '',
-      }).maybeSingle()
-
-      if (rpcError) {
-        // Fallback: show code via toast notification
-        toast.info(`Código de confirmação: ${code}`, {
-          description: `Enviado para ${userEmail}`,
-          duration: 30000,
-        })
-      } else {
-        toast.success(`Código enviado para ${userEmail}`)
-      }
-    } catch {
-      // Fallback: show code via toast
-      toast.info(`Código de confirmação: ${code}`, {
-        description: `Use este código para confirmar a exclusão`,
-        duration: 30000,
-      })
-    }
+    toast.info(`Código de confirmação: ${code}`, {
+      description: 'Use este código para confirmar a exclusão',
+      duration: 30000,
+    })
 
     setDeleteStep('code')
     setSendingCode(false)

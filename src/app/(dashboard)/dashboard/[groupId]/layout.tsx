@@ -23,7 +23,16 @@ export default async function GroupLayout({
 
   if (!group) notFound()
 
-  // Membership guard: only active members can access the group dashboard
+  // Check if user is master
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_master')
+    .eq('id', user.id)
+    .single()
+
+  const isMaster = profile?.is_master === true
+
+  // Membership guard: only active members, creator, or master can access
   const { data: membership } = await supabase
     .from('group_members')
     .select('id')
@@ -33,7 +42,7 @@ export default async function GroupLayout({
     .single()
 
   const isCreator = group.created_by === user.id
-  if (!membership && !isCreator) redirect('/dashboard')
+  if (!membership && !isCreator && !isMaster) redirect('/dashboard')
 
   return (
     <div className="flex min-h-screen gradient-surface">
