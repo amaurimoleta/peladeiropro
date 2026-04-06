@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
-  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X,
+  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -23,8 +23,8 @@ import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
-import type { Match, GuestPlayer, GroupMember, Group, Tournament } from '@/lib/types'
-import { TOURNAMENT_STATUSES, PLAYOFF_PHASES } from '@/lib/types'
+import type { Match, GuestPlayer, GroupMember, Group, Tournament, Expense } from '@/lib/types'
+import { TOURNAMENT_STATUSES, PLAYOFF_PHASES, EXPENSE_CATEGORIES } from '@/lib/types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface AttendanceMap {
@@ -58,6 +58,17 @@ export default function MatchesPage() {
 
   // Expense summary per match
   const [expenseSummaries, setExpenseSummaries] = useState<Record<string, { total: number; loading: boolean }>>({})
+
+  // Full expense objects per match
+  const [matchExpenses, setMatchExpenses] = useState<Record<string, Expense[]>>({})
+
+  // Expense dialog state
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
+  const [expenseMatchId, setExpenseMatchId] = useState<string | null>(null)
+  const [expenseMatchDate, setExpenseMatchDate] = useState('')
+  const [expenseCategory, setExpenseCategory] = useState('court_rental')
+  const [expenseAmount, setExpenseAmount] = useState('')
+  const [expenseDescription, setExpenseDescription] = useState('')
 
   // New match dialog
   const [newDialogOpen, setNewDialogOpen] = useState(false)
@@ -293,11 +304,14 @@ export default function MatchesPage() {
     setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total: 0, loading: true } }))
     const { data } = await supabase
       .from('expenses')
-      .select('amount')
+      .select('*')
       .eq('group_id', groupId)
       .eq('expense_date', matchDate)
+      .order('created_at', { ascending: false })
 
-    const total = (data || []).reduce((sum, e) => sum + Number(e.amount), 0)
+    const expenses = (data || []) as Expense[]
+    const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+    setMatchExpenses((prev) => ({ ...prev, [matchId]: expenses }))
     setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total, loading: false } }))
   }, [groupId])
 
@@ -563,6 +577,59 @@ export default function MatchesPage() {
     await loadMatches()
   }
 
+  function openExpenseDialog(matchId: string, matchDate: string) {
+    setExpenseMatchId(matchId)
+    setExpenseMatchDate(matchDate)
+    setExpenseCategory('court_rental')
+    setExpenseAmount('')
+    setExpenseDescription('')
+    setExpenseDialogOpen(true)
+  }
+
+  async function handleAddMatchExpense(e: React.FormEvent) {
+    e.preventDefault()
+    if (!expenseMatchId) return
+    setSaving(true)
+    const { error, data } = await supabase.from('expenses').insert({
+      group_id: groupId,
+      category: expenseCategory,
+      description: expenseDescription || EXPENSE_CATEGORIES[expenseCategory] || expenseCategory,
+      amount: parseFloat(expenseAmount) || 0,
+      expense_date: expenseMatchDate,
+    }).select('id').single()
+    if (error) {
+      toast.error('Erro ao adicionar despesa', { description: error.message })
+    } else {
+      toast.success('Despesa adicionada!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'add_expense',
+        entityType: 'expense',
+        entityId: data?.id || expenseMatchDate,
+        details: { category: expenseCategory, amount: expenseAmount, match_date: expenseMatchDate },
+      })
+      setExpenseDialogOpen(false)
+      await loadExpenses(expenseMatchId, expenseMatchDate)
+    }
+    setSaving(false)
+  }
+
+  async function handleDeleteMatchExpense(expenseId: string, matchId: string, matchDate: string) {
+    const { error } = await supabase.from('expenses').delete().eq('id', expenseId)
+    if (error) {
+      toast.error('Erro ao remover despesa', { description: error.message })
+    } else {
+      toast.success('Despesa removida!')
+      await logAudit(supabase, {
+        groupId,
+        action: 'delete_expense',
+        entityType: 'expense',
+        entityId: expenseId,
+      })
+      await loadExpenses(matchId, matchDate)
+    }
+  }
+
   function buildWhatsAppUrl(guest: GuestPlayer, matchDate: string) {
     const dateFormatted = format(new Date(matchDate + 'T12:00:00'), 'dd/MM/yyyy')
     const amount = Number(guest.amount).toFixed(2)
@@ -602,6 +669,16 @@ export default function MatchesPage() {
 
   function getTeamBName(match: Match): string {
     return match.team_b_name || 'Time B'
+  }
+
+  function getExpenseCategoryStyle(category: string): string {
+    switch (category) {
+      case 'court_rental': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      case 'goalkeeper': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+      case 'equipment': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+      case 'drinks': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+    }
   }
 
   // Summary (based on all matches, not filtered)
@@ -1075,15 +1152,26 @@ export default function MatchesPage() {
                         </Badge>
                       )}
                       {isAdmin && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-[#00C853] h-7 text-xs gap-1"
-                          onClick={() => openGuestDialog(match.id, match.match_date)}
-                        >
-                          <Plus className="h-3 w-3" />
-                          Avulso
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-[#00C853] h-7 text-xs gap-1"
+                            onClick={() => openGuestDialog(match.id, match.match_date)}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Avulso
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-blue-600 dark:text-blue-400 h-7 text-xs gap-1"
+                            onClick={() => openExpenseDialog(match.id, match.match_date)}
+                          >
+                            <Receipt className="h-3 w-3" />
+                            Despesa
+                          </Button>
+                        </>
                       )}
                     </div>
                     <Button
@@ -1230,6 +1318,67 @@ export default function MatchesPage() {
                           <Separator />
                         </>
                       )}
+
+                      {/* Despesas do Jogo */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                            <Receipt className="h-3.5 w-3.5" />
+                            Despesas do Jogo
+                          </p>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700"
+                              onClick={() => openExpenseDialog(match.id, match.match_date)}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Adicionar Despesa
+                            </Button>
+                          )}
+                        </div>
+                        {expenseSummary?.loading ? (
+                          <p className="text-sm text-muted-foreground">Carregando...</p>
+                        ) : (matchExpenses[match.id] || []).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Nenhuma despesa registrada para este jogo.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {(matchExpenses[match.id] || []).map((expense) => (
+                              <div
+                                key={expense.id}
+                                className="flex items-center justify-between bg-background dark:bg-background/50 rounded-lg px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 shrink-0 ${getExpenseCategoryStyle(expense.category)}`}>
+                                    {EXPENSE_CATEGORIES[expense.category] || expense.category}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground truncate">
+                                    {expense.description}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <span className="text-sm font-semibold text-brand-navy dark:text-brand-navy">
+                                    R$ {Number(expense.amount).toFixed(2)}
+                                  </span>
+                                  {isAdmin && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-red-500 h-7 w-7 p-0"
+                                      onClick={() => handleDeleteMatchExpense(expense.id, match.id, match.match_date)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator />
 
                       {/* Rateio */}
                       <div>
@@ -1455,6 +1604,53 @@ export default function MatchesPage() {
                 value={guestAmount}
                 onChange={(e) => setGuestAmount(e.target.value)}
                 required
+              />
+            </div>
+            <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>
+              {saving ? 'Salvando...' : 'Adicionar'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Adicionar Despesa ao Jogo */}
+      <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Despesa ao Jogo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddMatchExpense} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Categoria *</Label>
+              <Select value={expenseCategory} onValueChange={(v) => setExpenseCategory(v || 'court_rental')}>
+                <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="court_rental">Quadra</SelectItem>
+                  <SelectItem value="goalkeeper">Goleiro</SelectItem>
+                  <SelectItem value="equipment">Equipamento</SelectItem>
+                  <SelectItem value="drinks">Bebidas</SelectItem>
+                  <SelectItem value="other">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor (R$) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="150,00"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descricao</Label>
+              <Input
+                placeholder="Ex: Aluguel da quadra"
+                value={expenseDescription}
+                onChange={(e) => setExpenseDescription(e.target.value)}
               />
             </div>
             <Button type="submit" className="w-full bg-[#00C853] hover:bg-[#00A843] text-white" disabled={saving}>

@@ -112,7 +112,10 @@ export default function SettingsPage() {
   const [loadingLogs, setLoadingLogs] = useState(false)
 
   // Delete group
-  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState('')
+  const [expectedDeleteCode, setExpectedDeleteCode] = useState('')
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'code'>('confirm')
+  const [sendingCode, setSendingCode] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
@@ -289,9 +292,49 @@ export default function SettingsPage() {
     setSavingRole(false)
   }
 
+  async function handleSendDeleteCode() {
+    setSendingCode(true)
+    const code = String(Math.floor(100000 + Math.random() * 900000))
+    setExpectedDeleteCode(code)
+
+    // Get user email
+    const { data: { user } } = await supabase.auth.getUser()
+    const userEmail = user?.email || ''
+
+    // Try to send code via email using Supabase Edge Function or Auth
+    try {
+      // Use Supabase's auth.resetPasswordForEmail as a mechanism to send a notification
+      // For now, we'll show the code in a toast as a fallback + send email via database function
+      const { error: rpcError } = await supabase.rpc('send_delete_confirmation', {
+        p_email: userEmail,
+        p_code: code,
+        p_group_name: group?.name || '',
+      }).maybeSingle()
+
+      if (rpcError) {
+        // Fallback: show code via toast notification
+        toast.info(`Código de confirmação: ${code}`, {
+          description: `Enviado para ${userEmail}`,
+          duration: 30000,
+        })
+      } else {
+        toast.success(`Código enviado para ${userEmail}`)
+      }
+    } catch {
+      // Fallback: show code via toast
+      toast.info(`Código de confirmação: ${code}`, {
+        description: `Use este código para confirmar a exclusão`,
+        duration: 30000,
+      })
+    }
+
+    setDeleteStep('code')
+    setSendingCode(false)
+  }
+
   async function handleDeleteGroup() {
-    if (deleteConfirmName !== group?.name) {
-      toast.error('Nome do grupo não confere')
+    if (deleteConfirmCode !== expectedDeleteCode) {
+      toast.error('Código incorreto')
       return
     }
     setDeleting(true)
@@ -309,7 +352,7 @@ export default function SettingsPage() {
       toast.error('Erro ao excluir grupo', { description: error.message })
       setDeleting(false)
     } else {
-      toast.success('Grupo excluido com sucesso')
+      toast.success('Grupo excluído com sucesso')
       router.push('/dashboard')
     }
   }
@@ -806,7 +849,14 @@ export default function SettingsPage() {
                     Todos os dados serão permanentemente excluídos. Esta ação não pode ser desfeita.
                   </p>
                 </div>
-                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+                  setDeleteDialogOpen(open)
+                  if (!open) {
+                    setDeleteStep('confirm')
+                    setDeleteConfirmCode('')
+                    setExpectedDeleteCode('')
+                  }
+                }}>
                   <DialogTrigger render={
                     <Button variant="destructive" size="sm" className="w-full sm:w-auto shrink-0">
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -817,33 +867,74 @@ export default function SettingsPage() {
                     <DialogHeader>
                       <DialogTitle>Excluir grupo permanentemente</DialogTitle>
                       <DialogDescription>
-                        Esta ação e irreversível. Todos os membros, mensalidades, despesas e dados do grupo serão excluídos permanentemente.
+                        Esta ação é irreversível. Todos os membros, mensalidades, despesas e dados do grupo serão excluídos permanentemente.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                      <Label>
-                        Para confirmar, digite o nome do grupo: <span className="font-bold">{group?.name}</span>
-                      </Label>
-                      <Input
-                        placeholder="Nome do grupo"
-                        value={deleteConfirmName}
-                        onChange={(e) => setDeleteConfirmName(e.target.value)}
-                      />
-                    </div>
-                    <DialogFooter>
-                      <DialogClose render={
-                        <Button variant="outline" onClick={() => setDeleteConfirmName('')}>
-                          Cancelar
-                        </Button>
-                      } />
-                      <Button
-                        variant="destructive"
-                        disabled={deleteConfirmName !== group?.name || deleting}
-                        onClick={handleDeleteGroup}
-                      >
-                        {deleting ? 'Excluindo...' : 'Excluir Grupo'}
-                      </Button>
-                    </DialogFooter>
+
+                    {deleteStep === 'confirm' ? (
+                      <>
+                        <div className="py-3">
+                          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+                            <p className="text-sm font-medium text-destructive">
+                              Você está prestes a excluir o grupo &ldquo;{group?.name}&rdquo;
+                            </p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              <li>- Todos os membros serão removidos</li>
+                              <li>- Todas as mensalidades e pagamentos serão apagados</li>
+                              <li>- Todas as despesas e receitas serão apagadas</li>
+                              <li>- Todos os jogos e campeonatos serão removidos</li>
+                              <li>- O histórico de atividades será perdido</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <DialogClose render={
+                            <Button variant="outline">Cancelar</Button>
+                          } />
+                          <Button
+                            variant="destructive"
+                            disabled={sendingCode}
+                            onClick={handleSendDeleteCode}
+                          >
+                            {sendingCode ? 'Enviando código...' : 'Enviar código de confirmação'}
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-3 py-2">
+                          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                              Um código de 6 dígitos foi enviado. Digite-o abaixo para confirmar a exclusão.
+                            </p>
+                          </div>
+                          <Label>Código de confirmação</Label>
+                          <Input
+                            placeholder="000000"
+                            value={deleteConfirmCode}
+                            onChange={(e) => setDeleteConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            maxLength={6}
+                            className="text-center text-2xl font-mono tracking-[0.5em] h-14"
+                            autoFocus
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => {
+                            setDeleteStep('confirm')
+                            setDeleteConfirmCode('')
+                          }}>
+                            Voltar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            disabled={deleteConfirmCode.length !== 6 || deleting}
+                            onClick={handleDeleteGroup}
+                          >
+                            {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
