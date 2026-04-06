@@ -30,13 +30,13 @@ import { GroupSelector } from '@/components/dashboard/group-selector'
 
 const navItems = [
   { href: '', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/minha-area', icon: UserCircle, label: 'Minha Área' },
+  { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
   { href: '/matches', icon: CalendarDays, label: 'Jogos' },
   { href: '/dia-de-jogo', icon: Zap, label: 'Dia de Jogo' },
   { href: '/campeonatos', icon: Trophy, label: 'Campeonatos' },
   { href: '/times', icon: Shield, label: 'Times' },
   { href: '/members', icon: Users, label: 'Membros' },
-  { href: '/financeiro', icon: CreditCard, label: 'Financeiro' },
+  { href: '/minha-area', icon: UserCircle, label: 'Minha Área' },
   { href: '/settings', icon: Settings, label: 'Configurações' },
 ]
 
