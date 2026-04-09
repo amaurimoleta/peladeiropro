@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Plus, Minus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
-  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus, Target,
+  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus, Target, Crown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -126,6 +126,12 @@ export default function MatchesPage() {
   const [statsInputs, setStatsInputs] = useState<Record<string, { goals: number; assists: number }>>({})
   const [statsDialogOpen, setStatsDialogOpen] = useState(false)
   const [statsMatchId, setStatsMatchId] = useState<string | null>(null)
+
+  // MVP voting
+  const [mvpVotes, setMvpVotes] = useState<Record<string, { voter_id: string; voted_for_id: string; voted_for_name: string }[]>>({})
+  const [mvpDialogOpen, setMvpDialogOpen] = useState(false)
+  const [mvpMatchId, setMvpMatchId] = useState<string | null>(null)
+  const [myMvpVote, setMyMvpVote] = useState<string | null>(null)
 
   // Search, filter, sort
   const [searchTerm, setSearchTerm] = useState('')
@@ -345,6 +351,58 @@ export default function MatchesPage() {
     setMatchStats((prev) => ({ ...prev, [matchId]: (data || []) as MatchStat[] }))
   }, [])
 
+  const loadMvpVotes = useCallback(async (matchId: string) => {
+    const { data } = await supabase
+      .from('mvp_votes')
+      .select('*, voted_for:group_members!mvp_votes_voted_for_id_fkey(id, name)')
+      .eq('match_id', matchId)
+    const votes = (data || []).map((v: any) => ({
+      voter_id: v.voter_id,
+      voted_for_id: v.voted_for_id,
+      voted_for_name: v.voted_for?.name || 'Jogador',
+    }))
+    setMvpVotes((prev) => ({ ...prev, [matchId]: votes }))
+  }, [])
+
+  function openMvpDialog(matchId: string) {
+    setMvpMatchId(matchId)
+    // Check if current user already voted
+    const votes = mvpVotes[matchId] || []
+    const myVote = votes.find(v => v.voter_id === myMemberId)
+    setMyMvpVote(myVote?.voted_for_id || null)
+    setMvpDialogOpen(true)
+  }
+
+  async function handleMvpVote(votedForId: string) {
+    if (!mvpMatchId || !myMemberId) {
+      toast.error('Voce precisa estar vinculado como membro para votar.')
+      return
+    }
+    // Delete existing vote
+    await supabase.from('mvp_votes').delete().eq('match_id', mvpMatchId).eq('voter_id', myMemberId)
+
+    if (votedForId === myMvpVote) {
+      // Toggle off - just remove vote
+      setMyMvpVote(null)
+      toast.success('Voto removido!')
+    } else {
+      // Cast new vote
+      const { error } = await supabase.from('mvp_votes').insert({
+        match_id: mvpMatchId,
+        group_id: groupId,
+        voter_id: myMemberId,
+        voted_for_id: votedForId,
+      })
+      if (error) {
+        toast.error('Erro ao votar')
+        return
+      }
+      setMyMvpVote(votedForId)
+      toast.success('Voto registrado!')
+    }
+    loadMvpVotes(mvpMatchId)
+  }
+
   function openStatsDialog(matchId: string) {
     setStatsMatchId(matchId)
     // Initialize inputs from existing stats + all present members
@@ -400,12 +458,13 @@ export default function MatchesPage() {
       loadAttendance(expandedMatch)
       loadPhotos(expandedMatch)
       loadMatchStats(expandedMatch)
+      loadMvpVotes(expandedMatch)
       const match = matches.find((m) => m.id === expandedMatch)
       if (match) {
         loadExpenses(expandedMatch, match.match_date)
       }
     }
-  }, [expandedMatch, matches, loadAttendance, loadExpenses, loadPhotos, loadMatchStats])
+  }, [expandedMatch, matches, loadAttendance, loadExpenses, loadPhotos, loadMatchStats, loadMvpVotes])
 
   async function toggleAttendance(matchId: string, memberId: string) {
     const current = attendanceMap[matchId]?.[memberId]
@@ -1622,6 +1681,74 @@ export default function MatchesPage() {
 
                       <Separator />
 
+                      {/* Votacao MVP */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                            <Crown className="h-3.5 w-3.5" />
+                            Votacao MVP
+                            {(mvpVotes[match.id] || []).length > 0 && (
+                              <span className="text-[10px] font-normal ml-1 text-muted-foreground">
+                                ({(mvpVotes[match.id] || []).length} voto{(mvpVotes[match.id] || []).length !== 1 ? 's' : ''})
+                              </span>
+                            )}
+                          </p>
+                          {myMemberId && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700"
+                              onClick={() => openMvpDialog(match.id)}
+                            >
+                              <Crown className="h-3.5 w-3.5" />
+                              Votar MVP
+                            </Button>
+                          )}
+                        </div>
+                        {(() => {
+                          const votes = mvpVotes[match.id] || []
+                          if (votes.length === 0) {
+                            return <p className="text-sm text-muted-foreground">Nenhum voto registrado.</p>
+                          }
+                          // Count votes per player
+                          const voteCounts: Record<string, { name: string; count: number }> = {}
+                          for (const v of votes) {
+                            if (!voteCounts[v.voted_for_id]) {
+                              voteCounts[v.voted_for_id] = { name: v.voted_for_name, count: 0 }
+                            }
+                            voteCounts[v.voted_for_id].count++
+                          }
+                          const sorted = Object.entries(voteCounts).sort((a, b) => b[1].count - a[1].count)
+                          const topCount = sorted[0]?.[1].count || 0
+                          return (
+                            <div className="space-y-1">
+                              {sorted.map(([memberId, { name, count }]) => {
+                                const isWinner = count === topCount && count > 0
+                                return (
+                                  <div
+                                    key={memberId}
+                                    className={`flex items-center justify-between text-sm py-1.5 px-3 rounded-lg ${isWinner ? 'bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-200 dark:ring-amber-800' : 'bg-muted/50'}`}
+                                  >
+                                    <span className="font-medium truncate flex items-center gap-1.5">
+                                      {isWinner && <Crown className="h-3.5 w-3.5 text-amber-500" />}
+                                      {name}
+                                    </span>
+                                    <Badge
+                                      variant="secondary"
+                                      className={`${isWinner ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground'} border-0 font-semibold px-2`}
+                                    >
+                                      {count} voto{count !== 1 ? 's' : ''}
+                                    </Badge>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()}
+                      </div>
+
+                      <Separator />
+
                       {/* Rateio */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -1977,6 +2104,88 @@ export default function MatchesPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Votacao MVP */}
+      <Dialog open={mvpDialogOpen} onOpenChange={setMvpDialogOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-500" />
+              Votar MVP do Jogo
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            if (!mvpMatchId) return null
+            const attendance = attendanceMap[mvpMatchId] || {}
+            const presentMembers = mensalistas.filter(m => attendance[m.id]?.present)
+            const votes = mvpVotes[mvpMatchId] || []
+            // Count votes per player
+            const voteCounts: Record<string, number> = {}
+            for (const v of votes) {
+              voteCounts[v.voted_for_id] = (voteCounts[v.voted_for_id] || 0) + 1
+            }
+
+            if (presentMembers.length === 0) {
+              return (
+                <p className="text-sm text-muted-foreground py-8 text-center px-4">
+                  Nenhum jogador presente. Registre a presenca primeiro.
+                </p>
+              )
+            }
+
+            return (
+              <>
+                <p className="text-xs text-muted-foreground px-4 pb-2">
+                  Toque no jogador para votar. Toque novamente para remover o voto. Voce nao pode votar em si mesmo.
+                </p>
+                <div className="flex-1 overflow-y-auto px-4 pb-2">
+                  {presentMembers
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((member) => {
+                      const isSelected = myMvpVote === member.id
+                      const isSelf = member.id === myMemberId
+                      const voteCount = voteCounts[member.id] || 0
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          disabled={isSelf}
+                          className={`w-full flex items-center justify-between py-3 px-3 rounded-lg mb-1 transition-all touch-manipulation text-left ${
+                            isSelected
+                              ? 'bg-amber-100 dark:bg-amber-900/40 ring-2 ring-amber-400 dark:ring-amber-600'
+                              : isSelf
+                                ? 'bg-muted/30 opacity-50 cursor-not-allowed'
+                                : 'bg-muted/50 hover:bg-muted active:scale-[0.98]'
+                          }`}
+                          onClick={() => handleMvpVote(member.id)}
+                        >
+                          <span className={`text-sm font-medium truncate flex items-center gap-2 ${isSelected ? 'text-amber-700 dark:text-amber-300' : ''}`}>
+                            {isSelected && <Crown className="h-4 w-4 text-amber-500 shrink-0" />}
+                            {member.name}
+                            {isSelf && <span className="text-[10px] text-muted-foreground font-normal">(voce)</span>}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {voteCount > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-0 font-semibold px-2"
+                              >
+                                {voteCount} voto{voteCount !== 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                </div>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 

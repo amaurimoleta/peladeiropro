@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Check, Clock, AlertCircle, Stethoscope, Upload, Trophy, Medal, Award,
   TrendingUp, DollarSign, Calendar, Eye, Image, CalendarCheck, Percent,
-  ChevronDown, ChevronUp, UserCheck, UserX, MapPin,
+  ChevronDown, ChevronUp, UserCheck, UserX, MapPin, Bell, BellOff, Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale'
 import { uploadReceipt } from '@/lib/upload-receipt'
 import { logAudit } from '@/lib/audit'
 import { PixQrCode } from '@/components/shared/pix-qrcode'
+import { isPushSupported, subscribeToPush, unsubscribeFromPush } from '@/lib/push-notifications'
 import type { Group, GroupMember, MonthlyFee } from '@/lib/types'
 
 interface RankedInfo {
@@ -59,6 +60,53 @@ export default function MinhaAreaPage() {
   // PIX dialog
   const [pixDialogOpen, setPixDialogOpen] = useState(false)
   const [pixAmount, setPixAmount] = useState<number>(0)
+
+  // Push notifications
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+
+  // Check push notification status on mount
+  useEffect(() => {
+    async function checkPush() {
+      if (!isPushSupported()) return
+      setPushSupported(true)
+      try {
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
+        setPushEnabled(!!subscription)
+      } catch {
+        // ignore
+      }
+    }
+    checkPush()
+  }, [])
+
+  async function togglePush() {
+    setPushLoading(true)
+    try {
+      if (pushEnabled) {
+        const success = await unsubscribeFromPush(supabase, groupId)
+        if (success) {
+          setPushEnabled(false)
+          toast.success('Notificações desativadas')
+        } else {
+          toast.error('Erro ao desativar notificações')
+        }
+      } else {
+        const subscription = await subscribeToPush(supabase, groupId)
+        if (subscription) {
+          setPushEnabled(true)
+          toast.success('Notificações ativadas!')
+        } else {
+          toast.error('Não foi possível ativar. Verifique as permissões do navegador.')
+        }
+      }
+    } catch {
+      toast.error('Erro ao alterar notificações')
+    }
+    setPushLoading(false)
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -529,6 +577,52 @@ export default function MinhaAreaPage() {
                   manualBrCode={group.pix_brcode}
                 />
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Notificações Push ── */}
+      {pushSupported && (
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${pushEnabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                  {pushEnabled ? (
+                    <Bell className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <BellOff className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Notificações Push</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pushEnabled ? 'Ativadas - você receberá alertas de jogos e cobranças' : 'Desativadas - ative para receber alertas'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant={pushEnabled ? 'outline' : 'default'}
+                className={pushEnabled ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950' : 'bg-[#00C853] hover:bg-[#00A843] text-white'}
+                onClick={togglePush}
+                disabled={pushLoading}
+              >
+                {pushLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : pushEnabled ? (
+                  <>
+                    <BellOff className="h-4 w-4 mr-1" />
+                    Desativar
+                  </>
+                ) : (
+                  <>
+                    <Bell className="h-4 w-4 mr-1" />
+                    Ativar
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>

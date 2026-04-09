@@ -1018,34 +1018,134 @@ export default function FinanceiroPage() {
     const { default: autoTable } = await import('jspdf-autotable')
 
     const doc = new jsPDF()
-    const navy = '#1B1F4B'
-    const green = '#00C853'
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const margin = 14
+    const contentW = pageW - margin * 2
+
+    // Brand colors
+    const navyRgb = { r: 27, g: 31, b: 75 }
+    const greenRgb = { r: 0, g: 200, b: 83 }
+    const redRgb = { r: 229, g: 57, b: 53 }
+    const blueRgb = { r: 21, g: 101, b: 192 }
+
     const monthLabel = format(currentDate, 'MMMM yyyy')
     const groupName = group?.name || 'Grupo'
-    let y = 15
+    let y = 0
 
-    // Header
-    doc.setFontSize(20)
-    doc.setTextColor(navy)
-    doc.text('PeladeiroPro - Relatorio Financeiro', 14, y)
-    y += 8
-    doc.setFontSize(12)
-    doc.setTextColor(100)
-    doc.text(`Grupo: ${groupName}`, 14, y)
-    y += 6
-    doc.text(`Referencia: ${monthLabel}`, 14, y)
-    y += 10
+    // ── Helper: draw a rounded rect ──
+    function roundedRect(x: number, yPos: number, w: number, h: number, radius: number) {
+      doc.roundedRect(x, yPos, w, h, radius, radius, 'F')
+    }
 
-    // Resumo Financeiro
-    doc.setFontSize(14)
-    doc.setTextColor(navy)
-    doc.text('Resumo Financeiro', 14, y)
-    y += 2
-    doc.setDrawColor(navy)
-    doc.setLineWidth(0.5)
-    doc.line(14, y, 196, y)
-    y += 7
+    // ── Helper: add footer to every page ──
+    function addFooters() {
+      const totalPages = doc.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        // Footer line
+        doc.setDrawColor(200, 200, 200)
+        doc.setLineWidth(0.3)
+        doc.line(margin, pageH - 18, pageW - margin, pageH - 18)
+        // Left: branding
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(navyRgb.r, navyRgb.g, navyRgb.b)
+        doc.text('PeladeiroPro', margin, pageH - 12)
+        // Center: generation date
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.setTextColor(150, 150, 150)
+        doc.text(
+          `Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+          pageW / 2,
+          pageH - 12,
+          { align: 'center' }
+        )
+        // Right: page number
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(150, 150, 150)
+        doc.text(
+          `Pagina ${i} de ${totalPages}`,
+          pageW - margin,
+          pageH - 12,
+          { align: 'right' }
+        )
+      }
+    }
 
+    // ── Helper: section header with icon ──
+    function sectionHeader(icon: string, title: string, yPos: number): number {
+      if (yPos > 245) { doc.addPage(); yPos = 20 }
+      // Accent bar
+      doc.setFillColor(navyRgb.r, navyRgb.g, navyRgb.b)
+      doc.rect(margin, yPos, 3, 8, 'F')
+      // Title text
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(navyRgb.r, navyRgb.g, navyRgb.b)
+      doc.text(`${icon}  ${title}`, margin + 6, yPos + 6)
+      // Subtle underline
+      doc.setDrawColor(220, 220, 220)
+      doc.setLineWidth(0.3)
+      doc.line(margin, yPos + 10, pageW - margin, yPos + 10)
+      return yPos + 14
+    }
+
+    // ── Helper: check page break ──
+    function checkPageBreak(yPos: number, needed: number): number {
+      if (yPos + needed > pageH - 25) {
+        doc.addPage()
+        return 20
+      }
+      return yPos
+    }
+
+    // ═══════════════════════════════════════════
+    //  HEADER BAR
+    // ═══════════════════════════════════════════
+    const headerH = 38
+    // Navy background bar
+    doc.setFillColor(navyRgb.r, navyRgb.g, navyRgb.b)
+    doc.rect(0, 0, pageW, headerH, 'F')
+    // Subtle gradient overlay (darker strip at top)
+    doc.setFillColor(15, 18, 55)
+    doc.rect(0, 0, pageW, 6, 'F')
+
+    // Brand name
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text('PeladeiroPro', margin, 17)
+
+    // Subtitle
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(200, 210, 255)
+    doc.text('Relatorio Financeiro', margin, 25)
+
+    // Group name (right side)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text(groupName, pageW - margin, 17, { align: 'right' })
+
+    // Month reference (right side)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(200, 210, 255)
+    const capitalizedMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+    doc.text(capitalizedMonth, pageW - margin, 25, { align: 'right' })
+
+    // Decorative accent line at bottom of header
+    doc.setFillColor(greenRgb.r, greenRgb.g, greenRgb.b)
+    doc.rect(0, headerH, pageW, 1.5, 'F')
+
+    y = headerH + 12
+
+    // ═══════════════════════════════════════════
+    //  SUMMARY CARDS
+    // ═══════════════════════════════════════════
     const totalReceitasMensalidades = displayFees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
     const totalReceitasAvulsos = paidGuests.reduce((s, g) => s + Number(g.amount), 0)
     const totalReceitasOutras = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
@@ -1053,29 +1153,60 @@ export default function FinanceiroPage() {
     const totalDespesas = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
     const saldo = totalReceitas - totalDespesas
 
-    doc.setFontSize(11)
-    doc.setTextColor(60)
-    doc.text(`Mensalidades pagas: R$ ${totalReceitasMensalidades.toFixed(2)}`, 14, y); y += 6
-    doc.text(`Avulsos pagos: R$ ${totalReceitasAvulsos.toFixed(2)}`, 14, y); y += 6
-    doc.text(`Outras receitas: R$ ${totalReceitasOutras.toFixed(2)}`, 14, y); y += 6
-    doc.setTextColor(green)
-    doc.text(`Receitas totais: R$ ${totalReceitas.toFixed(2)}`, 14, y); y += 6
-    doc.setTextColor(200, 0, 0)
-    doc.text(`Despesas totais: R$ ${totalDespesas.toFixed(2)}`, 14, y); y += 6
-    doc.setTextColor(saldo >= 0 ? green : '#E53935')
-    doc.setFontSize(12)
-    doc.text(`Saldo do periodo: ${saldo >= 0 ? '+' : ''}R$ ${saldo.toFixed(2)}`, 14, y)
-    y += 12
+    const cardW = (contentW - 9) / 4  // 4 cards with 3px gaps
+    const cardH = 28
+    const cardRadius = 3
 
-    // Tabela de Mensalidades
-    doc.setFontSize(14)
-    doc.setTextColor(navy)
-    doc.text('Mensalidades', 14, y)
-    y += 2
-    doc.setDrawColor(navy)
-    doc.line(14, y, 196, y)
-    y += 2
+    // Card data: [label, value, color rgb, icon]
+    const cards: Array<{ label: string; value: string; color: { r: number; g: number; b: number }; icon: string }> = [
+      { label: 'Mensalidades', value: `R$ ${totalReceitasMensalidades.toFixed(2)}`, color: greenRgb, icon: '\u26BD' },
+      { label: 'Avulsos', value: `R$ ${totalReceitasAvulsos.toFixed(2)}`, color: blueRgb, icon: '\uD83C\uDFAB' },
+      { label: 'Despesas', value: `R$ ${totalDespesas.toFixed(2)}`, color: redRgb, icon: '\uD83D\uDCC9' },
+      { label: 'Saldo', value: `${saldo >= 0 ? '+' : ''}R$ ${saldo.toFixed(2)}`, color: saldo >= 0 ? greenRgb : redRgb, icon: '\uD83D\uDCB0' },
+    ]
 
+    cards.forEach((card, i) => {
+      const x = margin + i * (cardW + 3)
+      // Card background with opacity effect - light tint
+      const tintR = Math.round(card.color.r + (255 - card.color.r) * 0.88)
+      const tintG = Math.round(card.color.g + (255 - card.color.g) * 0.88)
+      const tintB = Math.round(card.color.b + (255 - card.color.b) * 0.88)
+      doc.setFillColor(tintR, tintG, tintB)
+      roundedRect(x, y, cardW, cardH, cardRadius)
+
+      // Left color accent bar
+      doc.setFillColor(card.color.r, card.color.g, card.color.b)
+      doc.rect(x, y + 3, 2.5, cardH - 6, 'F')
+
+      // Card label
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100, 100, 100)
+      doc.text(`${card.icon}  ${card.label}`, x + 6, y + 9)
+
+      // Card value
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(card.color.r, card.color.g, card.color.b)
+      doc.text(card.value, x + 6, y + 20)
+    })
+
+    y += cardH + 6
+
+    // Other revenues note (if any)
+    if (totalReceitasOutras > 0) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(120, 120, 120)
+      doc.text(`Outras receitas incluidas: R$ ${totalReceitasOutras.toFixed(2)}`, margin, y + 2)
+      y += 8
+    }
+
+    y += 6
+
+    // ═══════════════════════════════════════════
+    //  MENSALIDADES TABLE
+    // ═══════════════════════════════════════════
     const statusLabel: Record<string, string> = {
       paid: 'Pago',
       pending: 'Pendente',
@@ -1083,6 +1214,8 @@ export default function FinanceiroPage() {
       waived: 'Isento',
       dm_leave: 'DM',
     }
+
+    y = sectionHeader('\u{1F4B0}', 'Mensalidades', y)
 
     const feeRows = displayFees.map(fee => [
       (fee.member as any)?.name || '-',
@@ -1095,38 +1228,64 @@ export default function FinanceiroPage() {
       startY: y,
       head: [['Membro', 'Valor', 'Status', 'Data Pagamento']],
       body: feeRows,
-      theme: 'grid',
-      headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
-      bodyStyles: { textColor: '#333333' },
+      theme: 'striped',
+      headStyles: {
+        fillColor: [navyRgb.r, navyRgb.g, navyRgb.b],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 4,
+      },
+      bodyStyles: {
+        textColor: [60, 60, 60],
+        fontSize: 8.5,
+        cellPadding: 3.5,
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 252],
+      },
+      columnStyles: {
+        0: { cellWidth: 55 },
+        1: { cellWidth: 35, halign: 'right' },
+        2: { cellWidth: 35, halign: 'center' },
+        3: { cellWidth: 40, halign: 'center' },
+      },
       didParseCell: (data: any) => {
         if (data.section === 'body' && data.column.index === 2) {
           const val = data.cell.raw as string
           if (val === 'Pago') {
-            data.cell.styles.textColor = '#00C853'
+            data.cell.styles.fillColor = [232, 245, 233]
+            data.cell.styles.textColor = [0, 150, 50]
             data.cell.styles.fontStyle = 'bold'
           } else if (val === 'Atrasado') {
-            data.cell.styles.textColor = '#E53935'
+            data.cell.styles.fillColor = [255, 235, 238]
+            data.cell.styles.textColor = [200, 30, 30]
             data.cell.styles.fontStyle = 'bold'
           } else if (val === 'Pendente') {
-            data.cell.styles.textColor = '#F9A825'
+            data.cell.styles.fillColor = [255, 249, 230]
+            data.cell.styles.textColor = [200, 140, 0]
             data.cell.styles.fontStyle = 'bold'
+          } else if (val === 'Isento') {
+            data.cell.styles.fillColor = [240, 240, 240]
+            data.cell.styles.textColor = [120, 120, 120]
+            data.cell.styles.fontStyle = 'italic'
+          } else if (val === 'DM') {
+            data.cell.styles.fillColor = [232, 240, 254]
+            data.cell.styles.textColor = [30, 90, 180]
+            data.cell.styles.fontStyle = 'italic'
           }
         }
       },
-      margin: { left: 14, right: 14 },
+      margin: { left: margin, right: margin },
     })
 
-    y = (doc as any).lastAutoTable.finalY + 10
+    y = (doc as any).lastAutoTable.finalY + 12
 
-    // Tabela de Despesas
-    if (y > 250) { doc.addPage(); y = 15 }
-    doc.setFontSize(14)
-    doc.setTextColor(navy)
-    doc.text('Despesas', 14, y)
-    y += 2
-    doc.setDrawColor(navy)
-    doc.line(14, y, 196, y)
-    y += 2
+    // ═══════════════════════════════════════════
+    //  DESPESAS TABLE
+    // ═══════════════════════════════════════════
+    y = checkPageBreak(y, 40)
+    y = sectionHeader('\u{1F4CB}', 'Despesas', y)
 
     const expenseRows = expenses.map((e: any) => [
       EXPENSE_CATEGORIES[e.category] || e.category,
@@ -1140,29 +1299,59 @@ export default function FinanceiroPage() {
         startY: y,
         head: [['Categoria', 'Descricao', 'Valor', 'Data']],
         body: expenseRows,
-        theme: 'grid',
-        headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
-        bodyStyles: { textColor: '#333333' },
-        margin: { left: 14, right: 14 },
+        theme: 'striped',
+        headStyles: {
+          fillColor: [navyRgb.r, navyRgb.g, navyRgb.b],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 4,
+        },
+        bodyStyles: {
+          textColor: [60, 60, 60],
+          fontSize: 8.5,
+          cellPadding: 3.5,
+        },
+        alternateRowStyles: {
+          fillColor: [252, 245, 245],
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 65 },
+          2: { cellWidth: 35, halign: 'right' },
+          3: { cellWidth: 30, halign: 'center' },
+        },
+        didDrawCell: (data: any) => {
+          // Add subtle red accent on value column
+          if (data.section === 'body' && data.column.index === 2) {
+            doc.setTextColor(redRgb.r, redRgb.g, redRgb.b)
+          }
+        },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            data.cell.styles.textColor = [redRgb.r, redRgb.g, redRgb.b]
+            data.cell.styles.fontStyle = 'bold'
+          }
+        },
+        margin: { left: margin, right: margin },
       })
-      y = (doc as any).lastAutoTable.finalY + 10
+      y = (doc as any).lastAutoTable.finalY + 12
     } else {
-      y += 4
-      doc.setFontSize(10)
-      doc.setTextColor(150)
-      doc.text('Nenhuma despesa registrada no periodo.', 14, y)
-      y += 10
+      // Empty state
+      doc.setFillColor(248, 248, 248)
+      roundedRect(margin, y, contentW, 16, 3)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(150, 150, 150)
+      doc.text('Nenhuma despesa registrada no periodo.', pageW / 2, y + 10, { align: 'center' })
+      y += 24
     }
 
-    // Tabela de Avulsos
-    if (y > 250) { doc.addPage(); y = 15 }
-    doc.setFontSize(14)
-    doc.setTextColor(navy)
-    doc.text('Jogadores Avulsos', 14, y)
-    y += 2
-    doc.setDrawColor(navy)
-    doc.line(14, y, 196, y)
-    y += 2
+    // ═══════════════════════════════════════════
+    //  JOGADORES AVULSOS TABLE
+    // ═══════════════════════════════════════════
+    y = checkPageBreak(y, 40)
+    y = sectionHeader('\u{1F465}', 'Jogadores Avulsos', y)
 
     const guestRows = allGuests.map((g: any) => [
       g.name || '-',
@@ -1176,46 +1365,64 @@ export default function FinanceiroPage() {
         startY: y,
         head: [['Nome', 'Valor', 'Pago', 'Data']],
         body: guestRows,
-        theme: 'grid',
-        headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
-        bodyStyles: { textColor: '#333333' },
+        theme: 'striped',
+        headStyles: {
+          fillColor: [navyRgb.r, navyRgb.g, navyRgb.b],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 4,
+        },
+        bodyStyles: {
+          textColor: [60, 60, 60],
+          fontSize: 8.5,
+          cellPadding: 3.5,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 248, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 55 },
+          1: { cellWidth: 35, halign: 'right' },
+          2: { cellWidth: 30, halign: 'center' },
+          3: { cellWidth: 40, halign: 'center' },
+        },
         didParseCell: (data: any) => {
           if (data.section === 'body' && data.column.index === 2) {
             const val = data.cell.raw as string
             if (val === 'Sim') {
-              data.cell.styles.textColor = '#00C853'
+              data.cell.styles.fillColor = [232, 245, 233]
+              data.cell.styles.textColor = [0, 150, 50]
               data.cell.styles.fontStyle = 'bold'
             } else {
-              data.cell.styles.textColor = '#E53935'
+              data.cell.styles.fillColor = [255, 235, 238]
+              data.cell.styles.textColor = [200, 30, 30]
               data.cell.styles.fontStyle = 'bold'
             }
           }
         },
-        margin: { left: 14, right: 14 },
+        margin: { left: margin, right: margin },
       })
       y = (doc as any).lastAutoTable.finalY + 10
     } else {
-      y += 4
-      doc.setFontSize(10)
-      doc.setTextColor(150)
-      doc.text('Nenhum jogador avulso registrado no periodo.', 14, y)
-      y += 10
+      // Empty state
+      doc.setFillColor(248, 248, 248)
+      roundedRect(margin, y, contentW, 16, 3)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(150, 150, 150)
+      doc.text('Nenhum jogador avulso registrado no periodo.', pageW / 2, y + 10, { align: 'center' })
+      y += 24
     }
 
-    // Footer
-    const pageCount = doc.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(8)
-      doc.setTextColor(150)
-      doc.text(
-        `Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} pelo PeladeiroPro`,
-        doc.internal.pageSize.getWidth() / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      )
-    }
+    // ═══════════════════════════════════════════
+    //  FOOTER ON ALL PAGES
+    // ═══════════════════════════════════════════
+    addFooters()
 
+    // ═══════════════════════════════════════════
+    //  SAVE
+    // ═══════════════════════════════════════════
     const safeGroupName = groupName.toLowerCase().replace(/[^a-z0-9]/g, '-')
     const month = format(currentDate, 'MM')
     const year = format(currentDate, 'yyyy')
