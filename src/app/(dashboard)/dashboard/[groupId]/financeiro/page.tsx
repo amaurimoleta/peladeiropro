@@ -1031,47 +1031,20 @@ export default function FinanceiroPage() {
     })
   }
 
-  // Load Montserrat font as base64 for jsPDF
-  async function loadMontserratFont(doc: any) {
-    try {
-      const [regularRes, boldRes] = await Promise.all([
-        fetch('https://fonts.gstatic.com/s/montserrat/v29/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXp-p7K4KLg.ttf'),
-        fetch('https://fonts.gstatic.com/s/montserrat/v29/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM70w5aXp-p7K4KLg.ttf'),
-      ])
-      const [regularBuf, boldBuf] = await Promise.all([regularRes.arrayBuffer(), boldRes.arrayBuffer()])
-
-      function arrayBufferToBase64(buf: ArrayBuffer) {
-        const bytes = new Uint8Array(buf)
-        let binary = ''
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
-        return btoa(binary)
-      }
-
-      doc.addFileToVFS('Montserrat-Regular.ttf', arrayBufferToBase64(regularBuf))
-      doc.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal')
-      doc.addFileToVFS('Montserrat-Bold.ttf', arrayBufferToBase64(boldBuf))
-      doc.addFont('Montserrat-Bold.ttf', 'Montserrat', 'bold')
-      return true
-    } catch {
-      return false
-    }
-  }
-
   async function generatePDF() {
     const { default: jsPDF } = await import('jspdf')
     const { default: autoTable } = await import('jspdf-autotable')
 
     toast.info('Gerando PDF...')
 
+    try {
     const doc = new jsPDF()
     const pageW = doc.internal.pageSize.getWidth()
     const pageH = doc.internal.pageSize.getHeight()
     const margin = 14
     const contentW = pageW - margin * 2
 
-    // Load Montserrat font
-    const hasMontserrat = await loadMontserratFont(doc)
-    const fontFamily = hasMontserrat ? 'Montserrat' : 'helvetica'
+    const fontFamily = 'helvetica'
 
     // Load logo as PNG
     let logoPng: string | null = null
@@ -1370,6 +1343,10 @@ export default function FinanceiroPage() {
     const year = format(currentDate, 'yyyy')
     doc.save(`relatorio-${safeGroupName}-${month}-${year}.pdf`)
     toast.success('Relatorio gerado com sucesso!')
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err)
+      toast.error('Erro ao gerar o PDF. Tente novamente.')
+    }
   }
 
   function drePercentage(value: number, total: number) {
