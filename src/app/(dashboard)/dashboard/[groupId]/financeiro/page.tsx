@@ -1120,7 +1120,7 @@ export default function FinanceiroPage() {
       margin: { left: m, right: m },
     }
 
-    // ── HEADER ──
+    // ── HEADER (v2) ──
     const hH = 28
     doc.setFillColor(N.r, N.g, N.b)
     doc.rect(0, 0, pageW, hH, 'F')
