@@ -2,6 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+
+interface RealtimeConfig {
+  /** Table to subscribe to */
+  table: string
+  /** Schema (default: public) */
+  schema?: string
+  /** Filter string (e.g. "group_id=eq.xxx") */
+  filter?: string
+  /** Events to listen for (default: all) */
+  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*'
+}
 
 interface QueryOptions {
   /** Cache key - used to deduplicate and cache results */
@@ -12,6 +24,8 @@ interface QueryOptions {
   enabled?: boolean
   /** Stale time in milliseconds - won't refetch if data is younger than this */
   staleTime?: number
+  /** Enable realtime subscription — auto-refetches on table changes */
+  realtime?: RealtimeConfig
 }
 
 interface QueryResult<T> {
@@ -29,7 +43,7 @@ export function useSupabaseQuery<T>(
   queryFn: (supabase: ReturnType<typeof createClient>) => Promise<{ data: T | null; error: any }>,
   options: QueryOptions
 ): QueryResult<T> {
-  const { key, refreshInterval = 0, enabled = true, staleTime = 30000 } = options
+  const { key, refreshInterval = 0, enabled = true, staleTime = 30000, realtime } = options
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [loading, setLoading] = useState(true)
@@ -121,6 +135,30 @@ export function useSupabaseQuery<T>(
     const interval = setInterval(fetchData, refreshInterval)
     return () => clearInterval(interval)
   }, [fetchData, refreshInterval])
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!realtime || !enabled) return
+
+    const { table, schema = 'public', filter, event = '*' } = realtime
+    const channelName = `query:${key}`
+
+    const config: any = { event, schema, table }
+    if (filter) config.filter = filter
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', config, () => {
+        // Invalidate cache and refetch
+        cache.delete(key)
+        fetchData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [realtime?.table, realtime?.filter, realtime?.event, key, enabled])
 
   // Cleanup
   useEffect(() => {
