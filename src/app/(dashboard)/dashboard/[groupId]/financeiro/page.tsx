@@ -1013,18 +1013,22 @@ export default function FinanceiroPage() {
     return `R$ ${value.toFixed(2)}`
   }
 
-  // Convert SVG to PNG base64 via canvas
-  async function svgToBase64Png(svgUrl: string, width: number, height: number): Promise<string> {
+  // Convert SVG to base64 PNG preserving original aspect ratio
+  async function svgToBase64Png(svgUrl: string, targetW: number): Promise<{ data: string; w: number; h: number }> {
     return new Promise((resolve, reject) => {
       const img = new window.Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
+        // Use natural dimensions to get correct aspect ratio
+        const ratio = img.naturalHeight / img.naturalWidth
+        const w = targetW
+        const h = Math.round(targetW * ratio)
         const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
+        canvas.width = w * 2  // 2x for sharpness
+        canvas.height = h * 2
         const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/png'))
+        ctx.drawImage(img, 0, 0, w * 2, h * 2)
+        resolve({ data: canvas.toDataURL('image/png'), w, h })
       }
       img.onerror = reject
       img.src = svgUrl
@@ -1039,310 +1043,322 @@ export default function FinanceiroPage() {
 
     try {
     const doc = new jsPDF()
-    const pageW = doc.internal.pageSize.getWidth()
-    const pageH = doc.internal.pageSize.getHeight()
-    const margin = 14
-    const contentW = pageW - margin * 2
+    const pageW = doc.internal.pageSize.getWidth()  // 210
+    const pageH = doc.internal.pageSize.getHeight()  // 297
+    const m = 15  // margin
+    const cw = pageW - m * 2  // content width
 
-    const fontFamily = 'helvetica'
-
-    // Load logo as PNG
-    let logoPng: string | null = null
+    // Load Montserrat fonts (static TTF with cmap)
+    let fb = 'helvetica'  // fallback
+    let fr = 'helvetica'
     try {
-      logoPng = await svgToBase64Png('/logo.svg', 600, 150)
-    } catch { /* fallback to text */ }
+      const [boldRes, regularRes] = await Promise.all([
+        fetch('/fonts/Montserrat-Bold.ttf'),
+        fetch('/fonts/Montserrat-Regular.ttf'),
+      ])
+      const [boldBuf, regularBuf] = await Promise.all([boldRes.arrayBuffer(), regularRes.arrayBuffer()])
+      const toBase64 = (buf: ArrayBuffer) => {
+        const bytes = new Uint8Array(buf)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+        return btoa(binary)
+      }
+      doc.addFileToVFS('Montserrat-Bold.ttf', toBase64(boldBuf))
+      doc.addFont('Montserrat-Bold.ttf', 'Montserrat', 'bold')
+      doc.addFileToVFS('Montserrat-Regular.ttf', toBase64(regularBuf))
+      doc.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal')
+      // Test the font works
+      doc.setFont('Montserrat', 'bold')
+      fb = 'Montserrat'
+      fr = 'Montserrat'
+    } catch {
+      fb = 'helvetica'
+      fr = 'helvetica'
+    }
 
-    let logoWhitePng: string | null = null
-    try {
-      logoWhitePng = await svgToBase64Png('/logo-white.svg', 600, 150)
-    } catch { /* fallback to text */ }
+    // Load logos preserving aspect ratio (viewBox 450x82.5 = 5.45:1)
+    let logo: { data: string; w: number; h: number } | null = null
+    let logoW: { data: string; w: number; h: number } | null = null
+    try { logo = await svgToBase64Png('/logo.svg', 400) } catch {}
+    try { logoW = await svgToBase64Png('/logo-header-white.svg', 600) } catch {}
 
-    // Brand colors
-    const navy = { r: 27, g: 31, b: 75 }
-    const green = { r: 0, g: 200, b: 83 }
-    const red = { r: 229, g: 57, b: 53 }
-    const blue = { r: 21, g: 101, b: 192 }
+    // Colors
+    const N = { r: 27, g: 31, b: 75 }   // navy
+    const G = { r: 0, g: 200, b: 83 }    // green
+    const R = { r: 229, g: 57, b: 53 }   // red
+    const B = { r: 21, g: 101, b: 192 }  // blue
 
-    const monthLabel = format(currentDate, 'MMMM yyyy')
+    const mesesPt: Record<number, string> = { 0: 'Janeiro', 1: 'Fevereiro', 2: 'Mar\u00e7o', 3: 'Abril', 4: 'Maio', 5: 'Junho', 6: 'Julho', 7: 'Agosto', 8: 'Setembro', 9: 'Outubro', 10: 'Novembro', 11: 'Dezembro' }
+    const monthLabel = `${mesesPt[currentDate.getMonth()]} ${currentDate.getFullYear()}`
     const groupName = group?.name || 'Grupo'
     let y = 0
 
-    // ── Helpers ──
-    function roundedRect(x: number, yPos: number, w: number, h: number, r: number) {
-      doc.roundedRect(x, yPos, w, h, r, r, 'F')
+    // Helpers
+    function pg(yPos: number, need: number) { if (yPos + need > pageH - 22) { doc.addPage(); return 18 } return yPos }
+
+    function section(icon: string, title: string, yPos: number): number {
+      yPos = pg(yPos, 30)
+      doc.setFillColor(N.r, N.g, N.b)
+      doc.rect(m, yPos, 2.5, 6, 'F')
+      doc.setFontSize(11)
+      doc.setFont(fb, 'bold')
+      doc.setTextColor(N.r, N.g, N.b)
+      doc.text(`${icon}  ${title}`, m + 5, yPos + 4.5)
+      doc.setDrawColor(230, 230, 230)
+      doc.setLineWidth(0.2)
+      doc.line(m, yPos + 7.5, pageW - m, yPos + 7.5)
+      return yPos + 11
     }
 
-    function checkPageBreak(yPos: number, needed: number): number {
-      if (yPos + needed > pageH - 25) { doc.addPage(); return 20 }
-      return yPos
+    // Table defaults: compact rows, Montserrat font
+    const tableBase = {
+      theme: 'striped' as const,
+      styles: { font: fr, fontSize: 9, cellPadding: 2, lineColor: [230, 230, 230] as [number, number, number], lineWidth: 0.1 },
+      headStyles: { fillColor: [N.r, N.g, N.b] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], font: fb, fontStyle: 'bold' as const, fontSize: 9, cellPadding: 2.5 },
+      bodyStyles: { textColor: [50, 50, 50] as [number, number, number] },
+      alternateRowStyles: { fillColor: [248, 249, 253] as [number, number, number] },
+      margin: { left: m, right: m },
     }
 
-    function sectionHeader(title: string, yPos: number): number {
-      if (yPos > 245) { doc.addPage(); yPos = 20 }
-      doc.setFillColor(navy.r, navy.g, navy.b)
-      doc.rect(margin, yPos, 3, 8, 'F')
-      doc.setFontSize(13)
-      doc.setFont(fontFamily, 'bold')
-      doc.setTextColor(navy.r, navy.g, navy.b)
-      doc.text(title, margin + 7, yPos + 6)
-      doc.setDrawColor(220, 220, 220)
-      doc.setLineWidth(0.3)
-      doc.line(margin, yPos + 10, pageW - margin, yPos + 10)
-      return yPos + 14
+    // ── HEADER ──
+    const hH = 28
+    doc.setFillColor(N.r, N.g, N.b)
+    doc.rect(0, 0, pageW, hH, 'F')
+
+    // Logo bigger, flush left
+    const lx = m
+    if (logoW) {
+      const logoHeight = 10
+      const logoWidth = logoHeight * (logoW.w / logoW.h)
+      doc.addImage(logoW.data, 'PNG', lx, 3, logoWidth, logoHeight)
     }
-
-    function addFooters() {
-      const totalPages = doc.getNumberOfPages()
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i)
-        doc.setDrawColor(200, 200, 200)
-        doc.setLineWidth(0.3)
-        doc.line(margin, pageH - 20, pageW - margin, pageH - 20)
-        // Logo in footer
-        if (logoPng) {
-          doc.addImage(logoPng, 'PNG', margin, pageH - 17, 28, 7)
-        } else {
-          doc.setFontSize(7)
-          doc.setFont(fontFamily, 'bold')
-          doc.setTextColor(navy.r, navy.g, navy.b)
-          doc.text('PeladeiroPro', margin, pageH - 12)
-        }
-        // Center: date
-        doc.setFont(fontFamily, 'normal')
-        doc.setFontSize(7)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageW / 2, pageH - 12, { align: 'center' })
-        // Right: page
-        doc.text(`Pagina ${i} de ${totalPages}`, pageW - margin, pageH - 12, { align: 'right' })
-      }
-    }
-
-    // ═══════════════════════════════════════════
-    //  HEADER
-    // ═══════════════════════════════════════════
-    const headerH = 40
-    doc.setFillColor(navy.r, navy.g, navy.b)
-    doc.rect(0, 0, pageW, headerH, 'F')
-    doc.setFillColor(15, 18, 55)
-    doc.rect(0, 0, pageW, 5, 'F')
-
-    // Logo in header
-    if (logoWhitePng) {
-      doc.addImage(logoWhitePng, 'PNG', margin, 9, 48, 12)
-    } else {
-      doc.setFontSize(22)
-      doc.setFont(fontFamily, 'bold')
-      doc.setTextColor(255, 255, 255)
-      doc.text('PeladeiroPro', margin, 19)
-    }
-
-    // Subtitle
-    doc.setFontSize(9)
-    doc.setFont(fontFamily, 'normal')
-    doc.setTextColor(200, 210, 255)
-    doc.text('Relatorio Financeiro', margin, 28)
-
-    // Group name (right)
-    doc.setFontSize(11)
-    doc.setFont(fontFamily, 'bold')
+    // Text shifted right +3mm to align R with p of logo
+    doc.setFontSize(12)
+    doc.setFont(fb, 'bold')
     doc.setTextColor(255, 255, 255)
-    doc.text(groupName, pageW - margin, 17, { align: 'right' })
+    doc.text('Relat\u00f3rio Financeiro', lx + 3, 19)
 
-    // Month (right)
+    // Right side: group name + month
+    doc.setFontSize(12)
+    doc.setFont(fb, 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text(groupName, pageW - m, 10, { align: 'right' })
     doc.setFontSize(9)
-    doc.setFont(fontFamily, 'normal')
-    doc.setTextColor(200, 210, 255)
-    const capitalizedMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-    doc.text(capitalizedMonth, pageW - margin, 25, { align: 'right' })
+    doc.setFont(fr, 'normal')
+    doc.setTextColor(180, 190, 230)
+    doc.text(monthLabel, pageW - m, 17, { align: 'right' })
 
-    // Green accent line
-    doc.setFillColor(green.r, green.g, green.b)
-    doc.rect(0, headerH, pageW, 1.5, 'F')
+    // Green accent
+    doc.setFillColor(G.r, G.g, G.b)
+    doc.rect(0, hH, pageW, 1.5, 'F')
 
-    y = headerH + 12
+    y = hH + 10
 
-    // ═══════════════════════════════════════════
-    //  SUMMARY CARDS
-    // ═══════════════════════════════════════════
-    const totalReceitasMensalidades = displayFees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
-    const totalReceitasAvulsos = paidGuests.reduce((s, g) => s + Number(g.amount), 0)
-    const totalReceitasOutras = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
-    const totalReceitas = totalReceitasMensalidades + totalReceitasAvulsos + totalReceitasOutras
-    const totalDespesas = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
-    const saldo = totalReceitas - totalDespesas
+    // ── SUMMARY CARDS ──
+    const tMens = displayFees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
+    const tAvul = paidGuests.reduce((s, g) => s + Number(g.amount), 0)
+    const tOutr = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
+    const tRec = tMens + tAvul + tOutr
+    const tDesp = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
+    const saldo = tRec - tDesp
 
-    const cardW = (contentW - 9) / 4
-    const cardH = 28
-    const cardR = 3
-
+    const cW = (cw - 6) / 4
+    const cH = 24
     const cards = [
-      { label: 'Mensalidades', value: `R$ ${totalReceitasMensalidades.toFixed(2)}`, color: green },
-      { label: 'Avulsos', value: `R$ ${totalReceitasAvulsos.toFixed(2)}`, color: blue },
-      { label: 'Despesas', value: `R$ ${totalDespesas.toFixed(2)}`, color: red },
-      { label: 'Saldo', value: `${saldo >= 0 ? '+' : ''}R$ ${saldo.toFixed(2)}`, color: saldo >= 0 ? green : red },
+      { label: 'Mensalidades', value: `R$ ${tMens.toFixed(2)}`, c: G },
+      { label: 'Avulsos', value: `R$ ${tAvul.toFixed(2)}`, c: B },
+      { label: 'Despesas', value: `R$ ${tDesp.toFixed(2)}`, c: R },
+      { label: 'Saldo', value: `${saldo >= 0 ? '+' : ''}R$ ${saldo.toFixed(2)}`, c: saldo >= 0 ? G : R },
     ]
 
     cards.forEach((card, i) => {
-      const x = margin + i * (cardW + 3)
-      const tR = Math.round(card.color.r + (255 - card.color.r) * 0.88)
-      const tG = Math.round(card.color.g + (255 - card.color.g) * 0.88)
-      const tB = Math.round(card.color.b + (255 - card.color.b) * 0.88)
-      doc.setFillColor(tR, tG, tB)
-      roundedRect(x, y, cardW, cardH, cardR)
-      doc.setFillColor(card.color.r, card.color.g, card.color.b)
-      doc.rect(x, y + 3, 2.5, cardH - 6, 'F')
-      doc.setFontSize(7.5)
-      doc.setFont(fontFamily, 'normal')
-      doc.setTextColor(100, 100, 100)
-      doc.text(card.label, x + 6, y + 9)
-      doc.setFontSize(12)
-      doc.setFont(fontFamily, 'bold')
-      doc.setTextColor(card.color.r, card.color.g, card.color.b)
-      doc.text(card.value, x + 6, y + 20)
+      const x = m + i * (cW + 2)
+      // Light tint background
+      doc.setFillColor(
+        Math.round(card.c.r + (255 - card.c.r) * 0.9),
+        Math.round(card.c.g + (255 - card.c.g) * 0.9),
+        Math.round(card.c.b + (255 - card.c.b) * 0.9)
+      )
+      doc.roundedRect(x, y, cW, cH, 2, 2, 'F')
+      // Left accent bar
+      doc.setFillColor(card.c.r, card.c.g, card.c.b)
+      doc.rect(x, y + 2, 2, cH - 4, 'F')
+      // Label
+      doc.setFontSize(10)
+      doc.setFont(fb, 'bold')
+      doc.setTextColor(0, 0, 0)
+      doc.text(card.label, x + 5, y + 8)
+      // Value
+      doc.setFontSize(14)
+      doc.setFont(fb, 'bold')
+      doc.setTextColor(card.c.r, card.c.g, card.c.b)
+      doc.text(card.value, x + 5, y + 17)
     })
 
-    y += cardH + 6
-    if (totalReceitasOutras > 0) {
-      doc.setFontSize(8)
-      doc.setFont(fontFamily, 'normal')
-      doc.setTextColor(120, 120, 120)
-      doc.text(`Outras receitas incluidas: R$ ${totalReceitasOutras.toFixed(2)}`, margin, y + 2)
-      y += 8
+    y += cH + 4
+    if (tOutr > 0) {
+      doc.setFontSize(7)
+      doc.setFont(fr, 'normal')
+      doc.setTextColor(130, 130, 130)
+      doc.text(`* Inclui outras receitas: R$ ${tOutr.toFixed(2)}`, m, y + 2)
+      y += 6
     }
-    y += 6
+    y += 4
 
-    // ═══════════════════════════════════════════
-    //  MENSALIDADES
-    // ═══════════════════════════════════════════
-    const statusLabel: Record<string, string> = {
-      paid: 'Pago', pending: 'Pendente', overdue: 'Atrasado', waived: 'Isento', dm_leave: 'DM',
-    }
+    // ── SALDO INICIAL / FINAL ──
+    y = section('=', 'Balan\u00e7o do M\u00eas', y)
+    const balW = (cw - 4) / 3
+    const balH = 22
+    const balItems = [
+      { label: 'Saldo Inicial', value: `R$ ${saldoInicial.toFixed(2)}`, c: B },
+      { label: 'Movimenta\u00e7\u00e3o', value: `${(tRec - tDesp) >= 0 ? '+' : ''}R$ ${(tRec - tDesp).toFixed(2)}`, c: (tRec - tDesp) >= 0 ? G : R },
+      { label: 'Saldo Final', value: `R$ ${saldoFinal.toFixed(2)}`, c: saldoFinal >= 0 ? G : R },
+    ]
+    balItems.forEach((item, i) => {
+      const x = m + i * (balW + 2)
+      doc.setFillColor(
+        Math.round(item.c.r + (255 - item.c.r) * 0.92),
+        Math.round(item.c.g + (255 - item.c.g) * 0.92),
+        Math.round(item.c.b + (255 - item.c.b) * 0.92)
+      )
+      doc.roundedRect(x, y, balW, balH, 2, 2, 'F')
+      doc.setFontSize(10)
+      doc.setFont(fb, 'bold')
+      doc.setTextColor(0, 0, 0)
+      doc.text(item.label, x + 4, y + 7)
+      doc.setFontSize(14)
+      doc.setFont(fb, 'bold')
+      doc.setTextColor(item.c.r, item.c.g, item.c.b)
+      doc.text(item.value, x + 4, y + 16)
+    })
+    y += balH + 8
 
-    y = sectionHeader('Mensalidades', y)
-
-    const feeRows = displayFees.map(fee => [
-      (fee.member as any)?.name || '-',
-      `R$ ${Number(fee.amount).toFixed(2)}`,
-      statusLabel[fee.status] || fee.status,
-      fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-',
-    ])
+    // ── MENSALIDADES ──
+    const stLabel: Record<string, string> = { paid: 'Pago', pending: 'Pendente', overdue: 'Atrasado', waived: 'Isento', dm_leave: 'DM' }
+    const statusOrder: Record<string, number> = { paid: 0, pending: 1, overdue: 2, waived: 3, dm_leave: 4 }
+    const sortedFees = [...displayFees].sort((a, b) => {
+      const sa = statusOrder[a.status] ?? 99
+      const sb = statusOrder[b.status] ?? 99
+      if (sa !== sb) return sa - sb
+      const na = ((a.member as any)?.name || '').toLowerCase()
+      const nb = ((b.member as any)?.name || '').toLowerCase()
+      return na.localeCompare(nb, 'pt-BR')
+    })
+    y = section('$', 'Mensalidades', y)
 
     autoTable(doc, {
+      ...tableBase,
       startY: y,
-      head: [['Membro', 'Valor', 'Status', 'Data Pagamento']],
-      body: feeRows,
-      theme: 'striped',
-      styles: { font: fontFamily, fontSize: 8.5, cellPadding: 3.5 },
-      headStyles: { fillColor: [navy.r, navy.g, navy.b], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
-      bodyStyles: { textColor: [60, 60, 60] },
-      alternateRowStyles: { fillColor: [245, 247, 252] },
-      columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 35, halign: 'right' }, 2: { cellWidth: 35, halign: 'center' }, 3: { cellWidth: 40, halign: 'center' } },
+      head: [['Membro', 'Valor', 'Status', 'Pago em']],
+      body: sortedFees.map(fee => [
+        (fee.member as any)?.name || '-',
+        `R$ ${Number(fee.amount).toFixed(2)}`,
+        stLabel[fee.status] || fee.status,
+        fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-',
+      ]),
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
       didParseCell: (data: any) => {
         if (data.section === 'body' && data.column.index === 2) {
-          const val = data.cell.raw as string
-          if (val === 'Pago') { data.cell.styles.fillColor = [232, 245, 233]; data.cell.styles.textColor = [0, 150, 50]; data.cell.styles.fontStyle = 'bold' }
-          else if (val === 'Atrasado') { data.cell.styles.fillColor = [255, 235, 238]; data.cell.styles.textColor = [200, 30, 30]; data.cell.styles.fontStyle = 'bold' }
-          else if (val === 'Pendente') { data.cell.styles.fillColor = [255, 249, 230]; data.cell.styles.textColor = [200, 140, 0]; data.cell.styles.fontStyle = 'bold' }
-          else if (val === 'Isento') { data.cell.styles.fillColor = [240, 240, 240]; data.cell.styles.textColor = [120, 120, 120] }
-          else if (val === 'DM') { data.cell.styles.fillColor = [232, 240, 254]; data.cell.styles.textColor = [30, 90, 180] }
+          const v = data.cell.raw as string
+          if (v === 'Pago') { data.cell.styles.fillColor = [230, 245, 232]; data.cell.styles.textColor = [0, 140, 50]; data.cell.styles.fontStyle = 'bold' }
+          else if (v === 'Atrasado') { data.cell.styles.fillColor = [255, 233, 236]; data.cell.styles.textColor = [200, 30, 30]; data.cell.styles.fontStyle = 'bold' }
+          else if (v === 'Pendente') { data.cell.styles.fillColor = [255, 248, 228]; data.cell.styles.textColor = [190, 130, 0]; data.cell.styles.fontStyle = 'bold' }
+          else if (v === 'Isento') { data.cell.styles.fillColor = [242, 242, 242]; data.cell.styles.textColor = [130, 130, 130] }
+          else if (v === 'DM') { data.cell.styles.fillColor = [230, 238, 252]; data.cell.styles.textColor = [30, 90, 180] }
         }
       },
-      margin: { left: margin, right: margin },
     })
-    y = (doc as any).lastAutoTable.finalY + 12
+    y = (doc as any).lastAutoTable.finalY + 10
 
-    // ═══════════════════════════════════════════
-    //  DESPESAS
-    // ═══════════════════════════════════════════
-    y = checkPageBreak(y, 40)
-    y = sectionHeader('Despesas', y)
-
-    const expenseRows = expenses.map((e: any) => [
+    // ── DESPESAS ──
+    y = section('-', 'Despesas', y)
+    const expRows = expenses.map((e: any) => [
       EXPENSE_CATEGORIES[e.category] || e.category,
       e.description || '-',
       `R$ ${Number(e.amount).toFixed(2)}`,
       e.expense_date ? format(new Date(e.expense_date), 'dd/MM/yyyy') : '-',
     ])
-
-    if (expenseRows.length > 0) {
+    if (expRows.length > 0) {
       autoTable(doc, {
+        ...tableBase,
         startY: y,
-        head: [['Categoria', 'Descricao', 'Valor', 'Data']],
-        body: expenseRows,
-        theme: 'striped',
-        styles: { font: fontFamily, fontSize: 8.5, cellPadding: 3.5 },
-        headStyles: { fillColor: [navy.r, navy.g, navy.b], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
-        bodyStyles: { textColor: [60, 60, 60] },
-        alternateRowStyles: { fillColor: [252, 245, 245] },
-        columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 65 }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 30, halign: 'center' } },
-        didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 2) {
-            data.cell.styles.textColor = [red.r, red.g, red.b]
-            data.cell.styles.fontStyle = 'bold'
-          }
-        },
-        margin: { left: margin, right: margin },
+        head: [['Categoria', 'Descri\u00e7\u00e3o', 'Valor', 'Data']],
+        body: expRows,
+        alternateRowStyles: { fillColor: [253, 247, 247] },
+        columnStyles: { 2: { halign: 'right', textColor: [R.r, R.g, R.b], fontStyle: 'bold' }, 3: { halign: 'center' } },
       })
-      y = (doc as any).lastAutoTable.finalY + 12
+      y = (doc as any).lastAutoTable.finalY + 10
     } else {
       doc.setFillColor(248, 248, 248)
-      roundedRect(margin, y, contentW, 16, 3)
-      doc.setFontSize(9)
-      doc.setFont(fontFamily, 'normal')
-      doc.setTextColor(150, 150, 150)
-      doc.text('Nenhuma despesa registrada no periodo.', pageW / 2, y + 10, { align: 'center' })
-      y += 24
+      doc.roundedRect(m, y, cw, 12, 2, 2, 'F')
+      doc.setFontSize(8)
+      doc.setFont(fr, 'normal')
+      doc.setTextColor(160, 160, 160)
+      doc.text('Nenhuma despesa registrada no per\u00edodo.', pageW / 2, y + 7.5, { align: 'center' })
+      y += 18
     }
 
-    // ═══════════════════════════════════════════
-    //  JOGADORES AVULSOS
-    // ═══════════════════════════════════════════
-    y = checkPageBreak(y, 40)
-    y = sectionHeader('Jogadores Avulsos', y)
-
-    const guestRows = allGuests.map((g: any) => [
+    // ── JOGADORES AVULSOS ──
+    y = section('+', 'Jogadores Avulsos', y)
+    const gRows = allGuests.map((g: any) => [
       g.name || '-',
       `R$ ${Number(g.amount).toFixed(2)}`,
-      g.paid ? 'Sim' : 'Nao',
+      g.paid ? 'Sim' : 'N\u00e3o',
       g.match_date ? format(new Date(g.match_date), 'dd/MM/yyyy') : '-',
     ])
-
-    if (guestRows.length > 0) {
+    if (gRows.length > 0) {
       autoTable(doc, {
+        ...tableBase,
         startY: y,
         head: [['Nome', 'Valor', 'Pago', 'Data']],
-        body: guestRows,
-        theme: 'striped',
-        styles: { font: fontFamily, fontSize: 8.5, cellPadding: 3.5 },
-        headStyles: { fillColor: [navy.r, navy.g, navy.b], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, cellPadding: 4 },
-        bodyStyles: { textColor: [60, 60, 60] },
-        alternateRowStyles: { fillColor: [245, 248, 252] },
-        columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 35, halign: 'right' }, 2: { cellWidth: 30, halign: 'center' }, 3: { cellWidth: 40, halign: 'center' } },
+        body: gRows,
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
         didParseCell: (data: any) => {
           if (data.section === 'body' && data.column.index === 2) {
-            const val = data.cell.raw as string
-            if (val === 'Sim') { data.cell.styles.fillColor = [232, 245, 233]; data.cell.styles.textColor = [0, 150, 50]; data.cell.styles.fontStyle = 'bold' }
-            else { data.cell.styles.fillColor = [255, 235, 238]; data.cell.styles.textColor = [200, 30, 30]; data.cell.styles.fontStyle = 'bold' }
+            const v = data.cell.raw as string
+            if (v === 'Sim') { data.cell.styles.fillColor = [230, 245, 232]; data.cell.styles.textColor = [0, 140, 50]; data.cell.styles.fontStyle = 'bold' }
+            else { data.cell.styles.fillColor = [255, 233, 236]; data.cell.styles.textColor = [200, 30, 30]; data.cell.styles.fontStyle = 'bold' }
           }
         },
-        margin: { left: margin, right: margin },
       })
     } else {
       doc.setFillColor(248, 248, 248)
-      roundedRect(margin, y, contentW, 16, 3)
-      doc.setFontSize(9)
-      doc.setFont(fontFamily, 'normal')
-      doc.setTextColor(150, 150, 150)
-      doc.text('Nenhum jogador avulso registrado no periodo.', pageW / 2, y + 10, { align: 'center' })
+      doc.roundedRect(m, y, cw, 12, 2, 2, 'F')
+      doc.setFontSize(8)
+      doc.setFont(fr, 'normal')
+      doc.setTextColor(160, 160, 160)
+      doc.text('Nenhum jogador avulso registrado no per\u00edodo.', pageW / 2, y + 7.5, { align: 'center' })
     }
 
-    addFooters()
+    // ── FOOTER (all pages) ──
+    const tp = doc.getNumberOfPages()
+    for (let i = 1; i <= tp; i++) {
+      doc.setPage(i)
+      doc.setDrawColor(220, 220, 220)
+      doc.setLineWidth(0.2)
+      doc.line(m, pageH - 15, pageW - m, pageH - 15)
+      // Logo in footer (correct proportion)
+      if (logo) {
+        const fH = 5
+        const fW = fH * (logo.w / logo.h)
+        doc.addImage(logo.data, 'PNG', m, pageH - 13, fW, fH)
+      } else {
+        doc.setFontSize(6.5)
+        doc.setFont(fb, 'bold')
+        doc.setTextColor(N.r, N.g, N.b)
+        doc.text('PeladeiroPro', m, pageH - 9)
+      }
+      doc.setFontSize(6.5)
+      doc.setFont(fr, 'normal')
+      doc.setTextColor(160, 160, 160)
+      doc.text(`Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageW / 2, pageH - 9, { align: 'center' })
+      doc.text(`P\u00e1gina ${i} de ${tp}`, pageW - m, pageH - 9, { align: 'right' })
+    }
 
-    const safeGroupName = groupName.toLowerCase().replace(/[^a-z0-9]/g, '-')
-    const month = format(currentDate, 'MM')
-    const year = format(currentDate, 'yyyy')
-    doc.save(`relatorio-${safeGroupName}-${month}-${year}.pdf`)
-    toast.success('Relatorio gerado com sucesso!')
+    // ── SAVE ──
+    const safe = groupName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+    doc.save(`relatorio-${safe}-${format(currentDate, 'MM')}-${format(currentDate, 'yyyy')}.pdf`)
+    toast.success('Relat\u00f3rio gerado com sucesso!')
     } catch (err) {
       console.error('Erro ao gerar PDF:', err)
       toast.error('Erro ao gerar o PDF. Tente novamente.')
