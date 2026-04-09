@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
-  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus,
+  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus, Target,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -23,7 +23,7 @@ import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
-import type { Match, GuestPlayer, GroupMember, Group, Tournament, Expense, MatchPhoto } from '@/lib/types'
+import type { Match, GuestPlayer, GroupMember, Group, Tournament, Expense, MatchPhoto, MatchStat } from '@/lib/types'
 import { TOURNAMENT_STATUSES, PLAYOFF_PHASES, EXPENSE_CATEGORIES } from '@/lib/types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -120,6 +120,12 @@ export default function MatchesPage() {
   const [matchPhotos, setMatchPhotos] = useState<Record<string, MatchPhoto[]>>({})
   const [photoUploading, setPhotoUploading] = useState(false)
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null)
+
+  // Match stats (goals/assists)
+  const [matchStats, setMatchStats] = useState<Record<string, MatchStat[]>>({})
+  const [statsInputs, setStatsInputs] = useState<Record<string, { goals: number; assists: number }>>({})
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false)
+  const [statsMatchId, setStatsMatchId] = useState<string | null>(null)
 
   // Search, filter, sort
   const [searchTerm, setSearchTerm] = useState('')
@@ -330,17 +336,76 @@ export default function MatchesPage() {
     setMatchPhotos((prev) => ({ ...prev, [matchId]: (data || []) as MatchPhoto[] }))
   }, [groupId])
 
-  // When a match is expanded, load attendance, expenses and photos
+  const loadMatchStats = useCallback(async (matchId: string) => {
+    const { data } = await supabase
+      .from('match_stats')
+      .select('*, member:group_members(id, name)')
+      .eq('match_id', matchId)
+      .order('goals', { ascending: false })
+    setMatchStats((prev) => ({ ...prev, [matchId]: (data || []) as MatchStat[] }))
+  }, [])
+
+  function openStatsDialog(matchId: string) {
+    setStatsMatchId(matchId)
+    // Initialize inputs from existing stats + all present members
+    const existing = matchStats[matchId] || []
+    const attendance = attendanceMap[matchId] || {}
+    const inputs: Record<string, { goals: number; assists: number }> = {}
+    // Add all present members
+    for (const [memberId, att] of Object.entries(attendance)) {
+      if (att.present) {
+        const stat = existing.find((s) => s.member_id === memberId)
+        inputs[memberId] = { goals: stat?.goals || 0, assists: stat?.assists || 0 }
+      }
+    }
+    // Add existing stats that might not be in attendance
+    for (const stat of existing) {
+      if (!inputs[stat.member_id]) {
+        inputs[stat.member_id] = { goals: stat.goals, assists: stat.assists }
+      }
+    }
+    setStatsInputs(inputs)
+    setStatsDialogOpen(true)
+  }
+
+  async function handleSaveStats() {
+    if (!statsMatchId) return
+    // Delete existing stats for this match
+    await supabase.from('match_stats').delete().eq('match_id', statsMatchId)
+    // Insert new stats (only non-zero)
+    const rows = Object.entries(statsInputs)
+      .filter(([, v]) => v.goals > 0 || v.assists > 0)
+      .map(([memberId, v]) => ({
+        match_id: statsMatchId,
+        group_id: groupId,
+        member_id: memberId,
+        goals: v.goals,
+        assists: v.assists,
+      }))
+    if (rows.length > 0) {
+      const { error } = await supabase.from('match_stats').insert(rows)
+      if (error) {
+        toast.error('Erro ao salvar estatísticas')
+        return
+      }
+    }
+    toast.success('Estatísticas salvas!')
+    loadMatchStats(statsMatchId)
+    setStatsDialogOpen(false)
+  }
+
+  // When a match is expanded, load attendance, expenses, photos and stats
   useEffect(() => {
     if (expandedMatch) {
       loadAttendance(expandedMatch)
       loadPhotos(expandedMatch)
+      loadMatchStats(expandedMatch)
       const match = matches.find((m) => m.id === expandedMatch)
       if (match) {
         loadExpenses(expandedMatch, match.match_date)
       }
     }
-  }, [expandedMatch, matches, loadAttendance, loadExpenses, loadPhotos])
+  }, [expandedMatch, matches, loadAttendance, loadExpenses, loadPhotos, loadMatchStats])
 
   async function toggleAttendance(matchId: string, memberId: string) {
     const current = attendanceMap[matchId]?.[memberId]
@@ -1443,6 +1508,52 @@ export default function MatchesPage() {
 
                       <Separator />
 
+                      {/* Estatísticas do Jogo (Gols e Assistências) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                            <Target className="h-3.5 w-3.5" />
+                            Estatísticas do Jogo
+                          </p>
+                          {!isReadOnly && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
+                              onClick={() => openStatsDialog(match.id)}
+                            >
+                              <Target className="h-3 w-3" />
+                              Lançar Estatísticas
+                            </Button>
+                          )}
+                        </div>
+                        {(matchStats[match.id] || []).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Nenhuma estatística registrada.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {(matchStats[match.id] || []).map((stat) => (
+                              <div key={stat.id} className="flex items-center justify-between text-sm py-1 px-2 rounded bg-muted/50">
+                                <span className="font-medium">{stat.member?.name || 'Jogador'}</span>
+                                <div className="flex items-center gap-3 text-xs">
+                                  {stat.goals > 0 && (
+                                    <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-semibold">
+                                      {stat.goals} gol{stat.goals !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                  {stat.assists > 0 && (
+                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold">
+                                      {stat.assists} assist.
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator />
+
                       {/* Fotos do Jogo */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -1748,6 +1859,76 @@ export default function MatchesPage() {
               alt="Foto do jogo"
               className="w-full h-auto rounded-lg"
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Estatísticas do Jogo */}
+      <Dialog open={statsDialogOpen} onOpenChange={setStatsDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-orange-500" />
+              Lançar Estatísticas
+            </DialogTitle>
+          </DialogHeader>
+          {Object.keys(statsInputs).length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nenhum jogador presente. Registre a presença primeiro.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-[1fr_80px_80px] gap-2 text-xs font-semibold text-muted-foreground uppercase px-1">
+                <span>Jogador</span>
+                <span className="text-center">Gols</span>
+                <span className="text-center">Assist.</span>
+              </div>
+              {Object.entries(statsInputs)
+                .sort(([a], [b]) => {
+                  const nameA = mensalistas.find(m => m.id === a)?.name || ''
+                  const nameB = mensalistas.find(m => m.id === b)?.name || ''
+                  return nameA.localeCompare(nameB)
+                })
+                .map(([memberId, vals]) => {
+                  const member = mensalistas.find(m => m.id === memberId)
+                  return (
+                    <div key={memberId} className="grid grid-cols-[1fr_80px_80px] gap-2 items-center">
+                      <span className="text-sm font-medium truncate">{member?.name || 'Jogador'}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        className="h-8 text-center text-sm"
+                        value={vals.goals}
+                        onChange={(e) =>
+                          setStatsInputs((prev) => ({
+                            ...prev,
+                            [memberId]: { ...prev[memberId], goals: Math.max(0, parseInt(e.target.value) || 0) },
+                          }))
+                        }
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        className="h-8 text-center text-sm"
+                        value={vals.assists}
+                        onChange={(e) =>
+                          setStatsInputs((prev) => ({
+                            ...prev,
+                            [memberId]: { ...prev[memberId], assists: Math.max(0, parseInt(e.target.value) || 0) },
+                          }))
+                        }
+                      />
+                    </div>
+                  )
+                })}
+              <Button
+                className="w-full bg-[#00C853] hover:bg-[#00A843] text-white mt-2"
+                onClick={handleSaveStats}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Estatísticas
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>
