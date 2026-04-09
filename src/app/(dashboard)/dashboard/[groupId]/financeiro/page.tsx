@@ -1150,7 +1150,7 @@ export default function FinanceiroPage() {
     doc.setFontSize(12)
     doc.setFont(fb, 'bold')
     doc.setTextColor(255, 255, 255)
-    doc.text('Relat\u00f3rio Financeiro', lx + 3, 19)
+    doc.text('Relat\u00f3rio Financeiro', lx + 0.5, 19)
 
     // Right side: group name + month
     doc.setFontSize(12)
