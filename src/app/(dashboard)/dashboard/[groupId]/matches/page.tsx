@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
+  Plus, Minus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
   Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus, Target,
 } from 'lucide-react'
@@ -1514,16 +1514,21 @@ export default function MatchesPage() {
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                             <Target className="h-3.5 w-3.5" />
                             Estatísticas do Jogo
+                            {(matchStats[match.id] || []).length > 0 && (
+                              <span className="text-[10px] font-normal ml-1 text-muted-foreground">
+                                ({(matchStats[match.id] || []).reduce((s, st) => s + st.goals, 0)} gols, {(matchStats[match.id] || []).reduce((s, st) => s + st.assists, 0)} assist.)
+                              </span>
+                            )}
                           </p>
                           {!isReadOnly && (
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs gap-1 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
+                              className="h-8 text-xs gap-1.5 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
                               onClick={() => openStatsDialog(match.id)}
                             >
-                              <Target className="h-3 w-3" />
-                              Lançar Estatísticas
+                              <Target className="h-3.5 w-3.5" />
+                              {(matchStats[match.id] || []).length > 0 ? 'Editar' : 'Lançar'}
                             </Button>
                           )}
                         </div>
@@ -1532,18 +1537,18 @@ export default function MatchesPage() {
                         ) : (
                           <div className="space-y-1">
                             {(matchStats[match.id] || []).map((stat) => (
-                              <div key={stat.id} className="flex items-center justify-between text-sm py-1 px-2 rounded bg-muted/50">
-                                <span className="font-medium">{stat.member?.name || 'Jogador'}</span>
-                                <div className="flex items-center gap-3 text-xs">
+                              <div key={stat.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded-lg bg-muted/50">
+                                <span className="font-medium truncate">{stat.member?.name || 'Jogador'}</span>
+                                <div className="flex items-center gap-2 text-xs shrink-0 ml-2">
                                   {stat.goals > 0 && (
-                                    <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-semibold">
+                                    <Badge variant="secondary" className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-0 font-semibold px-2">
                                       {stat.goals} gol{stat.goals !== 1 ? 's' : ''}
-                                    </span>
+                                    </Badge>
                                   )}
                                   {stat.assists > 0 && (
-                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold">
+                                    <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-0 font-semibold px-2">
                                       {stat.assists} assist.
-                                    </span>
+                                    </Badge>
                                   )}
                                 </div>
                               </div>
@@ -1865,70 +1870,112 @@ export default function MatchesPage() {
 
       {/* Dialog: Estatísticas do Jogo */}
       <Dialog open={statsDialogOpen} onOpenChange={setStatsDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-4 pt-4 pb-2">
             <DialogTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-orange-500" />
               Lançar Estatísticas
             </DialogTitle>
           </DialogHeader>
           {Object.keys(statsInputs).length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
+            <p className="text-sm text-muted-foreground py-8 text-center px-4">
               Nenhum jogador presente. Registre a presença primeiro.
             </p>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-[1fr_80px_80px] gap-2 text-xs font-semibold text-muted-foreground uppercase px-1">
-                <span>Jogador</span>
-                <span className="text-center">Gols</span>
-                <span className="text-center">Assist.</span>
+            <>
+              <div className="flex-1 overflow-y-auto px-4 pb-2">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-x-2 items-center mb-2 px-1">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">Jogador</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase text-center w-[100px]">Gols</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase text-center w-[100px]">Assist.</span>
+                </div>
+                {Object.entries(statsInputs)
+                  .sort(([a], [b]) => {
+                    const nameA = mensalistas.find(m => m.id === a)?.name || ''
+                    const nameB = mensalistas.find(m => m.id === b)?.name || ''
+                    return nameA.localeCompare(nameB)
+                  })
+                  .map(([memberId, vals]) => {
+                    const member = mensalistas.find(m => m.id === memberId)
+                    const hasStats = vals.goals > 0 || vals.assists > 0
+                    return (
+                      <div
+                        key={memberId}
+                        className={`grid grid-cols-[1fr_auto_auto] gap-x-2 items-center py-2 px-1 border-b border-border/50 last:border-0 ${hasStats ? 'bg-orange-50/50 dark:bg-orange-950/20 rounded-lg' : ''}`}
+                      >
+                        <span className="text-sm font-medium truncate pr-1">{member?.name || 'Jogador'}</span>
+                        <div className="flex items-center gap-1 w-[100px] justify-center">
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-full flex items-center justify-center bg-muted hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 transition-all touch-manipulation"
+                            onClick={() =>
+                              setStatsInputs((prev) => ({
+                                ...prev,
+                                [memberId]: { ...prev[memberId], goals: Math.max(0, prev[memberId].goals - 1) },
+                              }))
+                            }
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className={`w-7 text-center text-base font-bold tabular-nums ${vals.goals > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                            {vals.goals}
+                          </span>
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-full flex items-center justify-center bg-muted hover:bg-green-100 dark:hover:bg-green-900/40 active:scale-90 transition-all touch-manipulation"
+                            onClick={() =>
+                              setStatsInputs((prev) => ({
+                                ...prev,
+                                [memberId]: { ...prev[memberId], goals: prev[memberId].goals + 1 },
+                              }))
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1 w-[100px] justify-center">
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-full flex items-center justify-center bg-muted hover:bg-red-100 dark:hover:bg-red-900/40 active:scale-90 transition-all touch-manipulation"
+                            onClick={() =>
+                              setStatsInputs((prev) => ({
+                                ...prev,
+                                [memberId]: { ...prev[memberId], assists: Math.max(0, prev[memberId].assists - 1) },
+                              }))
+                            }
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className={`w-7 text-center text-base font-bold tabular-nums ${vals.assists > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
+                            {vals.assists}
+                          </span>
+                          <button
+                            type="button"
+                            className="h-9 w-9 rounded-full flex items-center justify-center bg-muted hover:bg-blue-100 dark:hover:bg-blue-900/40 active:scale-90 transition-all touch-manipulation"
+                            onClick={() =>
+                              setStatsInputs((prev) => ({
+                                ...prev,
+                                [memberId]: { ...prev[memberId], assists: prev[memberId].assists + 1 },
+                              }))
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
               </div>
-              {Object.entries(statsInputs)
-                .sort(([a], [b]) => {
-                  const nameA = mensalistas.find(m => m.id === a)?.name || ''
-                  const nameB = mensalistas.find(m => m.id === b)?.name || ''
-                  return nameA.localeCompare(nameB)
-                })
-                .map(([memberId, vals]) => {
-                  const member = mensalistas.find(m => m.id === memberId)
-                  return (
-                    <div key={memberId} className="grid grid-cols-[1fr_80px_80px] gap-2 items-center">
-                      <span className="text-sm font-medium truncate">{member?.name || 'Jogador'}</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        className="h-8 text-center text-sm"
-                        value={vals.goals}
-                        onChange={(e) =>
-                          setStatsInputs((prev) => ({
-                            ...prev,
-                            [memberId]: { ...prev[memberId], goals: Math.max(0, parseInt(e.target.value) || 0) },
-                          }))
-                        }
-                      />
-                      <Input
-                        type="number"
-                        min="0"
-                        className="h-8 text-center text-sm"
-                        value={vals.assists}
-                        onChange={(e) =>
-                          setStatsInputs((prev) => ({
-                            ...prev,
-                            [memberId]: { ...prev[memberId], assists: Math.max(0, parseInt(e.target.value) || 0) },
-                          }))
-                        }
-                      />
-                    </div>
-                  )
-                })}
-              <Button
-                className="w-full bg-[#00C853] hover:bg-[#00A843] text-white mt-2"
-                onClick={handleSaveStats}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Estatísticas
-              </Button>
-            </div>
+              <div className="px-4 py-3 border-t bg-background">
+                <Button
+                  className="w-full h-12 text-base bg-[#00C853] hover:bg-[#00A843] text-white"
+                  onClick={handleSaveStats}
+                >
+                  <Save className="h-5 w-5 mr-2" />
+                  Salvar Estatísticas
+                </Button>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
