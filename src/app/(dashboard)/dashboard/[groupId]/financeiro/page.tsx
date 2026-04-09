@@ -1049,38 +1049,52 @@ export default function FinanceiroPage() {
     const cw = pageW - m * 2  // content width
 
     // Load Montserrat fonts (static TTF with cmap)
-    let fb = 'helvetica'  // fallback
+    let fb = 'helvetica'
     let fr = 'helvetica'
     try {
+      const toBase64 = (buf: ArrayBuffer) => {
+        const bytes = new Uint8Array(buf)
+        const chunks: string[] = []
+        const chunkSize = 0x8000
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize))))
+        }
+        return btoa(chunks.join(''))
+      }
       const [boldRes, regularRes] = await Promise.all([
         fetch('/fonts/Montserrat-Bold.ttf'),
         fetch('/fonts/Montserrat-Regular.ttf'),
       ])
-      const [boldBuf, regularBuf] = await Promise.all([boldRes.arrayBuffer(), regularRes.arrayBuffer()])
-      const toBase64 = (buf: ArrayBuffer) => {
-        const bytes = new Uint8Array(buf)
-        let binary = ''
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-        return btoa(binary)
+      if (boldRes.ok && regularRes.ok) {
+        const [boldBuf, regularBuf] = await Promise.all([boldRes.arrayBuffer(), regularRes.arrayBuffer()])
+        if (boldBuf.byteLength > 1000 && regularBuf.byteLength > 1000) {
+          doc.addFileToVFS('Montserrat-Bold.ttf', toBase64(boldBuf))
+          doc.addFont('Montserrat-Bold.ttf', 'Montserrat', 'bold')
+          doc.addFileToVFS('Montserrat-Regular.ttf', toBase64(regularBuf))
+          doc.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal')
+          doc.setFont('Montserrat', 'bold')
+          doc.text('', 0, 0) // force font parse
+          fb = 'Montserrat'
+          fr = 'Montserrat'
+          console.log('[PDF] Montserrat loaded OK')
+        }
       }
-      doc.addFileToVFS('Montserrat-Bold.ttf', toBase64(boldBuf))
-      doc.addFont('Montserrat-Bold.ttf', 'Montserrat', 'bold')
-      doc.addFileToVFS('Montserrat-Regular.ttf', toBase64(regularBuf))
-      doc.addFont('Montserrat-Regular.ttf', 'Montserrat', 'normal')
-      // Test the font works
-      doc.setFont('Montserrat', 'bold')
-      fb = 'Montserrat'
-      fr = 'Montserrat'
-    } catch {
+    } catch (e) {
+      console.warn('[PDF] Font fallback to helvetica:', e)
       fb = 'helvetica'
       fr = 'helvetica'
     }
 
-    // Load logos preserving aspect ratio (viewBox 450x82.5 = 5.45:1)
+    // Load logos with hardcoded aspect ratios (no naturalWidth dependency)
+    // logo.svg: viewBox 450x82.5 = ratio 5.4545
+    // logo-header-white.svg: viewBox 750x127.5 = ratio 5.8824
     let logo: { data: string; w: number; h: number } | null = null
     let logoW: { data: string; w: number; h: number } | null = null
     try { logo = await svgToBase64Png('/logo.svg', 400) } catch {}
     try { logoW = await svgToBase64Png('/logo-header-white.svg', 600) } catch {}
+    // Override aspect ratios with known values from SVG viewBox
+    const logoRatio = 5.4545
+    const logoWRatio = 5.8824
 
     // Colors
     const N = { r: 27, g: 31, b: 75 }   // navy
@@ -1129,7 +1143,7 @@ export default function FinanceiroPage() {
     const lx = m
     if (logoW) {
       const logoHeight = 10
-      const logoWidth = logoHeight * (logoW.w / logoW.h)
+      const logoWidth = logoHeight * logoWRatio
       doc.addImage(logoW.data, 'PNG', lx, 3, logoWidth, logoHeight)
     }
     // Text shifted right +3mm to align R with p of logo
@@ -1340,7 +1354,7 @@ export default function FinanceiroPage() {
       // Logo in footer (correct proportion)
       if (logo) {
         const fH = 5
-        const fW = fH * (logo.w / logo.h)
+        const fW = fH * logoRatio
         doc.addImage(logo.data, 'PNG', m, pageH - 13, fW, fH)
       } else {
         doc.setFontSize(6.5)
