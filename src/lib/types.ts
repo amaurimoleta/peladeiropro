@@ -26,6 +26,9 @@ export interface Group {
   cover_url: string | null
   goalkeeper_pays_fee: boolean
   initial_balance: number
+  theme_color: string
+  theme_secondary_color: string
+  badge_url: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -305,4 +308,46 @@ export const FEE_STATUSES: Record<string, string> = {
   overdue: 'Atrasado',
   waived: 'Dispensado',
   dm_leave: 'Afastado (DM)',
+}
+
+export interface MatchStat {
+  id: string
+  match_id: string
+  group_id: string
+  member_id: string
+  goals: number
+  assists: number
+  created_at: string
+  member?: GroupMember
+}
+
+export interface MvpVote {
+  id: string
+  match_id: string
+  group_id: string
+  voter_id: string
+  voted_for_id: string
+  created_at: string
+  voter?: GroupMember
+  voted_for?: GroupMember
+}
+
+export interface MatchPhoto {
+  id: string
+  match_id: string
+  group_id: string
+  photo_url: string
+  uploaded_by: string | null
+  caption: string | null
+  created_at: string
+}
+
+export interface PushSubscription {
+  id: string
+  profile_id: string
+  group_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  created_at: string
 }

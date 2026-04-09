@@ -17,7 +17,7 @@ import {
   Check, Clock, AlertCircle, Zap, Stethoscope, Plus, Trash2, Pencil,
   TrendingUp, TrendingDown, DollarSign, CreditCard, Receipt, BarChart3, Minus,
   MessageCircle, Send, Image, Eye, Wallet, Users, ShieldAlert,
-  ChevronLeft, ChevronRight, CalendarDays, Banknote,
+  ChevronLeft, ChevronRight, CalendarDays, Banknote, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -1013,6 +1013,216 @@ export default function FinanceiroPage() {
     return `R$ ${value.toFixed(2)}`
   }
 
+  async function generatePDF() {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+
+    const doc = new jsPDF()
+    const navy = '#1B1F4B'
+    const green = '#00C853'
+    const monthLabel = format(currentDate, 'MMMM yyyy')
+    const groupName = group?.name || 'Grupo'
+    let y = 15
+
+    // Header
+    doc.setFontSize(20)
+    doc.setTextColor(navy)
+    doc.text('PeladeiroPro - Relatorio Financeiro', 14, y)
+    y += 8
+    doc.setFontSize(12)
+    doc.setTextColor(100)
+    doc.text(`Grupo: ${groupName}`, 14, y)
+    y += 6
+    doc.text(`Referencia: ${monthLabel}`, 14, y)
+    y += 10
+
+    // Resumo Financeiro
+    doc.setFontSize(14)
+    doc.setTextColor(navy)
+    doc.text('Resumo Financeiro', 14, y)
+    y += 2
+    doc.setDrawColor(navy)
+    doc.setLineWidth(0.5)
+    doc.line(14, y, 196, y)
+    y += 7
+
+    const totalReceitasMensalidades = displayFees.filter(f => f.status === 'paid').reduce((s, f) => s + Number(f.amount), 0)
+    const totalReceitasAvulsos = paidGuests.reduce((s, g) => s + Number(g.amount), 0)
+    const totalReceitasOutras = revenues.reduce((s: number, r: any) => s + Number(r.amount), 0)
+    const totalReceitas = totalReceitasMensalidades + totalReceitasAvulsos + totalReceitasOutras
+    const totalDespesas = expenses.reduce((s: number, e: any) => s + Number(e.amount), 0)
+    const saldo = totalReceitas - totalDespesas
+
+    doc.setFontSize(11)
+    doc.setTextColor(60)
+    doc.text(`Mensalidades pagas: R$ ${totalReceitasMensalidades.toFixed(2)}`, 14, y); y += 6
+    doc.text(`Avulsos pagos: R$ ${totalReceitasAvulsos.toFixed(2)}`, 14, y); y += 6
+    doc.text(`Outras receitas: R$ ${totalReceitasOutras.toFixed(2)}`, 14, y); y += 6
+    doc.setTextColor(green)
+    doc.text(`Receitas totais: R$ ${totalReceitas.toFixed(2)}`, 14, y); y += 6
+    doc.setTextColor(200, 0, 0)
+    doc.text(`Despesas totais: R$ ${totalDespesas.toFixed(2)}`, 14, y); y += 6
+    doc.setTextColor(saldo >= 0 ? green : '#E53935')
+    doc.setFontSize(12)
+    doc.text(`Saldo do periodo: ${saldo >= 0 ? '+' : ''}R$ ${saldo.toFixed(2)}`, 14, y)
+    y += 12
+
+    // Tabela de Mensalidades
+    doc.setFontSize(14)
+    doc.setTextColor(navy)
+    doc.text('Mensalidades', 14, y)
+    y += 2
+    doc.setDrawColor(navy)
+    doc.line(14, y, 196, y)
+    y += 2
+
+    const statusLabel: Record<string, string> = {
+      paid: 'Pago',
+      pending: 'Pendente',
+      overdue: 'Atrasado',
+      waived: 'Isento',
+      dm_leave: 'DM',
+    }
+
+    const feeRows = displayFees.map(fee => [
+      (fee.member as any)?.name || '-',
+      `R$ ${Number(fee.amount).toFixed(2)}`,
+      statusLabel[fee.status] || fee.status,
+      fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-',
+    ])
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Membro', 'Valor', 'Status', 'Data Pagamento']],
+      body: feeRows,
+      theme: 'grid',
+      headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
+      bodyStyles: { textColor: '#333333' },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column.index === 2) {
+          const val = data.cell.raw as string
+          if (val === 'Pago') {
+            data.cell.styles.textColor = '#00C853'
+            data.cell.styles.fontStyle = 'bold'
+          } else if (val === 'Atrasado') {
+            data.cell.styles.textColor = '#E53935'
+            data.cell.styles.fontStyle = 'bold'
+          } else if (val === 'Pendente') {
+            data.cell.styles.textColor = '#F9A825'
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+      },
+      margin: { left: 14, right: 14 },
+    })
+
+    y = (doc as any).lastAutoTable.finalY + 10
+
+    // Tabela de Despesas
+    if (y > 250) { doc.addPage(); y = 15 }
+    doc.setFontSize(14)
+    doc.setTextColor(navy)
+    doc.text('Despesas', 14, y)
+    y += 2
+    doc.setDrawColor(navy)
+    doc.line(14, y, 196, y)
+    y += 2
+
+    const expenseRows = expenses.map((e: any) => [
+      EXPENSE_CATEGORIES[e.category] || e.category,
+      e.description || '-',
+      `R$ ${Number(e.amount).toFixed(2)}`,
+      e.expense_date ? format(new Date(e.expense_date), 'dd/MM/yyyy') : '-',
+    ])
+
+    if (expenseRows.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [['Categoria', 'Descricao', 'Valor', 'Data']],
+        body: expenseRows,
+        theme: 'grid',
+        headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
+        bodyStyles: { textColor: '#333333' },
+        margin: { left: 14, right: 14 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 10
+    } else {
+      y += 4
+      doc.setFontSize(10)
+      doc.setTextColor(150)
+      doc.text('Nenhuma despesa registrada no periodo.', 14, y)
+      y += 10
+    }
+
+    // Tabela de Avulsos
+    if (y > 250) { doc.addPage(); y = 15 }
+    doc.setFontSize(14)
+    doc.setTextColor(navy)
+    doc.text('Jogadores Avulsos', 14, y)
+    y += 2
+    doc.setDrawColor(navy)
+    doc.line(14, y, 196, y)
+    y += 2
+
+    const guestRows = allGuests.map((g: any) => [
+      g.name || '-',
+      `R$ ${Number(g.amount).toFixed(2)}`,
+      g.paid ? 'Sim' : 'Nao',
+      g.match_date ? format(new Date(g.match_date), 'dd/MM/yyyy') : '-',
+    ])
+
+    if (guestRows.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [['Nome', 'Valor', 'Pago', 'Data']],
+        body: guestRows,
+        theme: 'grid',
+        headStyles: { fillColor: navy, textColor: '#FFFFFF', fontStyle: 'bold' },
+        bodyStyles: { textColor: '#333333' },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const val = data.cell.raw as string
+            if (val === 'Sim') {
+              data.cell.styles.textColor = '#00C853'
+              data.cell.styles.fontStyle = 'bold'
+            } else {
+              data.cell.styles.textColor = '#E53935'
+              data.cell.styles.fontStyle = 'bold'
+            }
+          }
+        },
+        margin: { left: 14, right: 14 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 10
+    } else {
+      y += 4
+      doc.setFontSize(10)
+      doc.setTextColor(150)
+      doc.text('Nenhum jogador avulso registrado no periodo.', 14, y)
+      y += 10
+    }
+
+    // Footer
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text(
+        `Gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} pelo PeladeiroPro`,
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      )
+    }
+
+    const safeGroupName = groupName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+    const month = format(currentDate, 'MM')
+    const year = format(currentDate, 'yyyy')
+    doc.save(`relatorio-${safeGroupName}-${month}-${year}.pdf`)
+    toast.success('Relatorio gerado com sucesso!')
+  }
+
   function drePercentage(value: number, total: number) {
     if (total === 0) return 0
     return Math.round((value / total) * 100)
@@ -1156,12 +1366,26 @@ export default function FinanceiroPage() {
             <h1 className="text-xl sm:text-2xl font-bold text-[#1B1F4B] dark:text-gray-100">Financeiro</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Gerencie mensalidades, despesas e acompanhe o resultado</p>
           </div>
-          {isReadOnly && (
-            <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
-              <ShieldAlert className="h-3 w-3 mr-1" />
-              Somente leitura
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generatePDF}
+                className="border-[#1B1F4B]/20 text-[#1B1F4B] hover:bg-[#1B1F4B]/5 dark:text-gray-100 dark:border-gray-600"
+              >
+                <FileText className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Gerar PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </Button>
+            )}
+            {isReadOnly && (
+              <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
+                <ShieldAlert className="h-3 w-3 mr-1" />
+                Somente leitura
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 

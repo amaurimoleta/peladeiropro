@@ -1,12 +1,14 @@
 {
-  "name": "PeladeiroPro",
+  "name": "PeladeiroPro - Gestao de Tesouraria para Peladas",
   "short_name": "PeladeiroPro",
-  "description": "Agora o seu grupo de futebol e uma SAF",
+  "description": "Gerencie mensalidades, despesas e prestacao de contas do seu grupo de futebol. Gratis para sempre.",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#1B1F4B",
   "theme_color": "#1B1F4B",
   "orientation": "portrait-primary",
+  "categories": ["sports", "finance", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -19,6 +21,20 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Financeiro",
+      "short_name": "Financeiro",
+      "url": "/dashboard/financeiro",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

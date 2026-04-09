@@ -41,6 +41,7 @@ import {
   QrCode,
   Plus,
   Minus,
+  Palette,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PIX_KEY_TYPES, MEMBER_ROLES, type Group, type GroupMember, type AuditLog } from '@/lib/types'
@@ -101,6 +102,11 @@ export default function SettingsPage() {
   const [goalkeeperPaysFee, setGoalkeeperPaysFee] = useState(true)
   const [initialBalance, setInitialBalance] = useState('')
 
+  // Theme state
+  const [themeColor, setThemeColor] = useState('#1B1F4B')
+  const [themeSecondaryColor, setThemeSecondaryColor] = useState('#00C853')
+  const [badgeUrl, setBadgeUrl] = useState('')
+
   // Members state (for admin management)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [selectedMemberId, setSelectedMemberId] = useState('')
@@ -138,6 +144,9 @@ export default function SettingsPage() {
         setPixBrcode(data.pix_brcode || '')
         setGoalkeeperPaysFee(data.goalkeeper_pays_fee ?? true)
         setInitialBalance(String(data.initial_balance ?? 0))
+        setThemeColor(data.theme_color || '#1B1F4B')
+        setThemeSecondaryColor(data.theme_secondary_color || '#00C853')
+        setBadgeUrl(data.badge_url || '')
       }
       setLoading(false)
     }
@@ -200,6 +209,9 @@ export default function SettingsPage() {
       if (goalkeeperPaysFee !== group.goalkeeper_pays_fee) changes.goalkeeper_pays_fee = { from: group.goalkeeper_pays_fee, to: goalkeeperPaysFee }
       const newInitialBalance = parseFloat(initialBalance) || 0
       if (newInitialBalance !== (group.initial_balance ?? 0)) changes.initial_balance = { from: group.initial_balance ?? 0, to: newInitialBalance }
+      if ((themeColor || null) !== (group as any).theme_color) changes.theme_color = { from: (group as any).theme_color, to: themeColor || null }
+      if ((themeSecondaryColor || null) !== (group as any).theme_secondary_color) changes.theme_secondary_color = { from: (group as any).theme_secondary_color, to: themeSecondaryColor || null }
+      if ((badgeUrl || null) !== (group as any).badge_url) changes.badge_url = { from: (group as any).badge_url, to: badgeUrl || null }
     }
 
     const { error } = await supabase.from('groups').update({
@@ -217,6 +229,9 @@ export default function SettingsPage() {
       pix_brcode: pixBrcode || null,
       goalkeeper_pays_fee: goalkeeperPaysFee,
       initial_balance: parseFloat(initialBalance) || 0,
+      theme_color: themeColor || null,
+      theme_secondary_color: themeSecondaryColor || null,
+      badge_url: badgeUrl || null,
     }).eq('id', groupId)
 
     if (error) {
@@ -240,6 +255,9 @@ export default function SettingsPage() {
         pix_brcode: pixBrcode || null,
         goalkeeper_pays_fee: goalkeeperPaysFee,
         initial_balance: parseFloat(initialBalance) || 0,
+        theme_color: themeColor || '#1B1F4B',
+        theme_secondary_color: themeSecondaryColor || '#00C853',
+        badge_url: badgeUrl || null,
       } : null)
 
       // Log audit with details of what changed
@@ -800,6 +818,146 @@ export default function SettingsPage() {
 
         {/* Despesas Recorrentes */}
         <RecurringExpenses groupId={groupId} />
+
+        {/* Tema do Grupo */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#1B1F4B] to-[#00C853] flex items-center justify-center shadow-sm">
+                <Palette className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Tema do Grupo</CardTitle>
+                <CardDescription>Personalize as cores e o escudo do grupo</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Cor Principal */}
+            <div className="space-y-2">
+              <Label>Cor Principal</Label>
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    value={themeColor}
+                    onChange={(e) => setThemeColor(e.target.value)}
+                    disabled={isReadOnly}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <div
+                    className="h-10 w-10 rounded-lg border-2 border-border shadow-sm"
+                    style={{ backgroundColor: themeColor }}
+                  />
+                </div>
+                <Input
+                  value={themeColor}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) setThemeColor(val)
+                  }}
+                  placeholder="#1B1F4B"
+                  disabled={isReadOnly}
+                  className="font-mono text-sm max-w-[140px]"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Cor Secundaria */}
+            <div className="space-y-2">
+              <Label>Cor Secundaria</Label>
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    value={themeSecondaryColor}
+                    onChange={(e) => setThemeSecondaryColor(e.target.value)}
+                    disabled={isReadOnly}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <div
+                    className="h-10 w-10 rounded-lg border-2 border-border shadow-sm"
+                    style={{ backgroundColor: themeSecondaryColor }}
+                  />
+                </div>
+                <Input
+                  value={themeSecondaryColor}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) setThemeSecondaryColor(val)
+                  }}
+                  placeholder="#00C853"
+                  disabled={isReadOnly}
+                  className="font-mono text-sm max-w-[140px]"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Escudo do Grupo */}
+            <div className="space-y-2">
+              <Label>Escudo do Grupo</Label>
+              <div className="flex items-center gap-4">
+                <ImageUpload
+                  currentUrl={badgeUrl || null}
+                  onUpload={async (url) => {
+                    setBadgeUrl(url)
+                    const { error } = await supabase.from('groups').update({ badge_url: url || null }).eq('id', groupId)
+                    if (error) {
+                      toast.error('Erro ao salvar escudo', { description: error.message })
+                    } else {
+                      toast.success('Escudo atualizado!')
+                      setGroup((prev) => prev ? { ...prev, badge_url: url || null } as any : null)
+                    }
+                  }}
+                  bucket="receipts"
+                  folder="badges"
+                  size="md"
+                  shape="rounded"
+                  label="Escudo"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Envie a imagem do escudo ou logo do grupo. Formatos aceitos: JPG, PNG, WebP.
+                </p>
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="space-y-2">
+              <Label>Preview</Label>
+              <div className="rounded-lg border overflow-hidden shadow-sm">
+                <div
+                  className="px-4 py-3 flex items-center gap-3"
+                  style={{ backgroundColor: themeColor }}
+                >
+                  {badgeUrl && (
+                    <img
+                      src={badgeUrl}
+                      alt="Escudo"
+                      className="h-8 w-8 rounded object-cover"
+                    />
+                  )}
+                  <span className="text-white font-semibold text-sm truncate">
+                    {name || 'Nome do Grupo'}
+                  </span>
+                </div>
+                <div className="px-4 py-2 bg-background flex items-center gap-2">
+                  <div
+                    className="h-2 rounded-full flex-1"
+                    style={{ backgroundColor: themeSecondaryColor }}
+                  />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: themeSecondaryColor }}
+                  >
+                    Destaque
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Danger Zone - admin only */}
         {isAdmin && (

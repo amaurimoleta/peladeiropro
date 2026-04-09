@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Plus, Trash2, Pencil, MapPin, CalendarDays, Users, Check, ChevronDown, ChevronUp,
   MessageCircle, DollarSign, Trophy, Save, Loader2, UserCheck, UserX, HelpCircle, Share2,
-  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt,
+  Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Receipt, Camera, ImagePlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, endOfMonth } from 'date-fns'
@@ -23,7 +23,7 @@ import { MonthNavigator } from '@/components/shared/month-navigator'
 import { useGroupRole } from '@/hooks/use-group-role'
 import { logAudit } from '@/lib/audit'
 import { TeamShuffle } from '@/components/dashboard/team-shuffle'
-import type { Match, GuestPlayer, GroupMember, Group, Tournament, Expense } from '@/lib/types'
+import type { Match, GuestPlayer, GroupMember, Group, Tournament, Expense, MatchPhoto } from '@/lib/types'
 import { TOURNAMENT_STATUSES, PLAYOFF_PHASES, EXPENSE_CATEGORIES } from '@/lib/types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -115,6 +115,11 @@ export default function MatchesPage() {
   // Match confirmations (RSVP)
   const [confirmationsMap, setConfirmationsMap] = useState<Record<string, any[]>>({})
   const [myMemberId, setMyMemberId] = useState<string | null>(null)
+
+  // Match photos
+  const [matchPhotos, setMatchPhotos] = useState<Record<string, MatchPhoto[]>>({})
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null)
 
   // Search, filter, sort
   const [searchTerm, setSearchTerm] = useState('')
@@ -315,16 +320,27 @@ export default function MatchesPage() {
     setExpenseSummaries((prev) => ({ ...prev, [matchId]: { total, loading: false } }))
   }, [groupId])
 
-  // When a match is expanded, load attendance and expenses
+  // Load photos for a match
+  const loadPhotos = useCallback(async (matchId: string) => {
+    const { data } = await supabase
+      .from('match_photos')
+      .select('*')
+      .eq('match_id', matchId)
+      .order('created_at', { ascending: false })
+    setMatchPhotos((prev) => ({ ...prev, [matchId]: (data || []) as MatchPhoto[] }))
+  }, [groupId])
+
+  // When a match is expanded, load attendance, expenses and photos
   useEffect(() => {
     if (expandedMatch) {
       loadAttendance(expandedMatch)
+      loadPhotos(expandedMatch)
       const match = matches.find((m) => m.id === expandedMatch)
       if (match) {
         loadExpenses(expandedMatch, match.match_date)
       }
     }
-  }, [expandedMatch, matches, loadAttendance, loadExpenses])
+  }, [expandedMatch, matches, loadAttendance, loadExpenses, loadPhotos])
 
   async function toggleAttendance(matchId: string, memberId: string) {
     const current = attendanceMap[matchId]?.[memberId]
@@ -627,6 +643,53 @@ export default function MatchesPage() {
         entityId: expenseId,
       })
       await loadExpenses(matchId, matchDate)
+    }
+  }
+
+  async function handlePhotoUpload(matchId: string, file: File) {
+    setPhotoUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const fileName = `photos/${groupId}/${matchId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+      if (uploadError) {
+        toast.error('Erro ao enviar foto', { description: uploadError.message })
+        setPhotoUploading(false)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(fileName)
+
+      const { error: insertError } = await supabase.from('match_photos').insert({
+        match_id: matchId,
+        group_id: groupId,
+        photo_url: urlData.publicUrl,
+        uploaded_by: myMemberId,
+      })
+
+      if (insertError) {
+        toast.error('Erro ao salvar foto', { description: insertError.message })
+      } else {
+        toast.success('Foto adicionada!')
+        await loadPhotos(matchId)
+      }
+    } catch (err) {
+      toast.error('Erro ao enviar foto')
+    }
+    setPhotoUploading(false)
+  }
+
+  async function handleDeletePhoto(photoId: string, matchId: string) {
+    const { error } = await supabase.from('match_photos').delete().eq('id', photoId)
+    if (error) {
+      toast.error('Erro ao remover foto', { description: error.message })
+    } else {
+      toast.success('Foto removida!')
+      await loadPhotos(matchId)
     }
   }
 
@@ -1380,6 +1443,69 @@ export default function MatchesPage() {
 
                       <Separator />
 
+                      {/* Fotos do Jogo */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                            <Camera className="h-3.5 w-3.5" />
+                            Fotos do Jogo
+                          </p>
+                          {!isReadOnly && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700"
+                              disabled={photoUploading}
+                              onClick={() => {
+                                const input = document.createElement('input')
+                                input.type = 'file'
+                                input.accept = 'image/*'
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement).files?.[0]
+                                  if (file) handlePhotoUpload(match.id, file)
+                                }
+                                input.click()
+                              }}
+                            >
+                              {photoUploading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <ImagePlus className="h-3 w-3" />
+                              )}
+                              {photoUploading ? 'Enviando...' : 'Adicionar Foto'}
+                            </Button>
+                          )}
+                        </div>
+                        {(matchPhotos[match.id] || []).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Nenhuma foto.</p>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {(matchPhotos[match.id] || []).map((photo) => (
+                              <div key={photo.id} className="relative group rounded-lg overflow-hidden bg-background border">
+                                <img
+                                  src={photo.photo_url}
+                                  alt="Foto do jogo"
+                                  className="w-full h-28 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => setViewingPhoto(photo.photo_url)}
+                                />
+                                {isAdmin && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => handleDeletePhoto(photo.id, match.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator />
+
                       {/* Rateio */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -1610,6 +1736,19 @@ export default function MatchesPage() {
               {saving ? 'Salvando...' : 'Adicionar'}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Visualizar Foto */}
+      <Dialog open={!!viewingPhoto} onOpenChange={() => setViewingPhoto(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          {viewingPhoto && (
+            <img
+              src={viewingPhoto}
+              alt="Foto do jogo"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
         </DialogContent>
       </Dialog>
 
